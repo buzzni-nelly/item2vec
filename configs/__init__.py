@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     trainer_limit_test_batches: int | float = 1.0
     trainer_strategy: str = "auto"  # deepspeed_stage_1
     trainer_precision: str = "16-mixed"
+    trainer_profiler: str = "advanced"
 
     checkpoint_dirpath: str = "checkpoints"
     checkpoint_monitor: str = "train_loss"

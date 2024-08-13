@@ -28,6 +28,7 @@ TRAINER_LIMIT_TRAIN_BATCHES = settings.trainer_limit_train_batches
 TRAINER_LIMIT_VAL_BATCHES = settings.trainer_limit_val_batches
 TRAINER_LIMIT_TEST_BATCHES = settings.trainer_limit_test_batches
 TRAINER_MAX_EPOCHS = settings.trainer_max_epochs
+TRAINER_PROFILER = settings.trainer_profiler
 
 # DataModules
 DATAMODULE_BATCH_SIZE = settings.datamodule_batch_size
@@ -79,6 +80,7 @@ def main():
             strategy=TRAINER_STRATEGY,
             precision=TRAINER_PRECISION,
             logger=WandbLogger(),
+            profiler=PROFILER,
             callbacks=[
                 ModelCheckpoint(
                     dirpath=CHECKPOINT_DIRPATH,
