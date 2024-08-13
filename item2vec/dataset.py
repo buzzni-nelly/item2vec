@@ -29,17 +29,20 @@ class SkipGramDataset(IterableDataset, ABC):
     def __iter__(self):
         random.shuffle(self.pairs_paths)
         for pair_path in self.pairs_paths:
-            with open(pair_path, "r") as pairs:
-                for pair in pairs:
-                    target, positive = json.loads(pair)
-                    negatives = random.sample(self.item_ids, self.negative_k)
-                    target = torch.LongTensor([target])
-                    samples = torch.LongTensor([positive, *negatives])
-                    labels = [1] + [0] * self.negative_k
-                    labels = torch.FloatTensor(labels)
-                    yield target, samples, labels
+            pairs = []
+            with open(pair_path, "r") as lines:
+                for pair in lines:
+                    pairs.append(json.loads(pair))
+            for target, positive in pairs:
+                negatives = random.sample(self.item_ids, self.negative_k)
+                target = torch.LongTensor([target])
+                samples = torch.LongTensor([positive, *negatives])
+                labels = [1] + [0] * self.negative_k
+                labels = torch.FloatTensor(labels)
+                yield target, samples, labels
 
     def __len__(self) -> int:
+        return 100000
         if self.size:
             print(f"Dataset size is {self.size:,}")
             return self.size
