@@ -2,3 +2,4 @@ pytorch-lightning
 wandb
 pydantic
 pydantic-settings
+orjson

@@ -1,10 +1,9 @@
 import json
-import os
 import random
 from abc import ABC
-from multiprocessing import Pool
 from pathlib import Path
 
+import orjson
 import torch
 from pytorch_lightning import LightningDataModule
 from torch.utils.data import DataLoader, IterableDataset, Dataset, ConcatDataset
@@ -67,9 +66,9 @@ class SkipGramDataset(Dataset):
 
         self.item_ids = vocab.pids()
 
-        with open(self.pairs_path, "r") as p:
-            pairs = json.load(p)
-            self.pairs = list(map(tuple, pairs))
+        with open(self.pairs_path, "rb") as p:
+            pairs = orjson.loads(p.read())
+            self.pairs = [(pair[0], pair[1]) for pair in pairs]
 
     def __len__(self) -> int:
         return len(self.pairs)
