@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     weight_decay: float = 1e-2
 
     datamodule_batch_size: int = 2**14
-    datamodule_num_workers: int = 22
+    datamodule_num_workers: int = 12
 
     trainer_max_epochs: int = 1000
     trainer_limit_val_batches: int | float = 1.0

@@ -117,6 +117,6 @@ class SkipGramDataModule(LightningDataModule):
             self.train_dataset,
             batch_size=self.batch_size,
             num_workers=self.num_workers,
-            pin_memory=True
-            # persistent_workers=True,
+            pin_memory=True,
+            shuffle=True,
         )
