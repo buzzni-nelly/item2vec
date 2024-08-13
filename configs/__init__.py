@@ -29,8 +29,8 @@ class Settings(BaseSettings):
 
     wandb_api_key: str = "7290cd5cb94c29300893438a08b4b6aa844149f3"
 
-    pairs_path: str | None = "/nelly/data/user_items_*.pairs.jsonl"
-    item_path: str | None = "/nelly/data/items.json"
+    pairs_path: str | None = "/home/work/nelly/data/user_items_*.pairs.jsonl"
+    item_path: str | None = "/home/work/nelly/data/items.json"
 
 
 settings = Settings()
