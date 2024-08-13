@@ -9,8 +9,8 @@ from pytorch_lightning.loggers import WandbLogger
 import directories
 import wandb
 from configs import settings
-from item2vec.dataset import SkipGramDataModule
-from item2vec.model import Item2VecModule
+from item2vec.datasets import SkipGramDataModule
+from item2vec.models import Item2VecModule
 
 os.environ["WANDB_API_KEY"] = settings.wandb_api_key
 
@@ -41,8 +41,8 @@ CHECKPOINT_EVERY_N_TRAIN_STEPS = settings.checkpoint_every_n_train_steps
 CKPT_PATH = settings.checkpoint_path
 
 # dataset path
-PAIRS_PATH = settings.pairs_path or directories.pairs.as_posix()
-ITEM_PATH = settings.item_path or directories.item.as_posix()
+PAIRS_PATH = directories.pairs.as_posix()
+ITEM_PATH = directories.item.as_posix()
 
 # Wandb
 WANDB_CONFIG = settings.dict()

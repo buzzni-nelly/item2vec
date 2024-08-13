@@ -106,7 +106,7 @@ class SkipGramDataModule(LightningDataModule):
             self.train_dataset = ConcatDataset(datasets)
 
     def load_datasets(self):
-        print("load datasets..")
+        print("Loading datasets..")
         with Pool() as p:
             args = zip(self.pair_paths, [self.negative_k] * len(self.pair_paths))
             return p.starmap(SkipGramDataset, args)
