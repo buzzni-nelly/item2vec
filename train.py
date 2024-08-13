@@ -20,7 +20,6 @@ EMBED_DIM = settings.embed_dim
 # Optimizers and training envs
 LR = settings.lr
 WEIGHT_DECAY = settings.weight_decay
-DROPOUT = settings.dropout
 
 # Trainers
 TRAINER_STRATEGY = settings.trainer_strategy
@@ -67,7 +66,6 @@ def main():
             embed_dim=EMBED_DIM,
             lr=LR,
             weight_decay=WEIGHT_DECAY,
-            dropout=DROPOUT,
         )
 
         wandb.init(project="item2vec", config=WANDB_CONFIG)

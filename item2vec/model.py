@@ -24,12 +24,10 @@ class Item2VecModule(pl.LightningModule):
         embed_dim: int = 128,
         lr: float = 1e-3,
         weight_decay: float = 1e-2,
-        dropout: float = 0.5,
     ):
         super(Item2VecModule, self).__init__()
         self.lr = lr
         self.weight_decay = weight_decay
-        self.dropout = dropout
         self.item2vec = Item2Vec(vocab_size, embed_dim)
         self.criterion = nn.BCEWithLogitsLoss()
 

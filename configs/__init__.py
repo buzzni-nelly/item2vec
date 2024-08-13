@@ -8,7 +8,6 @@ class Settings(BaseSettings):
 
     lr: float = 1e-3
     weight_decay: float = 1e-2
-    dropout: float = 0.2
 
     datamodule_batch_size: int = 2**10  # 2**14
     datamodule_num_workers: int = 22
