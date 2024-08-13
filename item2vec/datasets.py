@@ -107,23 +107,17 @@ class SkipGramDataModule(LightningDataModule):
             datasets = self.load_datasets()
             self.train_dataset = ConcatDataset(datasets)
 
-    def _load(self, path):
-        return SkipGramDataset(path, negative_k=self.negative_k)
-
     def load_datasets(self):
-        worker_number = os.cpu_count() // 2
-        print(f"Using {worker_number} workers")
+        datasets = []
+        total_count = 0
+        iteration = tqdm(self.pair_paths, desc="Loading datasets...")
 
-        with Pool(worker_number) as pool:
-            iteration = tqdm(
-                pool.imap(self._load, self.pair_paths),
-                total=len(self.pair_paths),
-                desc=f"Loading datasets ({worker_number}w):",
-            )
-            datasets = list(iteration)
+        for path in iteration:
+            dataset = SkipGramDataset(path, negative_k=self.negative_k)
+            total_count += len(dataset)
+            datasets.append(dataset)
+            iteration.set_postfix(total_count=total_count)
 
-        total_count = sum(len(x) for x in datasets)
-        print(f"Total items loaded: {total_count}")
         return datasets
 
     def train_dataloader(self):
