@@ -95,7 +95,7 @@ class SkipGramDataModule(LightningDataModule):
         super().__init__()
         self.train_dataset = None
         self.item_path = item_path
-        self.pair_paths = pair_paths  # [:3]
+        self.pair_paths = pair_paths
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.negative_k = negative_k
