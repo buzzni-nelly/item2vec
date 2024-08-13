@@ -50,49 +50,50 @@ WANDB_CONFIG = settings.dict()
 
 
 def main():
-    print(WANDB_CONFIG)
-    pair_paths = glob.glob(PAIRS_PATH)
-    pair_paths = list(map(Path, pair_paths))
-    item_path = Path(ITEM_PATH)
+    try:
+        pair_paths = glob.glob(PAIRS_PATH)
+        pair_paths = list(map(Path, pair_paths))
+        item_path = Path(ITEM_PATH)
 
-    data_module = SkipGramDataModule(
-        pair_paths=pair_paths,
-        item_path=item_path,
-        batch_size=DATAMODULE_BATCH_SIZE,
-        num_workers=DATAMODULE_NUM_WORKERS,
-    )
+        data_module = SkipGramDataModule(
+            pair_paths=pair_paths,
+            item_path=item_path,
+            batch_size=DATAMODULE_BATCH_SIZE,
+            num_workers=DATAMODULE_NUM_WORKERS,
+        )
 
-    item2vec = Item2VecModule(
-        vocab_size=data_module.vocab_size,
-        embed_dim=EMBED_DIM,
-        lr=LR,
-        weight_decay=WEIGHT_DECAY,
-        dropout=DROPOUT,
-    )
+        item2vec = Item2VecModule(
+            vocab_size=data_module.vocab_size,
+            embed_dim=EMBED_DIM,
+            lr=LR,
+            weight_decay=WEIGHT_DECAY,
+            dropout=DROPOUT,
+        )
 
-    wandb.init(project="item2vec", config=WANDB_CONFIG)
-    wandb.watch(item2vec, log="all", log_freq=1)
+        wandb.init(project="item2vec", config=WANDB_CONFIG)
+        wandb.watch(item2vec, log="all", log_freq=1)
 
-    trainer = Trainer(
-        limit_train_batches=TRAINER_LIMIT_TRAIN_BATCHES,
-        limit_val_batches=TRAINER_LIMIT_VAL_BATCHES,
-        limit_test_batches=TRAINER_LIMIT_TEST_BATCHES,
-        max_epochs=TRAINER_MAX_EPOCHS,
-        strategy=TRAINER_STRATEGY,
-        precision=TRAINER_PRECISION,
-        logger=WandbLogger(),
-        callbacks=[
-            ModelCheckpoint(
-                dirpath=CHECKPOINT_DIRPATH,
-                monitor=CHECKPOINT_MONITOR,
-                mode=CHECKPOINT_MODE,
-                every_n_train_steps=CHECKPOINT_EVERY_N_TRAIN_STEPS,
-                save_last=True,
-            ),
-        ],
-    )
-    trainer.fit(model=item2vec, datamodule=data_module, ckpt_path=CKPT_PATH)
-    wandb.finish()
+        trainer = Trainer(
+            limit_train_batches=TRAINER_LIMIT_TRAIN_BATCHES,
+            limit_val_batches=TRAINER_LIMIT_VAL_BATCHES,
+            limit_test_batches=TRAINER_LIMIT_TEST_BATCHES,
+            max_epochs=TRAINER_MAX_EPOCHS,
+            strategy=TRAINER_STRATEGY,
+            precision=TRAINER_PRECISION,
+            logger=WandbLogger(),
+            callbacks=[
+                ModelCheckpoint(
+                    dirpath=CHECKPOINT_DIRPATH,
+                    monitor=CHECKPOINT_MONITOR,
+                    mode=CHECKPOINT_MODE,
+                    every_n_train_steps=CHECKPOINT_EVERY_N_TRAIN_STEPS,
+                    save_last=True,
+                ),
+            ],
+        )
+        trainer.fit(model=item2vec, datamodule=data_module, ckpt_path=CKPT_PATH)
+    finally:
+        wandb.finish()
 
 
 if __name__ == "__main__":
