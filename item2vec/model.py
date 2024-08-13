@@ -41,14 +41,18 @@ class Item2VecModule(pl.LightningModule):
         focus_items, context_items, labels = batch
         scores = self.forward(focus_items, context_items)
         loss = self.criterion(scores, labels)
-        self.log("train_loss", loss)
+        self.log(
+            "train_loss", loss, on_step=True, on_epoch=True, prog_bar=True, logger=True
+        )
         return loss
 
     def validation_step(self, batch, batch_idx):
         focus_items, context_items, labels = batch
         scores = self(focus_items, context_items)
         loss = self.criterion(scores, labels)
-        self.log("val_loss", loss)
+        self.log(
+            "val_loss", loss, on_step=True, on_epoch=True, prog_bar=True, logger=True
+        )
         return loss
 
     def configure_optimizers(self):

@@ -5,7 +5,6 @@ class Settings(BaseSettings):
 
     embed_dim: int = 128
     encoder_dim: int = 128
-    K: int = 20
 
     lr: float = 1e-3
     weight_decay: float = 1e-2
