@@ -1,0 +1,9 @@
+.git
+.idea
+.venv
+.gitignore
+
+wandb
+checkpoints
+data
+csv
