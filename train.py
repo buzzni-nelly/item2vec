@@ -42,9 +42,6 @@ CHECKPOINT_EVERY_N_TRAIN_STEPS = settings.checkpoint_every_n_train_steps
 CKPT_PATH = settings.checkpoint_path
 
 # dataset path
-
-pairs_path = os.getenv("PAIRS_PATH", None)
-
 PAIRS_PATH = settings.pairs_path or directories.pairs.as_posix()
 ITEM_PATH = settings.item_path or directories.item.as_posix()
 
