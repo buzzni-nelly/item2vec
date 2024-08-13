@@ -1,24 +1,25 @@
 import pandas as pd
+from tqdm import tqdm
 
-import clients.trinox
+import clients
 import directories
 import queries
 
 dates = [
-    # ("2024-07-01", "2024-07-01"),
-    # ("2024-07-02", "2024-07-02"),
-    # ("2024-07-03", "2024-07-03"),
-    # ("2024-07-04", "2024-07-04"),
-    # ("2024-07-05", "2024-07-05"),
-    # ("2024-07-06", "2024-07-06"),
-    # ("2024-07-07", "2024-07-07"),
-    # ("2024-07-08", "2024-07-08"),
-    # ("2024-07-09", "2024-07-09"),
-    # ("2024-07-10", "2024-07-10"),
-    # ("2024-07-11", "2024-07-11"),
-    # ("2024-07-12", "2024-07-12"),
-    # ("2024-07-13", "2024-07-13"),
-    # ("2024-07-14", "2024-07-14"),
+    ("2024-07-01", "2024-07-01"),
+    ("2024-07-02", "2024-07-02"),
+    ("2024-07-03", "2024-07-03"),
+    ("2024-07-04", "2024-07-04"),
+    ("2024-07-05", "2024-07-05"),
+    ("2024-07-06", "2024-07-06"),
+    ("2024-07-07", "2024-07-07"),
+    ("2024-07-08", "2024-07-08"),
+    ("2024-07-09", "2024-07-09"),
+    ("2024-07-10", "2024-07-10"),
+    ("2024-07-11", "2024-07-11"),
+    ("2024-07-12", "2024-07-12"),
+    ("2024-07-13", "2024-07-13"),
+    ("2024-07-14", "2024-07-14"),
     ("2024-07-15", "2024-07-15"),
     ("2024-07-16", "2024-07-16"),
     ("2024-07-17", "2024-07-17"),
@@ -50,11 +51,11 @@ dates = [
     ("2024-08-12", "2024-08-12"),
 ]
 
-for start_date, end_date in dates:
+for start_date, end_date in tqdm(dates, desc="Fetching queries"):
     query = queries.query_user_items.format(start_date=start_date, end_date=end_date)
     rows, columns = clients.trinox.fetch(query=query)
 
     data = pd.DataFrame(rows, columns=columns)
     data["product_id"].astype(str)
-    save_path = f"user_items_{start_date}.csv"  # directories.data.joinpath(f"user_items_{start_date}.data").as_posix()
+    save_path = directories.data.joinpath(f"user_items_{start_date}.csv").as_posix()
     data.to_csv(save_path, index=False)

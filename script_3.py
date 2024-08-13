@@ -1,7 +1,6 @@
 import glob
 import itertools
 import json
-import os
 from pathlib import Path
 
 import pandas as pd
@@ -12,20 +11,22 @@ from item2vec import vocab
 
 WINDOW_SIZE = 5
 
-NEGATIVE_K = 5
-
 
 def build_pairs_dataset(filepath: str):
 
     mapper = vocab.load()
 
-    logs_df = pd.read_csv(filepath).dropna()
-    logs_df["product_id"] = logs_df["product_id"]
-    logs_df["pid"] = logs_df["product_id"].apply(mapper.get)
-    logs_df = logs_df.dropna()
+    logs_df = pd.read_csv(filepath)
+
+    logs_df.dropna(subset=["product_id"], inplace=True)
+    logs_df["product_id"] = logs_df["product_id"].astype(str)
+
+    logs_df["pid"] = logs_df["product_id"].map(mapper)
+
+    logs_df.dropna(subset=["pid"], inplace=True)
+    logs_df["pid"] = logs_df["pid"].astype(int)
 
     logs_df["product_id"] = logs_df["product_id"].astype(str)
-    logs_df["pid"] = logs_df["pid"].astype(int)
 
     logs_df = logs_df.sort_values(by=["uid", "time"])
     logs_df = logs_df[["uid", "pid"]]
@@ -44,20 +45,20 @@ def build_pairs_dataset(filepath: str):
             pairs = [(chunk[a], chunk[b]) for b in range(len(chunk)) if a != b]
             item_pairs.append(pairs)
 
-    item_pairs = itertools.chain.from_iterable(item_pairs)
+    item_pairs = list(itertools.chain.from_iterable(item_pairs))
 
     # save jsonl
     stem = Path(filepath).stem
-    with open(directories.data.joinpath(f"{stem}.pairs.jsonl"), "w") as pf:
-        pf.write("\n".join(map(json.dumps, item_pairs)))
+    with open(directories.data.joinpath(f"{stem}.pairs.json"), "w") as f:
+        json.dump(item_pairs, f)
 
     # remove data
-    os.remove(filepath)
+    # os.remove(filepath)
 
 
 if __name__ == "__main__":
     # log data paths
-    path = directories.data.joinpath("user_items_*.data")
+    path = directories.data.joinpath("user_items_*.csv")
     filepaths = glob.glob(path.as_posix())
     filepaths.sort()
 

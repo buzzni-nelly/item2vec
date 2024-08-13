@@ -1,17 +1,18 @@
 import json
 import random
 from abc import ABC
+from multiprocessing import Pool
 from pathlib import Path
 
 import torch
 from pytorch_lightning import LightningDataModule
-from torch.utils.data import DataLoader, IterableDataset
+from torch.utils.data import DataLoader, IterableDataset, Dataset, ConcatDataset
 from tqdm import tqdm
 
 from item2vec import vocab
 
 
-class SkipGramDataset(IterableDataset, ABC):
+class SkipGramIterableDataset(IterableDataset, ABC):
 
     size: int | None = None
 
@@ -42,7 +43,6 @@ class SkipGramDataset(IterableDataset, ABC):
                 yield target, samples, labels
 
     def __len__(self) -> int:
-        return 100000
         if self.size:
             print(f"Dataset size is {self.size:,}")
             return self.size
@@ -53,6 +53,33 @@ class SkipGramDataset(IterableDataset, ABC):
         self.size = size
         print(f"Dataset size is {self.size:,}")
         return size
+
+
+class SkipGramDataset(Dataset):
+    def __init__(
+        self,
+        pairs_path: Path,
+        negative_k: int = 9,
+    ):
+        self.negative_k = negative_k
+        self.pairs_path = pairs_path
+
+        self.item_ids = vocab.pids()
+
+        with open(self.pairs_path, "r") as p:
+            self.pairs = json.load(p)
+
+    def __len__(self) -> int:
+        return len(self.pairs)
+
+    def __getitem__(self, idx):
+        target, positive = self.pairs[idx]
+        negatives = random.sample(self.item_ids, self.negative_k)
+        target = torch.LongTensor([target])
+        samples = torch.LongTensor([positive, *negatives])
+        labels = [1] + [0] * self.negative_k
+        labels = torch.FloatTensor(labels)
+        return target, samples, labels
 
 
 class SkipGramDataModule(LightningDataModule):
@@ -75,13 +102,14 @@ class SkipGramDataModule(LightningDataModule):
 
     def setup(self, stage=None):
         if stage == "fit" or stage is None:
-            self.train_dataset = self.load_datasets()
+            datasets = self.load_datasets()
+            self.train_dataset = ConcatDataset(datasets)
 
     def load_datasets(self):
-        return SkipGramDataset(
-            pairs_paths=self.pair_paths[:],
-            negative_k=self.negative_k,
-        )
+        print("load datasets..")
+        with Pool() as p:
+            args = zip(self.pair_paths, [self.negative_k] * len(self.pair_paths))
+            return p.starmap(SkipGramDataset, args)
 
     def train_dataloader(self):
         return DataLoader(

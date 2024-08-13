@@ -1,6 +1,6 @@
 import json
 
-from configs import settings
+import directories
 
 _namespace = {}
 
@@ -8,8 +8,7 @@ _namespace = {}
 def load() -> dict:
     if "items" in _namespace:
         return _namespace["items"]
-    path = settings.item_path
-    with open(path, "r") as f:
+    with open(directories.item, "r") as f:
         _namespace["items"] = json.load(f)
     return _namespace["items"]
 
