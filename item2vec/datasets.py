@@ -95,7 +95,7 @@ class SkipGramDataModule(LightningDataModule):
         super().__init__()
         self.train_dataset = None
         self.item_path = item_path
-        self.pair_paths = pair_paths[:3]
+        self.pair_paths = pair_paths  # [:3]
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.negative_k = negative_k
@@ -108,8 +108,15 @@ class SkipGramDataModule(LightningDataModule):
 
     def load_datasets(self):
         datasets = []
-        for x in tqdm(self.pair_paths, desc="Loading datasets..."):
-            datasets.append(SkipGramDataset(x, negative_k=self.negative_k))
+        total_count = 0
+        iteration = tqdm(self.pair_paths, desc="Loading datasets...")
+
+        for path in iteration:
+            dataset = SkipGramDataset(path, negative_k=self.negative_k)
+            total_count += len(dataset)
+            datasets.append(dataset)
+            iteration.set_postfix(total_count=total_count)
+
         return datasets
 
     def train_dataloader(self):
@@ -117,6 +124,7 @@ class SkipGramDataModule(LightningDataModule):
             self.train_dataset,
             batch_size=self.batch_size,
             num_workers=self.num_workers,
+            persistent_workers=True,
             pin_memory=True,
             shuffle=True,
         )
