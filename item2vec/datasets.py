@@ -1,4 +1,5 @@
 import json
+import os
 import random
 from abc import ABC
 from multiprocessing import Pool
@@ -107,16 +108,22 @@ class SkipGramDataModule(LightningDataModule):
             self.train_dataset = ConcatDataset(datasets)
 
     def load_datasets(self):
-        datasets = []
-        total_count = 0
-        iteration = tqdm(self.pair_paths, desc="Loading datasets...")
 
-        for path in iteration:
-            dataset = SkipGramDataset(path, negative_k=self.negative_k)
-            total_count += len(dataset)
-            datasets.append(dataset)
-            iteration.set_postfix(total_count=total_count)
+        def load(path):
+            return SkipGramDataset(path, negative_k=self.negative_k)
 
+        worker_number = os.cpu_count() // 2
+        with Pool(worker_number) as pool:
+            datasets = list(
+                tqdm(
+                    pool.imap(load, self.pair_paths),
+                    total=len(self.pair_paths),
+                    desc="Loading datasets...",
+                )
+            )
+
+        total_count = sum(len(x) for x in datasets)
+        print(f"Total items loaded: {total_count}")
         return datasets
 
     def train_dataloader(self):
