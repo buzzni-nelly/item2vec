@@ -58,16 +58,17 @@ class SkipGramIterableDataset(IterableDataset, ABC):
 class SkipGramDataset(Dataset):
     def __init__(
         self,
-        pairs_path: Path,
+        pair_path: Path,
         negative_k: int = 9,
     ):
         self.negative_k = negative_k
-        self.pairs_path = pairs_path
+        self.pairs_path = pair_path
 
         self.item_ids = vocab.pids()
 
         with open(self.pairs_path, "r") as p:
-            self.pairs = json.load(p)
+            pairs = json.load(p)
+            self.pairs = list(map(tuple, pairs))
 
     def __len__(self) -> int:
         return len(self.pairs)
@@ -94,7 +95,7 @@ class SkipGramDataModule(LightningDataModule):
         super().__init__()
         self.train_dataset = None
         self.item_path = item_path
-        self.pair_paths = pair_paths
+        self.pair_paths = pair_paths[:3]
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.negative_k = negative_k
@@ -106,15 +107,16 @@ class SkipGramDataModule(LightningDataModule):
             self.train_dataset = ConcatDataset(datasets)
 
     def load_datasets(self):
-        print("Loading datasets..")
-        with Pool() as p:
-            args = zip(self.pair_paths, [self.negative_k] * len(self.pair_paths))
-            return p.starmap(SkipGramDataset, args)
+        datasets = []
+        for x in tqdm(self.pair_paths, desc="Loading datasets..."):
+            datasets.append(SkipGramDataset(x, negative_k=self.negative_k))
+        return datasets
 
     def train_dataloader(self):
         return DataLoader(
             self.train_dataset,
             batch_size=self.batch_size,
             num_workers=self.num_workers,
+            pin_memory=True
             # persistent_workers=True,
         )
