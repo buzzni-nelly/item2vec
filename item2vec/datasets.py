@@ -112,11 +112,13 @@ class SkipGramDataModule(LightningDataModule):
 
     def load_datasets(self):
         worker_number = os.cpu_count() // 2
+        print(f"Using {worker_number} workers")
+
         with Pool(worker_number) as pool:
             iteration = tqdm(
                 pool.imap(self._load, self.pair_paths),
                 total=len(self.pair_paths),
-                desc="Loading datasets...",
+                desc=f"Loading datasets ({worker_number}w):",
             )
             datasets = list(iteration)
 
