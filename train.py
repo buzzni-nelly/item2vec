@@ -53,6 +53,7 @@ WANDB_CONFIG = settings.dict()
 
 
 def main():
+    print(WANDB_CONFIG)
     pair_paths = glob.glob(PAIRS_PATH)
     pair_paths = list(map(Path, pair_paths))
     item_path = Path(ITEM_PATH)
