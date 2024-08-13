@@ -24,7 +24,7 @@ class Item2VecModule(pl.LightningModule):
         vocab_size: int,
         embed_dim: int = 128,
         lr: float = 1e-3,
-        weight_decay: float = 1e-4,
+        weight_decay: float = 1e-2,
         dropout: float = 0.5,
     ):
         super(Item2VecModule, self).__init__()

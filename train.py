@@ -2,17 +2,15 @@ import glob
 import os
 from pathlib import Path
 
-import clients
-import wandb
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
 
 import directories
+import wandb
 from configs import settings
 from item2vec.dataset import SkipGramDataModule
 from item2vec.model import Item2VecModule
-
 
 os.environ["WANDB_API_KEY"] = settings.wandb_api_key
 
@@ -34,7 +32,6 @@ TRAINER_MAX_EPOCHS = settings.trainer_max_epochs
 
 # DataModules
 DATAMODULE_BATCH_SIZE = settings.datamodule_batch_size
-DATAMODULE_K = settings.datamodule_k
 DATAMODULE_NUM_WORKERS = settings.datamodule_num_workers
 
 # Checkpoints
@@ -44,35 +41,18 @@ CHECKPOINT_MODE = settings.checkpoint_mode
 CHECKPOINT_EVERY_N_TRAIN_STEPS = settings.checkpoint_every_n_train_steps
 CKPT_PATH = settings.checkpoint_path
 
+# dataset path
+PAIRS_PATH = settings.pairs_path or directories.pairs.as_posix()
+ITEM_PATH = settings.item_path or directories.item.as_posix()
+
 # Wandb
 WANDB_CONFIG = settings.dict()
 
 
-def download_files(
-    source_path: str,
-    always: bool = False,
-):
-
-    filepath = directories.data.joinpath("user_items_*.pairs.jsonl")
-    filepath = filepath.as_posix()
-    pair_paths = list(map(Path, glob.glob(filepath)))
-
-    if always or len(pair_paths) == 0:
-        ceph = clients.ceph.CephClient()
-        destination_path = directories.data.as_posix()
-        ceph.download_dir(source_path, destination_path)
-
-
 def main():
-    download_files(
-        source_path=settings.download_source_path,
-        always=False,
-    )
-
-    filepath = directories.data.joinpath("user_items_*.pairs.jsonl")
-    filepath = filepath.as_posix()
-    pair_paths = list(map(Path, glob.glob(filepath)))
-    item_path = directories.data.joinpath("items.data")
+    pair_paths = glob.glob(PAIRS_PATH)
+    pair_paths = list(map(Path, pair_paths))
+    item_path = Path(ITEM_PATH)
 
     data_module = SkipGramDataModule(
         pair_paths=pair_paths,
@@ -106,10 +86,11 @@ def main():
                 monitor=CHECKPOINT_MONITOR,
                 mode=CHECKPOINT_MODE,
                 every_n_train_steps=CHECKPOINT_EVERY_N_TRAIN_STEPS,
+                save_last=True,
             ),
         ],
     )
-    trainer.fit(model=item2vec, datamodule=data_module)
+    trainer.fit(model=item2vec, datamodule=data_module, ckpt_path=CKPT_PATH)
     wandb.finish()
 
 

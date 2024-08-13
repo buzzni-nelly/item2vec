@@ -74,7 +74,9 @@ class S3fsS3Client:
                         os.path.join(directory_path, os.path.basename(file["name"])),
                     )
                 else:
-                    logger.warning(f"Skipping directory {file['name']} because recursive=False")
+                    logger.warning(
+                        f"Skipping directory {file['name']} because recursive=False"
+                    )
 
     def copy_file(
         self,
@@ -197,7 +199,9 @@ class S3fsS3Client:
 
     def list_buckets(self) -> List[str]:
         buckets = [
-            file["name"] for file in self.fs.ls("", detail=True) if file["type"] == "directory"
+            file["name"]
+            for file in self.fs.ls("", detail=True)
+            if file["type"] == "directory"
         ]
         return [os.path.basename(bucket) for bucket in buckets]
 
@@ -233,12 +237,16 @@ class CephClient:
     def cp(self, src: str, dst: str, force: bool = False):
         if not force:
             self._block_clobber(dst)
-        self.s3_client.copy_file(self.bucket, self._prefix(src), self.bucket, self._prefix(dst))
+        self.s3_client.copy_file(
+            self.bucket, self._prefix(src), self.bucket, self._prefix(dst)
+        )
 
     def mv(self, src: str, dst: str, force: bool = False):
         if not force:
             self._block_clobber(dst)
-        self.s3_client.copy_file(self.bucket, self._prefix(src), self.bucket, self._prefix(dst))
+        self.s3_client.copy_file(
+            self.bucket, self._prefix(src), self.bucket, self._prefix(dst)
+        )
 
     def upload_file(self, src: str, dst: str, force: bool = False):
         if not force:
