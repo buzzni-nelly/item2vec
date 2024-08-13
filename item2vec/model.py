@@ -10,7 +10,6 @@ class Item2Vec(nn.Module):
 
     def forward(self, items, samples):
         item_embeddings = self.embeddings(items)
-        item_embeddings = item_embeddings.unsqueeze(1)
         sample_embeddings = self.embeddings(samples)
         sample_embeddings = sample_embeddings.transpose(1, 2)
         scores = torch.bmm(item_embeddings, sample_embeddings)
