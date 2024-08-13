@@ -27,10 +27,10 @@ class Settings(BaseSettings):
     checkpoint_every_n_train_steps: int = 1
     checkpoint_path: str | None = "last"
 
-    wandb_api_key: str = ""
+    wandb_api_key: str = "7290cd5cb94c29300893438a08b4b6aa844149f3"
 
-    pairs_path: str | None = None
-    item_path: str | None = None
+    pairs_path: str | None = "/nelly/data/user_items_*.pairs.jsonl"
+    item_path: str | None = "/nelly/data/items.json"
 
 
 settings = Settings()
