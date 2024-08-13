@@ -11,19 +11,6 @@ from tqdm import tqdm
 from item2vec import vocab
 
 
-def collate_fn(batch):
-    pivots = [x[0] for x in batch]
-    samples = [x[1] for x in batch]
-    labels = [x[2] for x in batch]
-
-    pivots = torch.tensor(pivots)
-    samples = torch.stack([torch.tensor(x) for x in samples])
-    labels = torch.stack([torch.tensor(x) for x in labels])
-    labels = labels.float()
-
-    return pivots, samples, labels
-
-
 class SkipGramDataset(IterableDataset, ABC):
 
     size: int | None = None
@@ -46,19 +33,23 @@ class SkipGramDataset(IterableDataset, ABC):
                 for pair in pairs:
                     target, positive = json.loads(pair)
                     negatives = random.sample(self.item_ids, self.negative_k)
+                    target = torch.LongTensor([target])
+                    samples = torch.LongTensor([positive, *negatives])
                     labels = [1] + [0] * self.negative_k
-                    yield target, [positive, *negatives], labels
+                    labels = torch.FloatTensor(labels)
+                    yield target, samples, labels
 
-    def __len__(self):
+    def __len__(self) -> int:
         if self.size:
+            print(f"Dataset size is {self.size:,}")
             return self.size
-        count = 0
+        size = 0
         for pair_path in tqdm(self.pairs_paths, desc="Counting dataset size.."):
             with open(pair_path, "r") as pairs:
-                count += sum(1 for _ in pairs)
-        self.size = count
+                size += sum(1 for _ in pairs)
+        self.size = size
         print(f"Dataset size is {self.size:,}")
-        return count
+        return size
 
 
 class SkipGramDataModule(LightningDataModule):
@@ -93,6 +84,6 @@ class SkipGramDataModule(LightningDataModule):
         return DataLoader(
             self.train_dataset,
             batch_size=self.batch_size,
-            collate_fn=collate_fn,
             num_workers=self.num_workers,
+            # persistent_workers=True,
         )
