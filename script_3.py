@@ -1,6 +1,5 @@
 import glob
 import itertools
-import json
 from pathlib import Path
 
 import pandas as pd
@@ -26,8 +25,6 @@ def build_pairs_dataset(filepath: str):
     logs_df.dropna(subset=["pid"], inplace=True)
     logs_df["pid"] = logs_df["pid"].astype(int)
 
-    logs_df["product_id"] = logs_df["product_id"].astype(str)
-
     logs_df = logs_df.sort_values(by=["uid", "time"])
     logs_df = logs_df[["uid", "pid"]]
 
@@ -48,9 +45,12 @@ def build_pairs_dataset(filepath: str):
     item_pairs = list(itertools.chain.from_iterable(item_pairs))
 
     # save jsonl
+    pairs_df = pd.DataFrame(item_pairs, columns=["target", "positive"])
+
+    # Save to CSV
     stem = Path(filepath).stem
-    with open(directories.data.joinpath(f"{stem}.pairs.json"), "w") as f:
-        json.dump(item_pairs, f)
+    csv_path = directories.csv.joinpath(f"{stem}.pairs.csv")
+    pairs_df.to_csv(csv_path, index=False)
 
     # remove data
     # os.remove(filepath)
@@ -58,7 +58,7 @@ def build_pairs_dataset(filepath: str):
 
 if __name__ == "__main__":
     # log data paths
-    path = directories.data.joinpath("user_items_*.csv")
+    path = directories.csv.joinpath("user_items_*.csv")
     filepaths = glob.glob(path.as_posix())
     filepaths.sort()
 

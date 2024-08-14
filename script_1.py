@@ -19,5 +19,5 @@ items_df["pid"] = items_df["pid"].astype(int)
 items_df = items_df.dropna()
 
 print("Saving..")
-with open(directories.data.joinpath("items.json").as_posix(), "w") as f:
+with open(directories.csv.joinpath("items.json").as_posix(), "w") as f:
     json.dump(dict(zip(items_df["product_id"], items_df["pid"])), f)

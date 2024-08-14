@@ -57,5 +57,5 @@ for start_date, end_date in tqdm(dates, desc="Fetching queries"):
 
     data = pd.DataFrame(rows, columns=columns)
     data["product_id"].astype(str)
-    save_path = directories.data.joinpath(f"user_items_{start_date}.csv").as_posix()
+    save_path = directories.csv.joinpath(f"user_items_{start_date}.csv").as_posix()
     data.to_csv(save_path, index=False)

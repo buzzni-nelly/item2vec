@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     lr: float = 1e-3
     weight_decay: float = 1e-2
 
-    datamodule_batch_size: int = 2**14
+    datamodule_batch_size: int = 2**10
     datamodule_num_workers: int = 20
 
     trainer_max_epochs: int = 1000
@@ -18,12 +18,12 @@ class Settings(BaseSettings):
     trainer_limit_test_batches: int | float = 1.0
     trainer_strategy: str = "auto"  # deepspeed_stage_1
     trainer_precision: str = "16-mixed"
-    trainer_profiler: str = "advanced"
+    trainer_profiler: str = "simple"
 
     checkpoint_dirpath: str = "checkpoints"
     checkpoint_monitor: str = "train_loss"
     checkpoint_mode: str = "min"
-    checkpoint_every_n_train_steps: int = 1
+    checkpoint_every_n_train_steps: int = 100000
     checkpoint_path: str | None = "last"
 
     wandb_api_key: str = "7290cd5cb94c29300893438a08b4b6aa844149f3"

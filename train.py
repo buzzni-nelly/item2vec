@@ -74,19 +74,15 @@ def main():
 
         trainer = Trainer(
             limit_train_batches=TRAINER_LIMIT_TRAIN_BATCHES,
-            limit_val_batches=TRAINER_LIMIT_VAL_BATCHES,
-            limit_test_batches=TRAINER_LIMIT_TEST_BATCHES,
             max_epochs=TRAINER_MAX_EPOCHS,
-            strategy=TRAINER_STRATEGY,
-            precision=TRAINER_PRECISION,
             logger=WandbLogger(),
-            profiler=PROFILER,
+            profiler=TRAINER_PROFILER,
             callbacks=[
                 ModelCheckpoint(
                     dirpath=CHECKPOINT_DIRPATH,
                     monitor=CHECKPOINT_MONITOR,
                     mode=CHECKPOINT_MODE,
-                    every_n_train_steps=CHECKPOINT_EVERY_N_TRAIN_STEPS,
+                    # every_n_train_steps=CHECKPOINT_EVERY_N_TRAIN_STEPS,
                     save_last=True,
                 ),
             ],
