@@ -1,9 +1,10 @@
 import json
 import random
+import time
 from abc import ABC
 from pathlib import Path
 
-import orjson
+import pandas as pd
 import torch
 from pytorch_lightning import LightningDataModule
 from torch.utils.data import DataLoader, IterableDataset, Dataset, ConcatDataset
@@ -56,19 +57,15 @@ class SkipGramIterableDataset(IterableDataset, ABC):
 
 
 class SkipGramDataset(Dataset):
-    def __init__(
-        self,
-        pair_path: Path,
-        negative_k: int = 9,
-    ):
+    def __init__(self, pair_path: Path, negative_k: int = 9):
         self.negative_k = negative_k
-        self.pairs_path = pair_path
+        self.pair_path = pair_path
+
+        csv_path = self.pair_path.as_posix()
+        pairs_df = pd.read_csv(csv_path)
+        self.pairs = pairs_df.to_numpy()
 
         self.item_ids = vocab.pids()
-
-        with open(self.pairs_path, "rb") as p:
-            pairs = orjson.loads(p.read())
-            self.pairs = [(pair[0], pair[1]) for pair in pairs]
 
     def __len__(self) -> int:
         return len(self.pairs)
@@ -76,11 +73,10 @@ class SkipGramDataset(Dataset):
     def __getitem__(self, idx):
         target, positive = self.pairs[idx]
         negatives = random.sample(self.item_ids, self.negative_k)
-        target = torch.LongTensor([target])
-        samples = torch.LongTensor([positive, *negatives])
-        labels = [1] + [0] * self.negative_k
-        labels = torch.FloatTensor(labels)
-        return target, samples, labels
+        target_tensor = torch.LongTensor([target])
+        samples_tensor = torch.LongTensor([positive, *negatives])
+        labels_tensor = torch.FloatTensor([1] + [0] * self.negative_k)
+        return target_tensor, samples_tensor, labels_tensor
 
 
 class SkipGramDataModule(LightningDataModule):
@@ -103,8 +99,7 @@ class SkipGramDataModule(LightningDataModule):
 
     def setup(self, stage=None):
         if stage == "fit" or stage is None:
-            datasets = self.load_datasets()
-            self.train_dataset = ConcatDataset(datasets)
+            self.train_dataset = self.load_datasets()
 
     def load_datasets(self):
         datasets = []
