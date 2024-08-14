@@ -38,7 +38,7 @@ class Item2VecModule(pl.LightningModule):
         focus_items, context_items, labels = batch
         scores = self.forward(focus_items, context_items)
         loss = self.criterion(scores, labels)
-        self.log("train_loss", loss)
+        self.log("train_loss", loss, prog_bar=True, logger=True)
         return loss
 
     def configure_optimizers(self):

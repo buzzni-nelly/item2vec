@@ -33,6 +33,7 @@ TRAINER_PROFILER = settings.trainer_profiler
 # DataModules
 DATAMODULE_BATCH_SIZE = settings.datamodule_batch_size
 DATAMODULE_NUM_WORKERS = settings.datamodule_num_workers
+DATAMODULE_NEGATIVE_K = settings.datamodule_negative_k
 
 # Checkpoints
 CHECKPOINT_DIRPATH = settings.checkpoint_dirpath
@@ -60,6 +61,7 @@ def main():
             item_path=item_path,
             batch_size=DATAMODULE_BATCH_SIZE,
             num_workers=DATAMODULE_NUM_WORKERS,
+            negative_k=DATAMODULE_NEGATIVE_K,
         )
 
         item2vec = Item2VecModule(

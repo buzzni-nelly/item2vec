@@ -9,8 +9,9 @@ class Settings(BaseSettings):
     lr: float = 1e-3
     weight_decay: float = 1e-2
 
-    datamodule_batch_size: int = 2**10
+    datamodule_batch_size: int = 2**12
     datamodule_num_workers: int = 20
+    datamodule_negative_k: int = 9
 
     trainer_max_epochs: int = 1000
     trainer_limit_val_batches: int | float = 1.0
@@ -20,10 +21,10 @@ class Settings(BaseSettings):
     trainer_precision: str = "16-mixed"
     trainer_profiler: str = "simple"
 
-    checkpoint_dirpath: str = "checkpoints"
+    checkpoint_dirpath: str = "/home/work/nelly/checkpoints"
     checkpoint_monitor: str = "train_loss"
     checkpoint_mode: str = "min"
-    checkpoint_every_n_train_steps: int = 100000
+    checkpoint_every_n_train_steps: int = 10_000_000
     checkpoint_path: str | None = "last"
 
     wandb_api_key: str = "7290cd5cb94c29300893438a08b4b6aa844149f3"
