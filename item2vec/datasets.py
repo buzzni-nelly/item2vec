@@ -99,7 +99,8 @@ class SkipGramDataModule(LightningDataModule):
 
     def setup(self, stage=None):
         if stage == "fit" or stage is None:
-            self.train_dataset = self.load_datasets()
+            datasets = self.load_datasets()
+            self.train_dataset = ConcatDataset(datasets)
 
     def load_datasets(self):
         datasets = []
@@ -119,7 +120,7 @@ class SkipGramDataModule(LightningDataModule):
             self.train_dataset,
             batch_size=self.batch_size,
             num_workers=self.num_workers,
-            persistent_workers=True,
+            persistent_workers=bool(self.num_workers > 0),
             pin_memory=True,
             shuffle=True,
         )
