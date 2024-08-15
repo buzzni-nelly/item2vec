@@ -4,10 +4,9 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
 
     embed_dim: int = 128
-    encoder_dim: int = 128
 
     lr: float = 1e-3
-    weight_decay: float = 1e-2
+    weight_decay: float = 1e-3
 
     datamodule_batch_size: int = 2**12
     datamodule_num_workers: int = 20
