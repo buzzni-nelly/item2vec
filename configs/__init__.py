@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     checkpoint_dirpath: str = "/home/work/nelly/checkpoints"
     checkpoint_monitor: str = "train_loss"
     checkpoint_mode: str = "min"
-    checkpoint_every_n_train_steps: int = 10_000_000
+    checkpoint_every_n_train_steps: int = 20_000
     checkpoint_path: str | None = "last"
 
     wandb_api_key: str = "7290cd5cb94c29300893438a08b4b6aa844149f3"

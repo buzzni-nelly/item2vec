@@ -9,6 +9,7 @@ from pytorch_lightning.loggers import WandbLogger
 import directories
 import wandb
 from configs import settings
+from item2vec import vocab
 from item2vec.datasets import SkipGramDataModule
 from item2vec.models import Item2VecModule
 
@@ -59,6 +60,7 @@ def main():
         data_module = SkipGramDataModule(
             pair_paths=pair_paths,
             item_path=item_path,
+            vocab_size=vocab.size(),
             batch_size=DATAMODULE_BATCH_SIZE,
             num_workers=DATAMODULE_NUM_WORKERS,
             negative_k=DATAMODULE_NEGATIVE_K,
@@ -84,7 +86,7 @@ def main():
                     dirpath=CHECKPOINT_DIRPATH,
                     monitor=CHECKPOINT_MONITOR,
                     mode=CHECKPOINT_MODE,
-                    # every_n_train_steps=CHECKPOINT_EVERY_N_TRAIN_STEPS,
+                    every_n_train_steps=CHECKPOINT_EVERY_N_TRAIN_STEPS,
                     save_last=True,
                 ),
             ],

@@ -1,6 +1,5 @@
 import json
 import random
-import time
 from abc import ABC
 from pathlib import Path
 
@@ -84,6 +83,7 @@ class SkipGramDataModule(LightningDataModule):
         self,
         pair_paths: list[Path],
         item_path: Path,
+        vocab_size: int,
         batch_size: int = 512,
         num_workers: int = 8,
         negative_k: int = 9,
@@ -95,7 +95,7 @@ class SkipGramDataModule(LightningDataModule):
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.negative_k = negative_k
-        self.vocab_size = vocab.size()
+        self.vocab_size = vocab_size
 
     def setup(self, stage=None):
         if stage == "fit" or stage is None:
