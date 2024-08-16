@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     lr: float = 1e-3
     weight_decay: float = 1e-3
 
-    datamodule_batch_size: int = 256
+    datamodule_batch_size: int = 512
     datamodule_num_workers: int = 20
     datamodule_negative_k: int = 9
 
