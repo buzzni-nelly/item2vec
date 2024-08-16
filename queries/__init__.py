@@ -49,8 +49,7 @@ query_joined_items = """
 WITH ranked_products AS (
   SELECT
     product_id,
-    click_count,
-    DENSE_RANK() OVER (ORDER BY product_id) - 1 AS pid
+    click_count
   FROM
     (
       SELECT
@@ -70,18 +69,18 @@ WITH ranked_products AS (
     )
 )
 SELECT
-  rp.pid,
   rp.product_id,
   rp.click_count,
   ep.mall_product_name,
   ep.mall_product_category1,
   ep.mall_product_category2,
-  ep.mall_product_category3
+  ep.mall_product_category3,
+  DENSE_RANK() OVER (ORDER BY rp.product_id) - 1 AS pid
 FROM
   ranked_products rp
   LEFT JOIN iceberg_search.search_ep ep ON rp.product_id = ep.mall_product_id
 WHERE
   ep.mall_id = 'gsshop'
 ORDER BY
-  rp.pid
+  pid
 """
