@@ -41,6 +41,7 @@ CHECKPOINT_DIRPATH = settings.checkpoint_dirpath
 CHECKPOINT_MONITOR = settings.checkpoint_monitor
 CHECKPOINT_MODE = settings.checkpoint_mode
 CHECKPOINT_EVERY_N_TRAIN_STEPS = settings.checkpoint_every_n_train_steps
+CHECKPOINT_FILENAME = settings.checkpoint_filename
 CKPT_PATH = settings.checkpoint_path
 
 # dataset path
@@ -87,6 +88,7 @@ def main():
                     monitor=CHECKPOINT_MONITOR,
                     mode=CHECKPOINT_MODE,
                     every_n_train_steps=CHECKPOINT_EVERY_N_TRAIN_STEPS,
+                    filename=CHECKPOINT_FILENAME,
                     save_last=True,
                 ),
             ],
