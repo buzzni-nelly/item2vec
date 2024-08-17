@@ -3,14 +3,14 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
 
-    embed_dim: int = 256
+    embed_dim: int = 128
 
     lr: float = 1e-3
     weight_decay: float = 1e-2
 
     datamodule_batch_size: int = 2**14
     datamodule_num_workers: int = 20
-    datamodule_negative_k: int = 19
+    datamodule_negative_k: int = 9
 
     trainer_max_epochs: int = 1000
     trainer_limit_val_batches: int | float = 1.0
@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     checkpoint_monitor: str = "train_loss"
     checkpoint_filename: str = "{epoch}-{step}-{train_loss:.2f}"
     checkpoint_mode: str = "min"
-    checkpoint_every_n_train_steps: int = 20_000
+    checkpoint_every_n_train_steps: int = 10_000
     checkpoint_path: str | None = "last"
 
     wandb_api_key: str = "7290cd5cb94c29300893438a08b4b6aa844149f3"
