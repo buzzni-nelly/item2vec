@@ -14,4 +14,3 @@ def fetch(query) -> tuple:
     cur.execute(query)
     rows, columns = cur.fetchall(), [c[0] for c in cur.description]
     return rows, columns
-
