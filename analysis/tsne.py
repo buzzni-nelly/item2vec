@@ -14,7 +14,7 @@ mapper = vocab.load()
 # Item2Vec 모델 로드
 # weight decay: 0.001
 # dim_embed: 256
-model_path = "/checkpoints/v2-epoch=2-step=210000-train_loss=0.50.ckpt"
+model_path = "/Users/nelly/PycharmProjects/item2vec/checkpoints/v2-epoch=5-step=470000-train_loss=0.50.ckpt"
 vocab_size = vocab.size()
 item2vec_module = Item2VecModule.load_from_checkpoint(
     model_path, vocab_size=vocab_size, embed_dim=128

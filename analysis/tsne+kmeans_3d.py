@@ -12,7 +12,7 @@ from item2vec.models import Item2VecModule
 mapper = vocab.load()
 
 # Load Item2Vec model
-model_path = "/Users/nelly/PycharmProjects/item2vec/checkpoints/v2-epoch=5-step=470000-train_loss=0.50.ckpt"
+model_path = "/Users/nelly/PycharmProjects/item2vec/checkpoints/epoch=15-step=1250000-train_loss=0.49.ckpt"
 vocab_size = vocab.size()
 item2vec_module = Item2VecModule.load_from_checkpoint(
     model_path, vocab_size=vocab_size, embed_dim=128

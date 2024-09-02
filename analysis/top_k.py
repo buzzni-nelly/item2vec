@@ -7,7 +7,7 @@ from item2vec.models import Item2VecModule
 product_id_to_pid = vocab.load()
 pid_to_product_id = {k: v for v, k in product_id_to_pid.items()}
 
-model_path = "/Users/nelly/PycharmProjects/item2vec/checkpoints/v2-epoch=2-step=210000-train_loss=0.50.ckpt"
+model_path = "/Users/nelly/PycharmProjects/item2vec/checkpoints/epoch=15-step=1250000-train_loss=0.49.ckpt"
 vocab_size = vocab.size()
 item2vec_module = Item2VecModule.load_from_checkpoint(model_path, vocab_size=vocab_size)
 

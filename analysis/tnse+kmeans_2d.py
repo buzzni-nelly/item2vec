@@ -12,7 +12,7 @@ from item2vec.models import Item2VecModule
 mapper = vocab.load()
 
 # Item2Vec 모델 로드
-model_path = "/Users/nelly/PycharmProjects/item2vec/checkpoints/v2-epoch=5-step=470000-train_loss=0.50.ckpt"
+model_path = "/Users/nelly/PycharmProjects/item2vec/checkpoints/epoch=15-step=1250000-train_loss=0.49.ckpt"
 vocab_size = vocab.size()
 item2vec_module = Item2VecModule.load_from_checkpoint(
     model_path, vocab_size=vocab_size, embed_dim=128
@@ -50,7 +50,7 @@ tsne = TSNE(
 projections = tsne.fit_transform(features)
 
 # K-means 클러스터링 수행
-kmeans = KMeans(n_clusters=35, random_state=0).fit(projections)
+kmeans = KMeans(n_clusters=20, random_state=0).fit(projections)
 
 # 시각화를 위해 결과 데이터 프레임 생성
 result_df = pd.DataFrame(projections, columns=["x", "y"])

@@ -26,8 +26,8 @@ df["norm"] = df["pid"].apply(lambda x: norms[x].item() if x < len(norms) else No
 
 fig = px.scatter(
     df,
-    x="norm",
-    y="click_count",
+    x="click_count",
+    y="norm",
     labels={"norm": "Norm of Embeddings", "click_count": "Click Count"},
     hover_data=["pid", "mall_product_name", "click_count", "norm"],
     title="Top 20,000 Click Count vs Norm of Embeddings",

@@ -1,58 +1,13 @@
-import json
 import random
-from abc import ABC
 from pathlib import Path
 
 import pandas as pd
 import torch
 from pytorch_lightning import LightningDataModule
-from torch.utils.data import DataLoader, IterableDataset, Dataset, ConcatDataset
+from torch.utils.data import DataLoader, Dataset, ConcatDataset
 from tqdm import tqdm
 
 from item2vec import vocab
-
-
-class SkipGramIterableDataset(IterableDataset, ABC):
-
-    size: int | None = None
-
-    def __init__(
-        self,
-        pairs_paths: list[Path],
-        negative_k: int = 9,
-    ):
-        self.negative_k = negative_k
-        self.pairs_paths = pairs_paths
-        self.size = None
-
-        self.item_ids = vocab.pids()
-
-    def __iter__(self):
-        random.shuffle(self.pairs_paths)
-        for pair_path in self.pairs_paths:
-            pairs = []
-            with open(pair_path, "r") as lines:
-                for pair in lines:
-                    pairs.append(json.loads(pair))
-            for target, positive in pairs:
-                negatives = random.sample(self.item_ids, self.negative_k)
-                target = torch.LongTensor([target])
-                samples = torch.LongTensor([positive, *negatives])
-                labels = [1] + [0] * self.negative_k
-                labels = torch.FloatTensor(labels)
-                yield target, samples, labels
-
-    def __len__(self) -> int:
-        if self.size:
-            print(f"Dataset size is {self.size:,}")
-            return self.size
-        size = 0
-        for pair_path in tqdm(self.pairs_paths, desc="Counting dataset size.."):
-            with open(pair_path, "r") as pairs:
-                size += sum(1 for _ in pairs)
-        self.size = size
-        print(f"Dataset size is {self.size:,}")
-        return size
 
 
 class SkipGramDataset(Dataset):
