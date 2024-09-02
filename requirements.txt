@@ -3,3 +3,4 @@ wandb
 pydantic
 pydantic-settings
 orjson
+python-dateutil

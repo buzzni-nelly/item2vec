@@ -49,7 +49,7 @@ def build_pairs_dataset(filepath: str):
 
     # Save to CSV
     stem = Path(filepath).stem
-    csv_path = directories.csv.joinpath(f"{stem}.pairs.csv")
+    csv_path = directories.assets.joinpath(f"{stem}.pairs.csv")
     pairs_df.to_csv(csv_path, index=False)
 
     # remove data
@@ -58,7 +58,7 @@ def build_pairs_dataset(filepath: str):
 
 if __name__ == "__main__":
     # log data paths
-    path = directories.csv.joinpath("user_items_*.csv")
+    path = directories.assets.joinpath("user_items_*.csv")
     filepaths = glob.glob(path.as_posix())
     filepaths.sort()
 

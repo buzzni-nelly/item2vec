@@ -27,7 +27,7 @@ item2vec_module.freeze()
 embeddings = item2vec_module.item2vec.embeddings.weight.data
 
 # 아이템 데이터 로드
-items_path = directories.csv.joinpath("items.csv").as_posix()
+items_path = directories.assets.joinpath("items.csv").as_posix()
 df = pd.read_csv(items_path)
 df = df.sort_values(by="click_count", ascending=False)
 

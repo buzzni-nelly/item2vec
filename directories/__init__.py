@@ -4,8 +4,8 @@ from pathlib import Path
 
 project = Path(os.path.dirname(__file__)).parent
 
-csv = project.joinpath("csv")
+assets = project.joinpath("assets")
 
-pairs = csv.joinpath("user_items_*.pairs.csv")
+pairs = assets.joinpath("user_items_*.pairs.csv")
 
-item = csv.joinpath("items.json")
+item = assets.joinpath("items.json")

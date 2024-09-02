@@ -19,10 +19,10 @@ items_df["product_id"] = items_df["product_id"].astype(str)
 items_df["pid"] = items_df["pid"].astype(int)
 
 print("Saving..")
-save_path = directories.csv.joinpath("items.csv").as_posix()
+save_path = directories.assets.joinpath("items.csv").as_posix()
 items_df.to_csv(save_path, index=False)
 
-with open(directories.csv.joinpath("items.json").as_posix(), "w") as f:
+with open(directories.assets.joinpath("items.json").as_posix(), "w") as f:
     json.dump(dict(zip(items_df["product_id"], items_df["pid"])), f)
 
 print(f"Saved total: {len(items_df)}")
