@@ -12,15 +12,14 @@ WINDOW_SIZE = 5
 
 
 def build_pairs_dataset(filepath: str):
-
     mapper = vocab.load()
 
     logs_df = pd.read_csv(filepath)
 
-    logs_df.dropna(subset=["product_id"], inplace=True)
-    logs_df["product_id"] = logs_df["product_id"].astype(str)
+    logs_df.dropna(subset=["pdid"], inplace=True)
+    logs_df["pdid"] = logs_df["pdid"].astype(str)
 
-    logs_df["pid"] = logs_df["product_id"].map(mapper)
+    logs_df["pid"] = logs_df["pdid"].map(mapper)
 
     logs_df.dropna(subset=["pid"], inplace=True)
     logs_df["pid"] = logs_df["pid"].astype(int)
@@ -52,9 +51,6 @@ def build_pairs_dataset(filepath: str):
     csv_path = directories.assets.joinpath(f"{stem}.pairs.csv")
     pairs_df.to_csv(csv_path, index=False)
 
-    # remove data
-    # os.remove(filepath)
-
 
 if __name__ == "__main__":
     # log data paths
@@ -62,7 +58,5 @@ if __name__ == "__main__":
     filepaths = glob.glob(path.as_posix())
     filepaths.sort()
 
-    from multiprocessing import Pool
-
-    with Pool() as pool:
-        pool.map(build_pairs_dataset, filepaths)
+    for filepath in tqdm(filepaths):
+        build_pairs_dataset(filepath)

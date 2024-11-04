@@ -3,16 +3,16 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
 
-    embed_dim: int = 128
+    embed_dim: int = 64
 
     lr: float = 1e-3
     weight_decay: float = 1e-1
 
-    datamodule_batch_size: int = 2**12
-    datamodule_num_workers: int = 20
-    datamodule_negative_k: int = 9
+    datamodule_batch_size: int = 2**8
+    datamodule_num_workers: int = 10
+    datamodule_negative_k: int = 4
 
-    trainer_max_epochs: int = 1000
+    trainer_max_epochs: int = 3
     trainer_limit_val_batches: int | float = 1.0
     trainer_limit_train_batches: int | float = 1.0
     trainer_limit_test_batches: int | float = 1.0
@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     trainer_precision: str = "16-mixed"
     trainer_profiler: str = "simple"
 
-    checkpoint_dirpath: str = "/home/work/nelly/checkpoints"
+    checkpoint_dirpath: str = "/tmp/checkpoints"
     checkpoint_monitor: str = "train_loss"
     checkpoint_filename: str = "{epoch}-{step}-{train_loss:.2f}"
     checkpoint_mode: str = "min"

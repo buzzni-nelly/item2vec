@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 
-df = pd.read_csv("/Users/nelly/PycharmProjects/item2vec/csv/items.csv")
+df = pd.read_csv("/Users/nelly/PycharmProjects/item2vec/assets/items.csv")
 
 item_size = len(df)
 

@@ -1,28 +1,33 @@
-import json
+from datetime import timedelta
 
 import pandas as pd
+from dateutil import parser
+from tqdm import tqdm
 
-import clients.trinox
+import clients
 import directories
 import queries
 
-START_DATE = "2024-07-01"
-END_DATE = "2024-08-15"
 
-print(f"Fetching query for {START_DATE} to {END_DATE}")
-query = queries.query_joined_items.format(start_date=START_DATE, end_date=END_DATE)
-rows, columns = clients.trinox.fetch(query=query)
+start_date = "2024-07-01"
+start_date = parser.parse(start_date)
+end_date = "2024-11-03"
+end_date = parser.parse(end_date)
+current_date = start_date
 
-items_df = pd.DataFrame(rows, columns=columns)
-items_df = items_df.dropna()
-items_df["product_id"] = items_df["product_id"].astype(str)
-items_df["pid"] = items_df["pid"].astype(int)
+dates = []
+while current_date <= end_date:
+    dates.append(current_date)
+    current_date = current_date + timedelta(days=1)
 
-print("Saving..")
-save_path = directories.assets.joinpath("items.csv").as_posix()
-items_df.to_csv(save_path, index=False)
+for date in tqdm(dates, desc="Fetching queries"):
+    date_str = date.strftime("%Y-%m-%d")
+    query = queries.QUERY_USER_ITEMS.format(date=date_str)
+    rows, columns = clients.trinox.fetch(query=query)
 
-with open(directories.assets.joinpath("items.json").as_posix(), "w") as f:
-    json.dump(dict(zip(items_df["product_id"], items_df["pid"])), f)
+    df = pd.DataFrame(rows, columns=columns)
+    df["pdid"].astype(str)
+    df["pdid"] = df["pdid"].str.replace(r'\["?|"?\]', "", regex=True)
 
-print(f"Saved total: {len(items_df)}")
+    save_path = directories.assets.joinpath(f"user_items_{date_str}.csv").as_posix()
+    df.to_csv(save_path, index=False)

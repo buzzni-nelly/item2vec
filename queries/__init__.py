@@ -1,20 +1,4 @@
-query_items = """
-WITH distinct_products AS (
-    SELECT DISTINCT
-        event_info.products[1] AS product_id
-    FROM retarget.retarget_access_log
-    WHERE DATE(time) BETWEEN DATE '{start_date}' AND DATE '{end_date}'
-      AND event_info.products[1] IS NOT NULL
-      AND company_id = 'gsshop'
-)
-SELECT
-    product_id,
-    DENSE_RANK() OVER (ORDER BY product_id) - 1 AS pid
-FROM distinct_products
-ORDER BY product_id
-"""
-
-query_user_items = """
+QUERY_USER_ITEMS = """
 WITH raw_user_products AS (
     SELECT
         event_info.products[1] AS product_id,
@@ -28,25 +12,28 @@ WITH raw_user_products AS (
             url_extract_parameter(event_referrer, 'hsmoa_userid'),
             element_at(cookies, 'brtudid')[1]
         ) AS uid,
-        to_unixtime(time) AS time
+        to_unixtime(time) AS time,
+        event_type AS event
     FROM retarget.retarget_access_log
     WHERE DATE(time) = DATE '{date}'
-      AND company_id = 'gsshop'
+      AND company_id = 'aboutpet'
+      AND event_type != 'list'
+      AND event_type != 'basketview'
 )
 SELECT
-    DISTINCT u.uid AS uid,
-    u.product_id AS product_id,
-    MIN(u.time) AS time
+    u.uid AS uid,
+    ('aboutpet' || '_' || u.product_id) AS pdid,
+    u.time AS time,
+    u.event AS event
 FROM raw_user_products u
 WHERE NULLIF(u.uid, '') IS NOT NULL
   AND NULLIF(u.product_id, '') IS NOT NULL
   AND u.uid != '00000000-0000-0000-0000-000000000000'
-GROUP BY u.uid, u.product_id
 ORDER BY uid, time
 """
 
-query_joined_items = """
-WITH ranked_products AS (
+QUERY_ITEMS = """
+WITH product AS (
   SELECT
     product_id,
     click_count
@@ -61,26 +48,26 @@ WITH ranked_products AS (
         DATE(time) BETWEEN DATE '{start_date}' AND DATE '{end_date}'
         AND event_info.products [1] IS NOT NULL
         AND event_info.products [1] != ''
-        AND company_id = 'gsshop'
+        AND company_id = 'aboutpet'
       GROUP BY
         event_info.products [1]
       HAVING 
-        COUNT(*) >= 20
+        COUNT(*) >= 100
     )
 )
 SELECT
-  rp.product_id,
-  rp.click_count,
+  p.product_id,
+  p.click_count,
   ep.mall_product_name,
   ep.mall_product_category1,
   ep.mall_product_category2,
   ep.mall_product_category3,
-  DENSE_RANK() OVER (ORDER BY rp.product_id) - 1 AS pid
+  DENSE_RANK() OVER (ORDER BY p.product_id) - 1 AS pid
 FROM
-  ranked_products rp
-  LEFT JOIN iceberg_search.search_ep ep ON rp.product_id = ep.mall_product_id
+  product p
+  LEFT JOIN iceberg_search.search_ep ep ON p.product_id = ep.mall_product_id
 WHERE
-  ep.mall_id = 'gsshop'
+  ep.mall_id = 'aboutpet'
 ORDER BY
   pid
 """

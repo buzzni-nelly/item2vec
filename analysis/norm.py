@@ -5,7 +5,7 @@ from item2vec import vocab
 from item2vec.models import Item2VecModule
 import plotly.express as px
 
-df = pd.read_csv("/Users/nelly/PycharmProjects/item2vec/csv/items.csv")
+df = pd.read_csv("/Users/nelly/PycharmProjects/item2vec/assets/items.csv")
 
 df = df.sort_values(by="click_count", ascending=False).head(20000)
 
