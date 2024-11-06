@@ -56,7 +56,7 @@ def build_graph(filepath: str):
         current_category1 = row.category1
         current_category2 = row.category2
         current_index = row.Index  # Current index
-
+        current_timestamp = row.time
         collected_pids = []
 
         for prev_idx in range(current_index - 1, -1, -1):
@@ -65,6 +65,7 @@ def build_graph(filepath: str):
                 prev_row.uid == current_uid
                 and prev_row.category1 == current_category1
                 and prev_row.category2 == current_category2
+                and current_timestamp - prev_row.time > 60 * 5
             ):
                 collected_pids.append(prev_row.pid)
             else:
@@ -73,6 +74,7 @@ def build_graph(filepath: str):
         for pid in collected_pids:
             if pid != current_pid:
                 edge_indices.append((pid, current_pid))
+                # edge_indices.append((current_pid, pid))  # Add reverse edge as well
                 count += 1
 
     print(f"Total edges created: {count}")
@@ -87,8 +89,11 @@ if __name__ == "__main__":
 
     all_edge_indices = []
 
-    for filepath in tqdm(filepaths[:3]):
+    for filepath in tqdm(filepaths):
         edge_index = build_graph(filepath)
         all_edge_indices.extend(edge_index)
 
-    print(all_edge_indices)
+    all_edge_indices = list(set(all_edge_indices))
+    edge_df = pd.DataFrame(all_edge_indices, columns=["source", "target"])
+
+    edge_df.to_csv("edges.csv", index=False)

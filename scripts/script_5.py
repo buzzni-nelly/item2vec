@@ -10,7 +10,7 @@ from tqdm import tqdm
 
 import clients
 from item2vec import vocab
-from item2vec.models import Item2VecModule
+from item2vec.models import Item2VecModule, GraphItem2VecBPRModule
 
 
 class BM25:
@@ -108,16 +108,16 @@ def load_items():
     return items_dict
 
 
-def load_embeddings(embed_dim=64):
+def load_embeddings(embedding_dim=64):
     model_path = "/tmp/checkpoints/last.ckpt"
     vocab_size = vocab.size()
-    item2vec_module = Item2VecModule.load_from_checkpoint(
-        model_path, vocab_size=vocab_size, embed_dim=embed_dim
+    item2vec_module = GraphItem2VecBPRModule.load_from_checkpoint(
+        model_path, vocab_size=vocab_size, embedding_dim=embedding_dim
     )
     item2vec_module.eval()
     item2vec_module.freeze()
 
-    embeddings = item2vec_module.item2vec.embeddings.weight.data
+    embeddings = item2vec_module.get_graph_embeddings()
     return embeddings
 
 
@@ -126,7 +126,7 @@ def main(embed_dim=64, click_count_limit: int = 20, candidate_k: int = 100):
     pdid2pid = vocab.load()
     pid2pdid = {v: k for k, v in pdid2pid.items()}
 
-    embeddings = load_embeddings(embed_dim=embed_dim)
+    embeddings = load_embeddings(embedding_dim=embed_dim)
     items_dict = load_items()
     device = embeddings.device
 
@@ -134,9 +134,7 @@ def main(embed_dim=64, click_count_limit: int = 20, candidate_k: int = 100):
     embeddings[unknown_pids] = torch.zeros(embed_dim, device=device)
 
     recommendations = {}
-    for i in tqdm(
-        range(embeddings.shape[0]), desc="추천 점수를 계산 및 Redis 할당 중입니다.."
-    ):
+    for i in tqdm(range(embeddings.shape[0]), desc="추천 점수를 계산 및 Redis 할당 중입니다.."):
         if i in unknown_pids:
             continue
 
@@ -186,7 +184,7 @@ def main(embed_dim=64, click_count_limit: int = 20, candidate_k: int = 100):
             top_k_scores,
             reranked_items,
             reranked_scores,
-            show=True,
+            show=False,
         )
 
         candidate_scores = [
@@ -196,35 +194,6 @@ def main(embed_dim=64, click_count_limit: int = 20, candidate_k: int = 100):
         ]
 
         recommendations[pdid] = candidate_scores
-
-    # bm25 = BM25(items_dict)
-    # for i in tqdm(range(embeddings.shape[0]), desc="낙오 된 아이템 처리를 진행합니다.."):
-    #     if i in unknown_pids:
-    #         continue
-    #
-    #     pdid = pid2pdid[i]
-    #     query_item = items_dict[pdid]
-    #     name = query_item["name"]
-    #     category1, category2 = query_item["category1"], query_item["category2"]
-    #     click_count = query_item["click_count"]
-    #
-    #     if click_count >= click_count_limit:
-    #         continue
-    #
-    #     candidate_scores = bm25.find(name)
-    #     valid_pdids = [
-    #         c_pdid
-    #         for c_pdid, c_score, c_item in candidate_scores
-    #         if c_pdid != pdid
-    #         and c_pdid in recommendations
-    #         and c_item["category1"] == category1
-    #         and c_item["category2"] == category2
-    #         and c_item["purchase_count"] >= click_count_limit
-    #         and c_item["name"] != "UNKNOWN"
-    #     ]
-    #     if valid_pdids:
-    #         c_pdid = next(iter(valid_pdids))
-    #         recommendations[pdid] = recommendations[c_pdid]
 
     pipeline = clients.redis.aiaas_6.pipeline()
     for k, v in recommendations.items():

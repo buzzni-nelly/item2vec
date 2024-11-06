@@ -6,7 +6,7 @@ import plotly.express as px
 
 import directories
 from item2vec import vocab
-from item2vec.models import Item2VecModule
+from item2vec.models import GraphItem2VecBPRModule
 
 # vocab 모듈에서 사전 로드
 mapper = vocab.load()
@@ -16,15 +16,16 @@ mapper = vocab.load()
 # dim_embed: 256
 model_path = "/tmp/checkpoints/last.ckpt"
 vocab_size = vocab.size()
-item2vec_module = Item2VecModule.load_from_checkpoint(
-    model_path, vocab_size=vocab_size, embed_dim=64
+
+item2vec_module = GraphItem2VecBPRModule.load_from_checkpoint(
+    model_path, vocab_size=vocab_size, embedding_dim=64
 )
 
 item2vec_module.eval()
 item2vec_module.freeze()
 
 # 임베딩 가져오기
-embeddings = item2vec_module.item2vec.embeddings.weight.data
+embeddings = item2vec_module.get_graph_embeddings()
 
 # 아이템 데이터 로드
 items_path = directories.assets.joinpath("items.csv").as_posix()
