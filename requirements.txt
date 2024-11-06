@@ -4,3 +4,4 @@ pydantic
 pydantic-settings
 orjson
 python-dateutil
+rank_bm25
