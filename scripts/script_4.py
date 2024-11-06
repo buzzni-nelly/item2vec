@@ -184,7 +184,7 @@ def main(embed_dim=64, click_count_limit: int = 20, candidate_k: int = 100):
             top_k_scores,
             reranked_items,
             reranked_scores,
-            show=False,
+            show=True,
         )
 
         candidate_scores = [

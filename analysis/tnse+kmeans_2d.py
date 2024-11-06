@@ -30,7 +30,7 @@ df = pd.read_csv(items_path)
 # df = df.sort_values(by="click_count", ascending=False)
 
 # 상위 1000개의 pid 추출 및 해당 정보 포함
-top_pids = df.head(1000)
+top_pids = df.head(10000)
 
 # PyTorch 텐서로 변환
 indices = torch.LongTensor(top_pids["pid"].tolist())
@@ -55,7 +55,7 @@ kmeans = KMeans(n_clusters=20, random_state=0).fit(projections)
 # 시각화를 위해 결과 데이터 프레임 생성
 result_df = pd.DataFrame(projections, columns=["x", "y"])
 result_df["name"] = top_pids["name"].values
-result_df["category"] = top_pids["category"].values
+result_df["category"] = top_pids["category2"].values
 result_df["click_count"] = top_pids["click_count"].values
 result_df["cluster"] = kmeans.labels_
 result_df["pid"] = top_pids["pid"].values

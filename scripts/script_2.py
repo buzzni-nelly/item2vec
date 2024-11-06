@@ -74,17 +74,19 @@ if __name__ == "__main__":
     filepaths = glob.glob(path_pattern)
     filepaths.sort()
 
+    # TODO: concat 알고리즘 update 필요 for 대용량 like gsshop
     concatenated_df = load_and_concat_csvs(filepaths)
-    event_counts_df = aggregate_event_counts(concatenated_df)
+    items_df = aggregate_event_counts(concatenated_df)
 
     # Add product details (name, category) from MongoDB
-    event_counts_df = add_product_details(event_counts_df)
+    items_df = add_product_details(items_df)
 
-    event_counts_df = event_counts_df.sort_values(by="pdid").reset_index(drop=True)
+    items_df = items_df.sort_values(by="pdid").reset_index(drop=True)
     # event_counts_df = event_counts_df[event_counts_df['click_count'] >= 10]
-    event_counts_df["pid"] = pd.factorize(event_counts_df["pdid"])[0]
+    items_df = items_df[items_df["name"] != "UNKNOWN"]
+    items_df["pid"] = pd.factorize(items_df["pdid"])[0]
 
-    event_counts_df = event_counts_df[
+    items_df = items_df[
         [
             "pid",
             "pdid",
@@ -96,12 +98,12 @@ if __name__ == "__main__":
             "category3",
         ]
     ]
-    event_counts_df.to_csv(
+    items_df.to_csv(
         directories.assets.joinpath("items.csv").as_posix(),
         index=False,
         header=True,
     )
 
-    pdid_to_pid = event_counts_df.set_index("pdid")["pid"].to_dict()
+    pdid_to_pid = items_df.set_index("pdid")["pid"].to_dict()
     with open(directories.assets.joinpath("items.json").as_posix(), "w") as f:
         json.dump(pdid_to_pid, f)

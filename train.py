@@ -10,8 +10,8 @@ import directories
 import wandb
 from configs import settings
 from item2vec import vocab
-from item2vec.datasets import SkipGramDataModule
-from item2vec.models import Item2VecModule
+from item2vec.datasets import SkipGramDataModule, SkipGramBPRDataModule
+from item2vec.models import Item2VecModule, Item2VecBPRModule
 
 os.environ["WANDB_API_KEY"] = settings.wandb_api_key
 
@@ -58,7 +58,7 @@ def main():
         pair_paths = list(map(Path, pair_paths))
         item_path = Path(ITEM_PATH)
 
-        data_module = SkipGramDataModule(
+        data_module = SkipGramBPRDataModule(
             pair_paths=pair_paths,
             item_path=item_path,
             vocab_size=vocab.size(),
@@ -67,7 +67,7 @@ def main():
             negative_k=DATAMODULE_NEGATIVE_K,
         )
 
-        item2vec = Item2VecModule(
+        item2vec = Item2VecBPRModule(
             vocab_size=data_module.vocab_size,
             embed_dim=EMBED_DIM,
             lr=LR,

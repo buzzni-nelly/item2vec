@@ -10,7 +10,7 @@ class Settings(BaseSettings):
 
     datamodule_batch_size: int = 2**8
     datamodule_num_workers: int = 10
-    datamodule_negative_k: int = 4
+    datamodule_negative_k: int = 10
 
     trainer_max_epochs: int = 3
     trainer_limit_val_batches: int | float = 1.0

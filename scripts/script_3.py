@@ -27,6 +27,8 @@ def build_pairs_dataset(filepath: str):
     logs_df = logs_df.sort_values(by=["uid", "time"])
     logs_df = logs_df[["uid", "pid"]]
 
+    logs_df = logs_df[(logs_df["uid"] != logs_df["uid"].shift()) | (logs_df["pid"] != logs_df["pid"].shift())]
+
     # collect pairs by window size
     item_pairs = []
     for uid, group in tqdm(logs_df.groupby("uid")):
@@ -57,6 +59,7 @@ if __name__ == "__main__":
     path = directories.assets.joinpath("user_items_*.csv")
     filepaths = glob.glob(path.as_posix())
     filepaths.sort()
+    filepaths = [x for x in filepaths if ".pairs." not in x]
 
     for filepath in tqdm(filepaths):
         build_pairs_dataset(filepath)
