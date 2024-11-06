@@ -27,7 +27,10 @@ def build_pairs_dataset(filepath: str):
     logs_df = logs_df.sort_values(by=["uid", "time"])
     logs_df = logs_df[["uid", "pid"]]
 
-    logs_df = logs_df[(logs_df["uid"] != logs_df["uid"].shift()) | (logs_df["pid"] != logs_df["pid"].shift())]
+    logs_df = logs_df[
+        (logs_df["uid"] != logs_df["uid"].shift())
+        | (logs_df["pid"] != logs_df["pid"].shift())
+    ]
 
     # collect pairs by window size
     item_pairs = []
