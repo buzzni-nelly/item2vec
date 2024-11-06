@@ -110,13 +110,13 @@ class SkipGramBPRDataset(Dataset):
 
 class SkipGramBPRDataModule(LightningDataModule):
     def __init__(
-            self,
-            pair_paths: list[Path],
-            item_path: Path,
-            vocab_size: int,
-            batch_size: int = 512,
-            num_workers: int = 8,
-            negative_k: int = 9,
+        self,
+        pair_paths: list[Path],
+        item_path: Path,
+        vocab_size: int,
+        batch_size: int = 512,
+        num_workers: int = 8,
+        negative_k: int = 9,
     ):
         super().__init__()
         self.train_dataset = None
