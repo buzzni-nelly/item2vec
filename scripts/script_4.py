@@ -9,7 +9,7 @@ import directories
 WINDOW_SIZE = 5
 
 
-def build_graph(filepath: str):
+def build_edge_indices(filepath: str):
     df = pd.read_csv("/Users/nelly/PycharmProjects/item2vec/assets/items.csv")
     items = df.set_index("pdid").T.to_dict()
 
@@ -48,13 +48,12 @@ def build_graph(filepath: str):
 
     count = 0
     for row in logs_df.itertuples():
-        if row.event != "purchase":
+        if row.event not in ["purchase"]:
             continue
 
         current_uid = row.uid
         current_pid = row.pid
         current_category1 = row.category1
-        current_category2 = row.category2
         current_index = row.Index  # Current index
         current_timestamp = row.time
         collected_pids = []
@@ -64,12 +63,11 @@ def build_graph(filepath: str):
             if (
                 prev_row.uid == current_uid
                 and prev_row.category1 == current_category1
-                and prev_row.category2 == current_category2
-                and current_timestamp - prev_row.time > 60 * 5
+                and current_timestamp - prev_row.time > 60 * 3
             ):
                 collected_pids.append(prev_row.pid)
             else:
-                break  # Stop if conditions do not match
+                break
 
         for pid in collected_pids:
             if pid != current_pid:
@@ -90,7 +88,7 @@ if __name__ == "__main__":
     all_edge_indices = []
 
     for filepath in tqdm(filepaths):
-        edge_index = build_graph(filepath)
+        edge_index = build_edge_indices(filepath)
         all_edge_indices.extend(edge_index)
 
     all_edge_indices = list(set(all_edge_indices))

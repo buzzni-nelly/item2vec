@@ -6,7 +6,7 @@ import plotly.express as px
 
 import directories
 from item2vec import vocab
-from item2vec.models import GraphItem2VecBPRModule
+from item2vec.models import GraphBPRItem2VecModule
 
 # vocab 모듈에서 사전 로드
 mapper = vocab.load()
@@ -17,7 +17,7 @@ mapper = vocab.load()
 model_path = "/tmp/checkpoints/last.ckpt"
 vocab_size = vocab.size()
 
-item2vec_module = GraphItem2VecBPRModule.load_from_checkpoint(
+item2vec_module = GraphBPRItem2VecModule.load_from_checkpoint(
     model_path, vocab_size=vocab_size, embedding_dim=64
 )
 
@@ -47,8 +47,8 @@ features = selected_embeddings.cpu().numpy()
 tsne = TSNE(
     n_components=2,
     random_state=0,
-    perplexity=100,
-    early_exaggeration=50,
+    perplexity=30,
+    early_exaggeration=12.0,
     metric="cosine",
 )
 projections = tsne.fit_transform(features)

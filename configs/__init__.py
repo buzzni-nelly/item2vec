@@ -6,18 +6,18 @@ class Settings(BaseSettings):
     embed_dim: int = 64
 
     lr: float = 1e-3
-    weight_decay: float = 1e-1
+    weight_decay: float = 1e-2
 
     datamodule_batch_size: int = 2**8
     datamodule_num_workers: int = 10
     datamodule_negative_k: int = 10
 
-    trainer_max_epochs: int = 10
+    trainer_max_epochs: int = 15
     trainer_limit_val_batches: int | float = 1.0
     trainer_limit_train_batches: int | float = 1.0
     trainer_limit_test_batches: int | float = 1.0
     trainer_strategy: str = "auto"  # deepspeed_stage_1
-    trainer_precision: str = "16-mixed"
+    trainer_precision: str = "32-true"
     trainer_profiler: str = "simple"
 
     checkpoint_dirpath: str = "/tmp/checkpoints"

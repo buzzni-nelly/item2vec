@@ -9,9 +9,9 @@ import directories
 import queries
 
 
-start_date = "2024-07-01"
+start_date = "2024-11-03"
 start_date = parser.parse(start_date)
-end_date = "2024-11-03"
+end_date = "2024-11-07"
 end_date = parser.parse(end_date)
 current_date = start_date
 

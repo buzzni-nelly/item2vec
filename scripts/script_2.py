@@ -1,5 +1,6 @@
 import glob
 import json
+
 import pandas as pd
 
 import clients
@@ -72,6 +73,7 @@ def add_product_details(df: pd.DataFrame):
 if __name__ == "__main__":
     path_pattern = directories.assets.joinpath("user_items_*.csv").as_posix()
     filepaths = glob.glob(path_pattern)
+    filepaths = [x for x in filepaths if ".pairs." not in x]
     filepaths.sort()
 
     # TODO: concat 알고리즘 update 필요 for 대용량 like gsshop

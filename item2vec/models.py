@@ -53,7 +53,7 @@ class Item2VecModule(pl.LightningModule):
         )
 
 
-class Item2VecBPRModule(pl.LightningModule):
+class BPRItem2VecModule(pl.LightningModule):
     def __init__(
         self,
         vocab_size: int,
@@ -61,7 +61,7 @@ class Item2VecBPRModule(pl.LightningModule):
         lr: float = 1e-3,
         weight_decay: float = 1e-2,
     ):
-        super(Item2VecBPRModule, self).__init__()
+        super(BPRItem2VecModule, self).__init__()
         self.lr = lr
         self.weight_decay = weight_decay
         self.item2vec = Item2Vec(vocab_size, embedding_dim)
@@ -145,7 +145,7 @@ class GraphItem2Vec(nn.Module):
         return final_embeddings
 
 
-class GraphItem2VecBPRModule(pl.LightningModule):
+class GraphBPRItem2VecModule(pl.LightningModule):
     def __init__(
         self,
         vocab_size: int,
@@ -153,7 +153,7 @@ class GraphItem2VecBPRModule(pl.LightningModule):
         lr: float = 1e-3,
         weight_decay: float = 1e-2,
     ):
-        super(GraphItem2VecBPRModule, self).__init__()
+        super(GraphBPRItem2VecModule, self).__init__()
         self.lr = lr
         self.weight_decay = weight_decay
 
