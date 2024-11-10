@@ -72,7 +72,6 @@ def build_edge_indices(filepath: str):
         for pid in collected_pids:
             if pid != current_pid:
                 edge_indices.append((pid, current_pid))
-                # edge_indices.append((current_pid, pid))  # Add reverse edge as well
                 count += 1
 
     print(f"Total edges created: {count}")

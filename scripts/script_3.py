@@ -9,7 +9,7 @@ import directories
 from item2vec import vocab
 
 
-def build_pairs_dataset(filepath: str, window_size = 5):
+def build_pairs_dataset(filepath: str, window_size: int = 5):
     mapper = vocab.load()
 
     logs_df = pd.read_csv(filepath)
@@ -26,7 +26,8 @@ def build_pairs_dataset(filepath: str, window_size = 5):
     logs_df = logs_df[["uid", "pid", "time"]]
 
     logs_df = logs_df[
-        (logs_df["uid"] != logs_df["uid"].shift()) | (logs_df["pid"] != logs_df["pid"].shift())
+        (logs_df["uid"] != logs_df["uid"].shift())
+        | (logs_df["pid"] != logs_df["pid"].shift())
     ]
 
     # collect pairs by window size
@@ -38,8 +39,10 @@ def build_pairs_dataset(filepath: str, window_size = 5):
 
         data = list(zip(pids, timestamps))
         end = max(len(data) - window_size + 1, 1)
-        chunks = [data[x: x + window_size] for x in range(end)]
-        chunks = [list({pid: (pid, ts) for pid, ts in chunk}.values()) for chunk in chunks]
+        chunks = [data[x : x + window_size] for x in range(end)]
+        chunks = [
+            list({pid: (pid, ts) for pid, ts in chunk}.values()) for chunk in chunks
+        ]
 
         for chunk in chunks:
             if len(chunk) < 2:

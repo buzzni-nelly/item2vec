@@ -75,8 +75,12 @@ def load_embeddings(embedding_dim=64):
     return embeddings
 
 
-def cosine_topk(embeddings: torch.Tensor, target: int, pid2pdid: dict, items: dict, k=100):
-    similarities = F.cosine_similarity(embeddings[target].unsqueeze(0), embeddings, dim=1)
+def cosine_topk(
+    embeddings: torch.Tensor, target: int, pid2pdid: dict, items: dict, k=100
+):
+    similarities = F.cosine_similarity(
+        embeddings[target].unsqueeze(0), embeddings, dim=1
+    )
     top_k_values, top_k_pids = torch.topk(similarities, k)
 
     top_k_pdids = [pid2pdid[int(x)] for x in top_k_pids]
@@ -85,7 +89,9 @@ def cosine_topk(embeddings: torch.Tensor, target: int, pid2pdid: dict, items: di
     return top_k_items, top_k_pids, top_k_scores
 
 
-def dot_product_topk(embeddings: torch.Tensor, target: int, pid2pdid: dict, items: dict, k=100):
+def dot_product_topk(
+    embeddings: torch.Tensor, target: int, pid2pdid: dict, items: dict, k=100
+):
     similarities = torch.mm(embeddings[target].unsqueeze(0), embeddings.T).squeeze(0)
     top_k_values, top_k_pids = torch.topk(similarities, k)
 
@@ -95,15 +101,25 @@ def dot_product_topk(embeddings: torch.Tensor, target: int, pid2pdid: dict, item
     return top_k_items, top_k_pids, top_k_scores
 
 
-def rerank(top_k_items: list[dict], top_k_pids: torch.Tensor, top_k_scores: torch.Tensor, pid2pdid: dict, items: dict):
+def rerank(
+    top_k_items: list[dict],
+    top_k_pids: torch.Tensor,
+    top_k_scores: torch.Tensor,
+    pid2pdid: dict,
+    items: dict,
+):
     k, device = len(top_k_items), top_k_pids.device
 
     top_k_p_counts = [x["purchase_count"] for x in top_k_items]
     top_k_c_counts = [x["click_count"] for x in top_k_items]
 
     top_k_soft_values = F.softmax(top_k_scores, dim=0)
-    top_k_soft_p_values = F.softmax(torch.tensor(top_k_p_counts, device=device) / k, dim=0)
-    top_k_soft_c_values = F.softmax(torch.tensor(top_k_c_counts, device=device) / (k ** 2), dim=0)
+    top_k_soft_p_values = F.softmax(
+        torch.tensor(top_k_p_counts, device=device) / k, dim=0
+    )
+    top_k_soft_c_values = F.softmax(
+        torch.tensor(top_k_c_counts, device=device) / (k**2), dim=0
+    )
 
     combined_values = top_k_soft_values + top_k_soft_p_values + top_k_soft_c_values
     combined_values, merged_soft_indices = torch.sort(combined_values, descending=True)
@@ -128,7 +144,9 @@ def main(embed_dim=64, candidate_k: int = 100):
 
     cos_original_predictions, cos_reranked_predictions = {}, {}
     dot_original_predictions, dot_reranked_predictions = {}, {}
-    for i in tqdm(range(embeddings.shape[0]), desc="추천 점수를 계산 및 Redis 할당 중입니다.."):
+    for i in tqdm(
+        range(embeddings.shape[0]), desc="추천 점수를 계산 및 Redis 할당 중입니다.."
+    ):
         if i in unknown_pids:
             continue
 
@@ -185,16 +203,24 @@ def main(embed_dim=64, candidate_k: int = 100):
         )
 
         cos_original_predictions[pdid] = [
-            {"pdid": x["pdid"], "score": round(float(s), 4)} for x, s in zip(cos_top_k_items, cos_top_k_scores) if category1 == x["category1"]
+            {"pdid": x["pdid"], "score": round(float(s), 4)}
+            for x, s in zip(cos_top_k_items, cos_top_k_scores)
+            if category1 == x["category1"]
         ]
         cos_reranked_predictions[pdid] = [
-            {"pdid": x["pdid"], "score": round(float(s), 4)} for x, s in zip(cos_reranked_items, cos_reranked_scores) if category1 == x["category1"]
+            {"pdid": x["pdid"], "score": round(float(s), 4)}
+            for x, s in zip(cos_reranked_items, cos_reranked_scores)
+            if category1 == x["category1"]
         ]
         dot_original_predictions[pdid] = [
-            {"pdid": x["pdid"], "score": round(float(s), 4)} for x, s in zip(dot_top_k_items, dot_top_k_scores) if category1 == x["category1"]
+            {"pdid": x["pdid"], "score": round(float(s), 4)}
+            for x, s in zip(dot_top_k_items, dot_top_k_scores)
+            if category1 == x["category1"]
         ]
         dot_reranked_predictions[pdid] = [
-            {"pdid": x["pdid"], "score": round(float(s), 4)} for x, s in zip(dot_reranked_items, dot_reranked_scores) if category1 == x["category1"]
+            {"pdid": x["pdid"], "score": round(float(s), 4)}
+            for x, s in zip(dot_reranked_items, dot_reranked_scores)
+            if category1 == x["category1"]
         ]
 
     pipeline = clients.redis.aiaas_6.pipeline()
