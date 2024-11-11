@@ -14,8 +14,6 @@ def debug(
     target_item,
     top_k_items,
     top_k_scores,
-    reranked_items,
-    reranked_scores,
     show: bool = False,
 ):
     if not show:
@@ -30,19 +28,6 @@ def debug(
 
     print("=" * 20)
     for item, score in zip(top_k_items[:10], top_k_scores[:10]):
-        if target_item["category1"] != item["category1"]:
-            continue
-        print(
-            item["name"],
-            item["category1"],
-            item["category2"],
-            item["purchase_count"],
-            round(float(score), 4),
-        )
-
-    print("**" * 20)
-
-    for item, score in zip(reranked_items[:10], reranked_scores[:10]):
         if target_item["category1"] != item["category1"]:
             continue
         print(
@@ -79,9 +64,7 @@ def cosine_topk(
     embeddings: torch.Tensor, target: int, volume: Volume, k=100
 ):
     items = volume.items()
-    similarities = F.cosine_similarity(
-        embeddings[target].unsqueeze(0), embeddings, dim=1
-    )
+    similarities = F.cosine_similarity(embeddings[target].unsqueeze(0), embeddings, dim=1)
     top_k_values, top_k_pids = torch.topk(similarities, k)
 
     top_k_pdids = [volume.pid2pdid(int(x)) for x in top_k_pids]
@@ -164,8 +147,6 @@ def main(embed_dim=128, candidate_k: int = 100):
 
         debug(
             query_item,
-            cos_top_k_items,
-            cos_top_k_scores,
             cos_top_k_items,
             cos_top_k_scores,
             show=False,
