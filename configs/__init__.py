@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
 
-    embed_dim: int = 64
+    embed_dim: int = 128
 
     lr: float = 1e-3
     weight_decay: float = 1e-2

@@ -71,7 +71,8 @@ def add_product_details(df: pd.DataFrame):
 
 
 if __name__ == "__main__":
-    path_pattern = directories.assets.joinpath("user_items_*.csv").as_posix()
+    workspace_path = directories.workspace("aboutpet", "item2vec", "v1")
+    path_pattern = workspace_path.joinpath("user_items_*.csv").as_posix()
     filepaths = glob.glob(path_pattern)
     filepaths = [x for x in filepaths if ".pairs." not in x]
     filepaths.sort()
@@ -101,11 +102,11 @@ if __name__ == "__main__":
         ]
     ]
     items_df.to_csv(
-        directories.assets.joinpath("items.csv").as_posix(),
+        workspace_path.joinpath("items.csv").as_posix(),
         index=False,
         header=True,
     )
 
     pdid_to_pid = items_df.set_index("pdid")["pid"].to_dict()
-    with open(directories.assets.joinpath("items.json").as_posix(), "w") as f:
+    with open(workspace_path.joinpath("items.json").as_posix(), "w") as f:
         json.dump(pdid_to_pid, f)

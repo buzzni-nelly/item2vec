@@ -1,17 +1,14 @@
-import glob
 import os
-from pathlib import Path
 
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
 
-import directories
 import wandb
 from configs import settings
-from item2vec import vocab
 from item2vec.datasets import SkipGramBPRDataModule
 from item2vec.models import GraphBPRItem2VecModule
+from item2vec.volume import Volume
 
 os.environ["WANDB_API_KEY"] = settings.wandb_api_key
 
@@ -44,24 +41,16 @@ CHECKPOINT_EVERY_N_TRAIN_STEPS = settings.checkpoint_every_n_train_steps
 CHECKPOINT_FILENAME = settings.checkpoint_filename
 CKPT_PATH = settings.checkpoint_path
 
-# dataset path
-PAIRS_PATH = directories.pairs.as_posix()
-ITEM_PATH = directories.item.as_posix()
-
 # Wandb
 WANDB_CONFIG = settings.dict()
 
 
 def main():
     try:
-        pair_paths = glob.glob(PAIRS_PATH)
-        pair_paths = list(map(Path, pair_paths))
-        item_path = Path(ITEM_PATH)
+        volume = Volume(site="aboutpet", model="item2vec", version="v1")
 
         data_module = SkipGramBPRDataModule(
-            pair_paths=pair_paths,
-            item_path=item_path,
-            vocab_size=vocab.size(),
+            volume=volume,
             batch_size=DATAMODULE_BATCH_SIZE,
             num_workers=DATAMODULE_NUM_WORKERS,
             negative_k=DATAMODULE_NEGATIVE_K,

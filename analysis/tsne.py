@@ -1,24 +1,16 @@
 import pandas as pd
-
+import plotly.express as px
 import torch
 from sklearn.manifold import TSNE
-import plotly.express as px
 
-import directories
-from item2vec import vocab
 from item2vec.models import GraphBPRItem2VecModule
+from item2vec.volume import Volume
 
-# vocab 모듈에서 사전 로드
-mapper = vocab.load()
-
-# Item2Vec 모델 로드
-# weight decay: 0.001
-# dim_embed: 256
 model_path = "/tmp/checkpoints/last.ckpt"
-vocab_size = vocab.size()
+volume = Volume("aboutpet", "item2vec", "v1")
 
 item2vec_module = GraphBPRItem2VecModule.load_from_checkpoint(
-    model_path, vocab_size=vocab_size, embedding_dim=64
+    model_path, vocab_size=volume.vocab_size(), embedding_dim=128
 )
 
 item2vec_module.eval()
@@ -28,8 +20,8 @@ item2vec_module.freeze()
 embeddings = item2vec_module.get_graph_embeddings()
 
 # 아이템 데이터 로드
-items_path = directories.assets.joinpath("items.csv").as_posix()
-df = pd.read_csv(items_path)
+items = volume.items().values()
+df = pd.DataFrame(items)
 df = df[df["category1"] != "UNKNOWN"]
 df = df.sort_values(by="click_count", ascending=False)
 
@@ -57,7 +49,7 @@ projections = tsne.fit_transform(features)
 result_df = pd.DataFrame(projections, columns=["x", "y"])
 result_df["name"] = top_pids["name"].values
 result_df["category1"] = top_pids["category1"].values
-result_df["category2"] = top_pids["category2"].values
+result_df["category3"] = top_pids["category3"].values
 result_df["click_count"] = top_pids["click_count"].values
 
 # 시각화
@@ -65,8 +57,12 @@ fig = px.scatter(
     result_df,
     x="x",
     y="y",
-    color="category2",
-    hover_data=["name", "category1", "category2", "click_count"],
+    color="category3",
+    hover_data=["name", "category1", "category3", "click_count"],
 )
 fig.update_traces(marker_size=8)
 fig.show()
+
+# 오늘 중으로 poc 준비 끗
+# reranker issue
+# 

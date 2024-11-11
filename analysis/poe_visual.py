@@ -3,13 +3,11 @@ import seaborn as sns
 
 from item2vec.formers import PositionalEncoding
 
-# 인코딩을 초기화하고 데이터를 가져옵니다.
 embed_dim = 128
 max_len = 50
 pos_encoding = PositionalEncoding(embed_dim=embed_dim, max_len=max_len, scale=100)
 positional_encoding_data = pos_encoding.pe[0, :].cpu().numpy()
 
-# 히트맵 시각화
 plt.figure(figsize=(12, 6))
 sns.heatmap(positional_encoding_data, cmap="viridis", cbar=True)
 plt.title("Positional Encoding Heatmap")

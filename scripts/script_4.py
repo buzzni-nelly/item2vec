@@ -10,7 +10,8 @@ WINDOW_SIZE = 5
 
 
 def build_edge_indices(filepath: str):
-    df = pd.read_csv("/Users/nelly/PycharmProjects/item2vec/assets/items.csv")
+    items_csv_path = directories.workspace("aboutpet", "item2vec", "v1").joinpath("items.csv")
+    df = pd.read_csv(items_csv_path.as_posix())
     items = df.set_index("pdid").T.to_dict()
 
     logs_df = pd.read_csv(filepath)
@@ -54,7 +55,7 @@ def build_edge_indices(filepath: str):
         current_uid = row.uid
         current_pid = row.pid
         current_category1 = row.category1
-        current_index = row.Index  # Current index
+        current_index = row.Index
         current_timestamp = row.time
         collected_pids = []
 
@@ -63,7 +64,7 @@ def build_edge_indices(filepath: str):
             if (
                 prev_row.uid == current_uid
                 and prev_row.category1 == current_category1
-                and current_timestamp - prev_row.time > 60 * 3
+                and current_timestamp - prev_row.time < 60 * 3
             ):
                 collected_pids.append(prev_row.pid)
             else:
@@ -79,7 +80,7 @@ def build_edge_indices(filepath: str):
 
 
 if __name__ == "__main__":
-    path = directories.assets.joinpath("user_items_*.csv")
+    path = directories.workspace("aboutpet", "item2vec", "v1").joinpath("user_items_*.csv")
     filepaths = glob.glob(path.as_posix())
     filepaths.sort()
     filepaths = [x for x in filepaths if ".pairs." not in x]
@@ -91,6 +92,7 @@ if __name__ == "__main__":
         all_edge_indices.extend(edge_index)
 
     all_edge_indices = list(set(all_edge_indices))
+    print(len(all_edge_indices))
     edge_df = pd.DataFrame(all_edge_indices, columns=["source", "target"])
 
     edge_df.to_csv("edges.csv", index=False)

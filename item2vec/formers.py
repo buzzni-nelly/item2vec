@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from click.core import batch
 from transformers import BertModel, BertConfig
 
 from item2vec.models import GraphItem2Vec
@@ -70,8 +69,8 @@ class BERT4Rec(nn.Module):
             encoder_layer, num_layers=num_layers
         )
 
-        self.projection = nn.Linear(embed_dim, embed_dim)
-        self.output_layer = nn.Linear(embed_dim, vocab_size)
+        self.projection = nn.Linear(embed_dim, embed_dim // 2)
+        self.output_layer = nn.Linear(embed_dim // 2, 1)
 
         self.dropout = nn.Dropout(dropout)
 

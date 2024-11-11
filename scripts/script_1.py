@@ -9,9 +9,9 @@ import directories
 import queries
 
 
-start_date = "2024-11-03"
+start_date = "2024-11-07"
 start_date = parser.parse(start_date)
-end_date = "2024-11-07"
+end_date = "2024-11-10"
 end_date = parser.parse(end_date)
 current_date = start_date
 
@@ -29,5 +29,14 @@ for date in tqdm(dates, desc="Fetching queries"):
     df["pdid"].astype(str)
     df["pdid"] = df["pdid"].str.replace(r'\["?|"?\]', "", regex=True)
 
-    save_path = directories.assets.joinpath(f"user_items_{date_str}.csv").as_posix()
+    df["uid"].astype(str)
+    df.dropna(inplace=True)
+
+    df = df.sort_values(by=["uid", "time"])
+    df = df[["uid", "pdid", "time", "event"]]
+
+    df = df[(df["uid"] != df["uid"].shift()) | (df["pdid"] != df["pdid"].shift())]
+
+    workspace_path = directories.workspace("aboutpet", "item2vec", "v1")
+    save_path = workspace_path.joinpath(f"user_items_{date_str}.csv").as_posix()
     df.to_csv(save_path, index=False)

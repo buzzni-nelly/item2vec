@@ -6,8 +6,8 @@ import torch.nn.functional as F
 from tqdm import tqdm
 
 import clients
-from item2vec import vocab
 from item2vec.models import GraphBPRItem2VecModule
+from item2vec.volume import Volume
 
 
 def debug(
@@ -62,9 +62,9 @@ def load_items():
     return items_dict
 
 
-def load_embeddings(embedding_dim=64):
+def load_embeddings(volume: Volume, embedding_dim: int = 128):
     model_path = "/tmp/checkpoints/last.ckpt"
-    vocab_size = vocab.size()
+    vocab_size = volume.vocab_size()
     item2vec_module = GraphBPRItem2VecModule.load_from_checkpoint(
         model_path, vocab_size=vocab_size, embedding_dim=embedding_dim
     )
@@ -76,26 +76,27 @@ def load_embeddings(embedding_dim=64):
 
 
 def cosine_topk(
-    embeddings: torch.Tensor, target: int, pid2pdid: dict, items: dict, k=100
+    embeddings: torch.Tensor, target: int, volume: Volume, k=100
 ):
+    items = volume.items()
     similarities = F.cosine_similarity(
         embeddings[target].unsqueeze(0), embeddings, dim=1
     )
     top_k_values, top_k_pids = torch.topk(similarities, k)
 
-    top_k_pdids = [pid2pdid[int(x)] for x in top_k_pids]
+    top_k_pdids = [volume.pid2pdid(int(x)) for x in top_k_pids]
     top_k_items = [items[pdid] for pdid in top_k_pdids]
     top_k_scores = top_k_values
     return top_k_items, top_k_pids, top_k_scores
 
 
 def dot_product_topk(
-    embeddings: torch.Tensor, target: int, pid2pdid: dict, items: dict, k=100
+    embeddings: torch.Tensor, target: int, volume: Volume, items: dict, k=100
 ):
     similarities = torch.mm(embeddings[target].unsqueeze(0), embeddings.T).squeeze(0)
     top_k_values, top_k_pids = torch.topk(similarities, k)
 
-    top_k_pdids = [pid2pdid[int(x)] for x in top_k_pids]
+    top_k_pdids = [volume.pid2pdid(int(x)) for x in top_k_pids]
     top_k_items = [items[pdid] for pdid in top_k_pdids]
     top_k_scores = top_k_values
     return top_k_items, top_k_pids, top_k_scores
@@ -131,74 +132,42 @@ def rerank(
     return reranked_items, reranked_scores
 
 
-def main(embed_dim=64, candidate_k: int = 100):
+def main(embed_dim=128, candidate_k: int = 100):
     # Load vocabulary and model
-    pdid2pid = vocab.load()
-    pid2pdid = {v: k for k, v in pdid2pid.items()}
 
-    embeddings = load_embeddings(embedding_dim=embed_dim)
-    items_dict = load_items()
+    volume = Volume(site="aboutpet", model="item2vec", version="v1")
 
-    unknown_pids = [x["pid"] for x in items_dict.values() if x["name"] == "UNKNOWN"]
+    embeddings = load_embeddings(volume, embedding_dim=embed_dim)
+    items = volume.items()
+
+    unknown_pids = [x["pid"] for x in items.values() if x["name"] == "UNKNOWN"]
     embeddings[unknown_pids] = torch.zeros(embed_dim, device=embeddings.device)
 
     cos_original_predictions, cos_reranked_predictions = {}, {}
-    dot_original_predictions, dot_reranked_predictions = {}, {}
-    for i in tqdm(
+    for pid in tqdm(
         range(embeddings.shape[0]), desc="추천 점수를 계산 및 Redis 할당 중입니다.."
     ):
-        if i in unknown_pids:
+        if pid in unknown_pids:
             continue
 
-        pdid = pid2pdid[i]
-        query_item = items_dict[pdid]
+        pdid = volume.pid2pdid(pid)
+        query_item = items[pdid]
         category1, category2 = query_item["category1"], query_item["category2"]
         k = candidate_k
 
         cos_top_k_items, cos_top_k_pids, cos_top_k_scores = cosine_topk(
             embeddings=embeddings,
-            target=i,
-            pid2pdid=pid2pdid,
-            items=items_dict,
+            target=pid,
+            volume=volume,
             k=k,
-        )
-        cos_reranked_items, cos_reranked_scores = rerank(
-            top_k_items=cos_top_k_items,
-            top_k_pids=cos_top_k_pids,
-            top_k_scores=cos_top_k_scores,
-            pid2pdid=pid2pdid,
-            items=items_dict,
-        )
-
-        dot_top_k_items, dot_top_k_pids, dot_top_k_scores = dot_product_topk(
-            embeddings=embeddings,
-            target=i,
-            pid2pdid=pid2pdid,
-            items=items_dict,
-            k=k,
-        )
-        dot_reranked_items, dot_reranked_scores = rerank(
-            top_k_items=dot_top_k_items,
-            top_k_pids=dot_top_k_pids,
-            top_k_scores=dot_top_k_scores,
-            pid2pdid=pid2pdid,
-            items=items_dict,
         )
 
         debug(
             query_item,
             cos_top_k_items,
             cos_top_k_scores,
-            cos_reranked_items,
-            cos_reranked_scores,
-            show=False,
-        )
-        debug(
-            query_item,
-            dot_top_k_items,
-            dot_top_k_scores,
-            dot_reranked_items,
-            dot_reranked_scores,
+            cos_top_k_items,
+            cos_top_k_scores,
             show=False,
         )
 
@@ -207,40 +176,10 @@ def main(embed_dim=64, candidate_k: int = 100):
             for x, s in zip(cos_top_k_items, cos_top_k_scores)
             if category1 == x["category1"]
         ]
-        cos_reranked_predictions[pdid] = [
-            {"pdid": x["pdid"], "score": round(float(s), 4)}
-            for x, s in zip(cos_reranked_items, cos_reranked_scores)
-            if category1 == x["category1"]
-        ]
-        dot_original_predictions[pdid] = [
-            {"pdid": x["pdid"], "score": round(float(s), 4)}
-            for x, s in zip(dot_top_k_items, dot_top_k_scores)
-            if category1 == x["category1"]
-        ]
-        dot_reranked_predictions[pdid] = [
-            {"pdid": x["pdid"], "score": round(float(s), 4)}
-            for x, s in zip(dot_reranked_items, dot_reranked_scores)
-            if category1 == x["category1"]
-        ]
 
     pipeline = clients.redis.aiaas_6.pipeline()
     for k, v in cos_original_predictions.items():
-        key = f"i2i:aboutpet:i2v:v1:{k}"
-        pipeline.set(key, json.dumps(v))
-        pipeline.expire(key, 30 * 24 * 60 * 60)
-
-    for k, v in cos_reranked_predictions.items():
         key = f"i2i:aboutpet:i2v:v2:{k}"
-        pipeline.set(key, json.dumps(v))
-        pipeline.expire(key, 30 * 24 * 60 * 60)
-
-    for k, v in dot_original_predictions.items():
-        key = f"i2i:aboutpet:i2v:v3:{k}"
-        pipeline.set(key, json.dumps(v))
-        pipeline.expire(key, 30 * 24 * 60 * 60)
-
-    for k, v in dot_reranked_predictions.items():
-        key = f"i2i:aboutpet:i2v:v4:{k}"
         pipeline.set(key, json.dumps(v))
         pipeline.expire(key, 30 * 24 * 60 * 60)
 

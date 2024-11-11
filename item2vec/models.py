@@ -2,6 +2,7 @@ import pandas as pd
 import pytorch_lightning as pl
 import torch
 from torch import nn, optim
+from torch.optim import Optimizer
 from torch_geometric.nn import MessagePassing
 from torch_geometric.utils import add_self_loops, degree
 
@@ -93,14 +94,14 @@ class LightGCNConv(MessagePassing):
     def __init__(self):
         super(LightGCNConv, self).__init__(aggr="mean")  # 평균 집계 방식
 
-    def forward(self, x, edge_index):
+    def forward(self, x, edge_index) -> torch.Tensor:
         edge_index, _ = add_self_loops(edge_index, num_nodes=x.size(0))
         deg = degree(edge_index[0], x.size(0), dtype=x.dtype)
         deg_inv_sqrt = deg.pow(-0.5)
         norm = deg_inv_sqrt[edge_index[0]] * deg_inv_sqrt[edge_index[1]]
         return self.propagate(edge_index, x=x, norm=norm)
 
-    def message(self, x_j, norm):
+    def message(self, x_j, norm) -> torch.Tensor:
         return norm.view(-1, 1) * x_j
 
 
@@ -123,7 +124,7 @@ class GraphItem2Vec(nn.Module):
 
         self.convs = nn.ModuleList([LightGCNConv() for _ in range(num_layers)])
 
-    def forward(self, items, samples):
+    def forward(self, items, samples) -> torch.Tensor:
         embeddings = self.get_graph_embeddings()
         item_embeddings = embeddings[items]
         sample_embeddings = embeddings[samples]
@@ -133,7 +134,7 @@ class GraphItem2Vec(nn.Module):
         scores = scores.squeeze(1)
         return scores
 
-    def get_graph_embeddings(self):
+    def get_graph_embeddings(self) -> torch.Tensor:
         x = self.embeddings.weight
 
         all_embeddings = [x]
@@ -157,7 +158,7 @@ class GraphBPRItem2VecModule(pl.LightningModule):
         self.lr = lr
         self.weight_decay = weight_decay
 
-        edge_df = pd.read_csv("/Users/nelly/PycharmProjects/item2vec/edges.csv")
+        edge_df = pd.read_csv("/Users/nelly/PycharmProjects/item2vec/workspaces/aboutpet/item2vec/v1/edge.indices.csv")
         edge_index = torch.tensor(
             [edge_df["source"].values, edge_df["target"].values], dtype=torch.long
         )
@@ -166,15 +167,15 @@ class GraphBPRItem2VecModule(pl.LightningModule):
             vocab_size, edge_index, embedding_dim=embedding_dim
         )
 
-    def forward(self, focus_items, positive_items, negative_items):
+    def forward(self, focus_items, positive_items, negative_items) -> tuple[torch.Tensor, torch.Tensor]:
         pos_scores = self.item2vec(focus_items, positive_items)
         neg_scores = self.item2vec(focus_items, negative_items)
         return pos_scores, neg_scores
 
-    def bpr_loss(self, pos_scores, neg_scores):
+    def bpr_loss(self, pos_scores, neg_scores) -> torch.Tensor:
         return -torch.mean(torch.log(torch.sigmoid(pos_scores - neg_scores)))
 
-    def training_step(self, batch, batch_idx):
+    def training_step(self, batch, batch_idx) -> torch.Tensor:
         focus_items, positive_items, negative_items = batch
         pos_scores, neg_scores = self.forward(
             focus_items, positive_items, negative_items
@@ -183,10 +184,12 @@ class GraphBPRItem2VecModule(pl.LightningModule):
         self.log("train_loss", loss, prog_bar=True, logger=True)
         return loss
 
-    def configure_optimizers(self):
+    def configure_optimizers(self) -> Optimizer:
         return optim.AdamW(
             self.parameters(), lr=self.lr, weight_decay=self.weight_decay
         )
 
-    def get_graph_embeddings(self):
+    def get_graph_embeddings(self) -> torch.Tensor:
         return self.item2vec.get_graph_embeddings()
+
+

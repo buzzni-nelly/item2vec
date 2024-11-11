@@ -39,7 +39,7 @@ def build_pairs_dataset(filepath: str, window_size: int = 5):
 
         data = list(zip(pids, timestamps))
         end = max(len(data) - window_size + 1, 1)
-        chunks = [data[x : x + window_size] for x in range(end)]
+        chunks = [data[x: x + window_size] for x in range(end)]
         chunks = [
             list({pid: (pid, ts) for pid, ts in chunk}.values()) for chunk in chunks
         ]

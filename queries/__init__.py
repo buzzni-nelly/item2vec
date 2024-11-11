@@ -11,8 +11,8 @@ WITH raw_user_products AS (
             ),
             url_extract_parameter(event_referrer, 'hsmoa_userid'),
             element_at(cookies, 'brtudid')[1]
-        ) AS uid,
-        to_unixtime(time) AS time,
+        ) AS user_id,
+        to_unixtime(time) AS timestamp,
         event_type AS event
     FROM retarget.retarget_access_log
     WHERE DATE(time) = DATE '{date}'
@@ -21,13 +21,13 @@ WITH raw_user_products AS (
       AND event_type != 'basketview'
 )
 SELECT
-    u.uid AS uid,
+    u.user_id AS user_id,
     ('aboutpet' || '_' || u.product_id) AS pdid,
-    u.time AS time,
+    u.timestamp AS timestamp,
     u.event AS event
 FROM raw_user_products u
-WHERE NULLIF(u.uid, '') IS NOT NULL
+WHERE NULLIF(u.user_id, '') IS NOT NULL
   AND NULLIF(u.product_id, '') IS NOT NULL
-  AND u.uid != '00000000-0000-0000-0000-000000000000'
-ORDER BY uid, time
+  AND u.user_id != '00000000-0000-0000-0000-000000000000'
+ORDER BY user_id, timestamp
 """
