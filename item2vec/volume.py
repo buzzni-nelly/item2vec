@@ -53,7 +53,7 @@ class EventType(enum.Enum):
 
 
 class Item(Base):
-    __tablename__ = 'item'
+    __tablename__ = "item"
     id = Column(Integer, primary_key=True)
     pid = Column(Integer, index=True)
     pdid = Column(String, index=True, nullable=False)
@@ -92,7 +92,7 @@ class Item(Base):
 
 
 class Trace(Base):
-    __tablename__ = 'trace'
+    __tablename__ = "trace"
     id = Column(Integer, primary_key=True)
     user_id = Column(String, index=True, nullable=False)
     pdid = Column(String, nullable=False)
@@ -105,11 +105,21 @@ class Trace(Base):
         step = (max_id - min_id) // chunk_size
         for i in range(chunk_size):
             lower_bound = min_id + i * step
-            upper_bound = lower_bound + step if i < chunk_size - 1 else max_id  # 마지막 구간 포함
-            traces = session.query(Trace).filter(
-                Trace.id >= lower_bound,
-                Trace.id < upper_bound if i < chunk_size - 1 else Trace.id <= max_id
-            ).all()
+            upper_bound = (
+                lower_bound + step if i < chunk_size - 1 else max_id
+            )  # 마지막 구간 포함
+            traces = (
+                session.query(Trace)
+                .filter(
+                    Trace.id >= lower_bound,
+                    (
+                        Trace.id < upper_bound
+                        if i < chunk_size - 1
+                        else Trace.id <= max_id
+                    ),
+                )
+                .all()
+            )
             for trace in traces:
                 yield trace
 
@@ -134,7 +144,9 @@ class Trace(Base):
         return (
             session.query(
                 Trace.pdid,
-                func.sum(case((Trace.event == EventType.purchase.value, 1), else_=0)).label("purchase_count"),
+                func.sum(
+                    case((Trace.event == EventType.purchase.value, 1), else_=0)
+                ).label("purchase_count"),
                 func.count().label("total_count"),
             )
             .group_by(Trace.pdid)
@@ -189,7 +201,9 @@ class Volume:
 
             print(f"Inserting new traces after timestamp: {delete_criteria}")
             df.to_sql(name="trace", con=self.engine, index=False, if_exists="append")
-            print(f"Data for {date_str} has been successfully saved to the trace table.")
+            print(
+                f"Data for {date_str} has been successfully saved to the trace table."
+            )
 
             current_date += timedelta(days=1)
 
@@ -207,9 +221,15 @@ class Volume:
         products_dict = {
             x["_id"]: {
                 "name": x.get("name"),
-                "category1": x.get("category1", "UNKNOWN").replace("*", "").replace("_", ""),
-                "category2": x.get("category2", "UNKNOWN").replace("*", "").replace("_", ""),
-                "category3": x.get("category3", "UNKNOWN").replace("*", "").replace("_", ""),
+                "category1": x.get("category1", "UNKNOWN")
+                .replace("*", "")
+                .replace("_", ""),
+                "category2": x.get("category2", "UNKNOWN")
+                .replace("*", "")
+                .replace("_", ""),
+                "category3": x.get("category3", "UNKNOWN")
+                .replace("*", "")
+                .replace("_", ""),
             }
             for x in products
         }
@@ -226,7 +246,7 @@ class Volume:
                         name=products_dict[pdid]["name"],
                         category1=products_dict[pdid]["category1"],
                         category2=products_dict[pdid]["category2"],
-                        category3=products_dict[pdid]["category3"]
+                        category3=products_dict[pdid]["category3"],
                     )
                 )
                 pid += 1
@@ -234,7 +254,9 @@ class Volume:
         self.session.bulk_save_objects(items)
         self.session.commit()
 
-    def generate_pairs(self, window_size: int = 5, chunk_size: int = 3, timestamp: int = 60 * 3):
+    def generate_pairs(
+        self, window_size: int = 5, chunk_size: int = 3, timestamp: int = 60 * 3
+    ):
         traces = Trace.list_traces(self.session, chunk_size=chunk_size)
         linked_list = collections.deque(maxlen=window_size)
         item_pairs = []
@@ -252,7 +274,9 @@ class Volume:
                     continue
                 compare = linked_list[i]
                 if abs(current.timestamp - compare.timestamp) <= timestamp:
-                    pid_1, pid_2 = self.pdid2pid(current.pdid), self.pdid2pid(compare.pdid)
+                    pid_1, pid_2 = self.pdid2pid(current.pdid), self.pdid2pid(
+                        compare.pdid
+                    )
                     if pid_1 and pid_2:
                         item_pairs.append((pid_1, pid_2))
         return item_pairs
@@ -270,7 +294,9 @@ class Volume:
         linked_list = collections.deque(maxlen=linked_list_size)
         edge_indices = []
 
-        Order = collections.namedtuple('Order', ['user_id', 'pid', 'category1', 'timestamp'])
+        Order = collections.namedtuple(
+            "Order", ["user_id", "pid", "category1", "timestamp"]
+        )
 
         for x in traces:
             current_item = items.get(x.pdid)

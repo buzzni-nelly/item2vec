@@ -65,7 +65,3 @@ fig = px.scatter(
 )
 fig.update_traces(marker_size=8)
 fig.show()
-
-# 오늘 중으로 poc 준비 끗
-# reranker issue
-# 

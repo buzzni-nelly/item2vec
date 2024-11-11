@@ -1,8 +1,10 @@
 import pathlib
+from typing import Any
 
 import pandas as pd
 import pytorch_lightning as pl
 import torch
+from pytorch_lightning.utilities.types import STEP_OUTPUT
 from torch import nn, optim
 from torch.optim import Optimizer
 from torch_geometric.nn import MessagePassing
@@ -176,7 +178,9 @@ class GraphBPRItem2VecModule(pl.LightningModule):
             self.vocab_size, edge_index, embedding_dim=self.embedding_dim
         )
 
-    def forward(self, focus_items, positive_items, negative_items) -> tuple[torch.Tensor, torch.Tensor]:
+    def forward(
+        self, focus_items, positive_items, negative_items
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         pos_scores = self.item2vec(focus_items, positive_items)
         neg_scores = self.item2vec(focus_items, negative_items)
         return pos_scores, neg_scores
@@ -193,6 +197,26 @@ class GraphBPRItem2VecModule(pl.LightningModule):
         self.log("train_loss", loss, prog_bar=True, logger=True)
         return loss
 
+    def validation_step(self, batch: torch.Tensor, batch_idx: int) -> None:
+        sources, labels = batch
+
+        all_embeddings = self.get_graph_embeddings()
+        source_embeddings = all_embeddings[sources]
+        all_scores = torch.matmul(source_embeddings, all_embeddings.T)
+
+        top_k = 20
+        _, top_indices = torch.topk(all_scores, top_k, dim=-1)  # [256, 1, 10]
+        labels = labels.unsqueeze(1)  # [256, 1, 1]
+
+        relevance = (top_indices == labels).float()  # [256, 1, 10]
+        gains = 1 / torch.log2(torch.arange(2, top_k + 2).float()).to(
+            relevance.device
+        )  # torch.Size([10])
+        gains = gains.unsqueeze(0).unsqueeze(0)  # [1, 1, 10]
+
+        relevant_gains = relevance * gains
+        self.log("val_ndcg", relevant_gains.mean(), prog_bar=True, logger=True)
+
     def configure_optimizers(self) -> Optimizer:
         return optim.AdamW(
             self.parameters(), lr=self.lr, weight_decay=self.weight_decay
@@ -200,5 +224,3 @@ class GraphBPRItem2VecModule(pl.LightningModule):
 
     def get_graph_embeddings(self) -> torch.Tensor:
         return self.item2vec.get_graph_embeddings()
-
-
