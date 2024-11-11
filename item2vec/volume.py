@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 import sqlalchemy.orm
 import sqlalchemy.orm
-from sqlalchemy import Column, Integer, String, Float, Enum, func, case
+from sqlalchemy import Column, Integer, String, Float, Enum, func, case, text
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from tqdm import tqdm
@@ -76,6 +76,25 @@ class Item(Base):
     @staticmethod
     def count(session: Session) -> int:
         return session.query(func.count(Item.id)).scalar()  # count 쿼리 추가
+
+    @staticmethod
+    def list_popular_items(session: Session):
+        query = """
+        SELECT i.pdid, i.purchase_count, i.category1, i.category2
+        FROM item i
+        JOIN (
+            SELECT category1, category2, MAX(purchase_count) AS max_purchase_count
+            FROM item
+            GROUP BY category1, category2
+        ) max_items
+        ON i.category1 = max_items.category1
+        AND i.category2 = max_items.category2
+        AND i.purchase_count = max_items.max_purchase_count
+        ORDER BY i.category1, i.purchase_count DESC
+        """
+
+        result = session.execute(text(query)).fetchall()
+        return result
 
     def to_dict(self):
         return {
@@ -340,6 +359,9 @@ class Volume:
         edges_df = pd.DataFrame(edge_indices, columns=["source", "target"], dtype=int)
         csv_path = self.workspace_path.joinpath(f"edge.indices.csv")
         edges_df.to_csv(csv_path, index=False)
+
+    def list_popular_items(self):
+        return Item.list_popular_items(self.session)
 
     def items(self) -> dict:
         if not self._items:

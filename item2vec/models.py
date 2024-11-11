@@ -205,17 +205,14 @@ class GraphBPRItem2VecModule(pl.LightningModule):
         all_scores = torch.matmul(source_embeddings, all_embeddings.T)
 
         top_k = 20
-        _, top_indices = torch.topk(all_scores, top_k, dim=-1)  # [256, 1, 10]
-        labels = labels.unsqueeze(1)  # [256, 1, 1]
+        _, top_indices = torch.topk(all_scores, top_k, dim=-1)  # [256, 20]
+        top_indices = top_indices.squeeze(1)  # [256, 20]
 
-        relevance = (top_indices == labels).float()  # [256, 1, 10]
-        gains = 1 / torch.log2(torch.arange(2, top_k + 2).float()).to(
-            relevance.device
-        )  # torch.Size([10])
-        gains = gains.unsqueeze(0).unsqueeze(0)  # [1, 1, 10]
+        relevance = (top_indices == labels).float()  # [256, 20]
+        gains = 1 / torch.log2(torch.arange(2, top_k + 2).float()).to(relevance.device)  # [1, 20]
 
-        relevant_gains = relevance * gains
-        self.log("val_ndcg", relevant_gains.mean(), prog_bar=True, logger=True)
+        ndcg = (relevance * gains).sum(dim=-1)
+        self.log("val_ndcg", ndcg.mean(), prog_bar=True, logger=True)
 
     def configure_optimizers(self) -> Optimizer:
         return optim.AdamW(
