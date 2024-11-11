@@ -58,7 +58,8 @@ def main():
 
         item2vec = GraphBPRItem2VecModule(
             vocab_size=data_module.vocab_size,
-            embedding_dim=EMBED_DIM,
+            edge_index_path=volume.workspace_path.joinpath("edge.indices.csv"),
+            embed_dim=EMBED_DIM,
             lr=LR,
             weight_decay=WEIGHT_DECAY,
         )

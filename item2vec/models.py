@@ -1,3 +1,5 @@
+import pathlib
+
 import pandas as pd
 import pytorch_lightning as pl
 import torch
@@ -150,21 +152,28 @@ class GraphBPRItem2VecModule(pl.LightningModule):
     def __init__(
         self,
         vocab_size: int,
-        embedding_dim: int = 128,
+        edge_index_path: pathlib.Path,
+        embed_dim: int = 128,
         lr: float = 1e-3,
         weight_decay: float = 1e-2,
     ):
         super(GraphBPRItem2VecModule, self).__init__()
         self.lr = lr
         self.weight_decay = weight_decay
+        self.vocab_size = vocab_size
+        self.embedding_dim = embed_dim
+        self._edge_index_path = edge_index_path
 
-        edge_df = pd.read_csv("/Users/nelly/PycharmProjects/item2vec/workspaces/aboutpet/item2vec/v1/edge.indices.csv")
+        self.item2vec = None
+
+    def setup(self, stage: str = None):
+        edge_df = pd.read_csv(self._edge_index_path.as_posix())
         edge_index = torch.tensor(
             [edge_df["source"].values, edge_df["target"].values], dtype=torch.long
         )
-        edge_index = edge_index.to("mps")
+        edge_index = edge_index.to(self.device)
         self.item2vec = GraphItem2Vec(
-            vocab_size, edge_index, embedding_dim=embedding_dim
+            self.vocab_size, edge_index, embedding_dim=self.embedding_dim
         )
 
     def forward(self, focus_items, positive_items, negative_items) -> tuple[torch.Tensor, torch.Tensor]:

@@ -10,7 +10,10 @@ model_path = "/tmp/checkpoints/last.ckpt"
 volume = Volume("aboutpet", "item2vec", "v1")
 
 item2vec_module = GraphBPRItem2VecModule.load_from_checkpoint(
-    model_path, vocab_size=volume.vocab_size(), embedding_dim=128
+    model_path,
+    vocab_size=volume.vocab_size(),
+    edge_index_path=volume.workspace_path.joinpath("edge.indices.csv"),
+    embedding_dim=128,
 )
 
 item2vec_module.eval()
