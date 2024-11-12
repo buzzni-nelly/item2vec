@@ -16,6 +16,7 @@ item2vec_module = GraphBPRItem2VecModule.load_from_checkpoint(
     embedding_dim=128,
 )
 
+item2vec_module.setup()
 item2vec_module.eval()
 item2vec_module.freeze()
 

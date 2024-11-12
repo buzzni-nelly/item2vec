@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     lr: float = 1e-3
     weight_decay: float = 1e-2
 
-    datamodule_batch_size: int = 2**8
+    datamodule_batch_size: int = 2**9
     datamodule_num_workers: int = 10
     datamodule_negative_k: int = 10
 
@@ -21,9 +21,9 @@ class Settings(BaseSettings):
     trainer_profiler: str = "simple"
 
     checkpoint_dirpath: str = "/tmp/checkpoints"
-    checkpoint_monitor: str = "train_loss"
+    checkpoint_monitor: str = "val_ndcg@20"
     checkpoint_filename: str = "{epoch}-{step}-{train_loss:.2f}"
-    checkpoint_mode: str = "min"
+    checkpoint_mode: str = "max"
     checkpoint_every_n_train_steps: int = 10_000
     checkpoint_path: str | None = "last"
 

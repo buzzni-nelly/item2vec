@@ -16,6 +16,8 @@ for item in items:
         cats.append(item[0])
 
 popular_items = list(itertools.chain.from_iterable(zip(dogs, cats)))
+popular_items = [{"pdid": x, "score": -1} for x in popular_items]
+
 print(popular_items)
 print(len(popular_items))
 

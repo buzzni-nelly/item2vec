@@ -1,6 +1,5 @@
 import json
 
-import pandas as pd
 import torch
 import torch.nn.functional as F
 from tqdm import tqdm
@@ -40,19 +39,16 @@ def debug(
     print("=" * 20)
 
 
-def load_items():
-    items_df = pd.read_csv("/Users/nelly/PycharmProjects/item2vec/assets/items.csv")
-    items_dict = items_df.to_dict(orient="records")
-    items_dict = {item["pdid"]: item for item in items_dict}
-    return items_dict
-
-
 def load_embeddings(volume: Volume, embedding_dim: int = 128):
     model_path = "/tmp/checkpoints/last.ckpt"
     vocab_size = volume.vocab_size()
     item2vec_module = GraphBPRItem2VecModule.load_from_checkpoint(
-        model_path, vocab_size=vocab_size, embedding_dim=embedding_dim
+        model_path,
+        vocab_size=vocab_size,
+        edge_index_path=volume.workspace_path.joinpath("edge.indices.csv"),
+        embedding_dim=embedding_dim
     )
+    item2vec_module.setup()
     item2vec_module.eval()
     item2vec_module.freeze()
 
@@ -115,7 +111,7 @@ def rerank(
     return reranked_items, reranked_scores
 
 
-def main(embed_dim=128, candidate_k: int = 100):
+def main(embed_dim=128, k: int = 100):
     # Load vocabulary and model
 
     volume = Volume(site="aboutpet", model="item2vec", version="v1")
@@ -126,23 +122,21 @@ def main(embed_dim=128, candidate_k: int = 100):
     unknown_pids = [x["pid"] for x in items.values() if x["name"] == "UNKNOWN"]
     embeddings[unknown_pids] = torch.zeros(embed_dim, device=embeddings.device)
 
-    cos_original_predictions, cos_reranked_predictions = {}, {}
-    for pid in tqdm(
-        range(embeddings.shape[0]), desc="추천 점수를 계산 및 Redis 할당 중입니다.."
-    ):
+    aggregated_predictions = {}
+    desc = "추천 점수를 계산 및 Redis 할당 중입니다.."
+    for pid in tqdm(range(embeddings.shape[0]), desc=desc):
         if pid in unknown_pids:
             continue
 
         pdid = volume.pid2pdid(pid)
         query_item = items[pdid]
         category1, category2 = query_item["category1"], query_item["category2"]
-        k = candidate_k
 
         cos_top_k_items, cos_top_k_pids, cos_top_k_scores = cosine_topk(
             embeddings=embeddings,
             target=pid,
             volume=volume,
-            k=k,
+            k=k * 10,
         )
 
         debug(
@@ -152,21 +146,21 @@ def main(embed_dim=128, candidate_k: int = 100):
             show=False,
         )
 
-        cos_original_predictions[pdid] = [
-            {"pdid": x["pdid"], "score": round(float(s), 4)}
-            for x, s in zip(cos_top_k_items, cos_top_k_scores)
-            if category1 == x["category1"]
-        ]
+        for x, s in zip(cos_top_k_items, cos_top_k_scores):
+            if category1 != x["category1"]:
+                continue
+            value = {"pdid": x["pdid"], "score": round(float(s), 4)}
+            aggregated_predictions[pdid].append(value)
+        aggregated_predictions[pdid] = aggregated_predictions[pdid][:k]
 
     pipeline = clients.redis.aiaas_6.pipeline()
-    for k, v in cos_original_predictions.items():
+    for k, v in aggregated_predictions.items():
         key = f"i2i:aboutpet:i2v:v2:{k}"
         pipeline.set(key, json.dumps(v))
         pipeline.expire(key, 30 * 24 * 60 * 60)
 
     pipeline.execute()
-
-    print(len(cos_reranked_predictions))
+    print(len(aggregated_predictions))
 
 
 if __name__ == "__main__":

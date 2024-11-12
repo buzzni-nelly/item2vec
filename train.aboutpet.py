@@ -1,7 +1,7 @@
 import os
 
 from pytorch_lightning import Trainer
-from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from pytorch_lightning.loggers import WandbLogger
 
 import wandb
@@ -80,7 +80,7 @@ def main():
                     every_n_train_steps=CHECKPOINT_EVERY_N_TRAIN_STEPS,
                     filename=CHECKPOINT_FILENAME,
                     save_last=True,
-                ),
+                )
             ],
         )
         trainer.fit(model=item2vec, datamodule=data_module, ckpt_path=CKPT_PATH)

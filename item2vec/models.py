@@ -114,16 +114,16 @@ class GraphItem2Vec(nn.Module):
         self,
         vocab_size: int,
         edge_index: torch.Tensor,
-        embedding_dim: int = 128,
+        embed_dim: int = 128,
         num_layers: int = 2,
     ):
         super(GraphItem2Vec, self).__init__()
         self.vocab_size = vocab_size
         self.edge_index = edge_index
-        self.embedding_dim = embedding_dim
+        self.embed_dim = embed_dim
         self.num_layers = num_layers
 
-        self.embeddings = nn.Embedding(vocab_size, embedding_dim)
+        self.embeddings = nn.Embedding(vocab_size, embed_dim)
         nn.init.xavier_uniform_(self.embeddings.weight)
 
         self.convs = nn.ModuleList([LightGCNConv() for _ in range(num_layers)])
@@ -163,20 +163,19 @@ class GraphBPRItem2VecModule(pl.LightningModule):
         self.lr = lr
         self.weight_decay = weight_decay
         self.vocab_size = vocab_size
-        self.embedding_dim = embed_dim
-        self._edge_index_path = edge_index_path
+        self.embed_dim = embed_dim
 
-        self.item2vec = None
-
-    def setup(self, stage: str = None):
-        edge_df = pd.read_csv(self._edge_index_path.as_posix())
-        edge_index = torch.tensor(
-            [edge_df["source"].values, edge_df["target"].values], dtype=torch.long
-        )
-        edge_index = edge_index.to(self.device)
+        edge_df = pd.read_csv(edge_index_path.as_posix())
+        sources = edge_df["source"].values
+        targets = edge_df["target"].values
+        edge_index = torch.tensor([sources, targets], dtype=torch.long)
+        self.register_buffer("edge_index", edge_index)
         self.item2vec = GraphItem2Vec(
-            self.vocab_size, edge_index, embedding_dim=self.embedding_dim
+            self.vocab_size, self.edge_index, embed_dim=self.embed_dim
         )
+
+    def setup(self, stage=None):
+        self.item2vec.edge_index = self.item2vec.edge_index.to(self.device)
 
     def forward(
         self, focus_items, positive_items, negative_items
@@ -212,7 +211,7 @@ class GraphBPRItem2VecModule(pl.LightningModule):
         gains = 1 / torch.log2(torch.arange(2, top_k + 2).float()).to(relevance.device)  # [1, 20]
 
         ndcg = (relevance * gains).sum(dim=-1)
-        self.log("val_ndcg", ndcg.mean(), prog_bar=True, logger=True)
+        self.log("val_ndcg@20", ndcg.mean(), prog_bar=True, logger=True)
 
     def configure_optimizers(self) -> Optimizer:
         return optim.AdamW(
