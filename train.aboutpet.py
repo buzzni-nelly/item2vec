@@ -80,6 +80,12 @@ def main():
                     every_n_train_steps=CHECKPOINT_EVERY_N_TRAIN_STEPS,
                     filename=CHECKPOINT_FILENAME,
                     save_last=True,
+                ),
+                EarlyStopping(
+                    monitor=CHECKPOINT_MONITOR,
+                    mode=CHECKPOINT_MODE,
+                    patience=2,
+                    verbose=True
                 )
             ],
         )

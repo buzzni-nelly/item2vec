@@ -53,6 +53,7 @@ projections = tsne.fit_transform(features)
 result_df = pd.DataFrame(projections, columns=["x", "y"])
 result_df["name"] = top_pids["name"].values
 result_df["category1"] = top_pids["category1"].values
+result_df["category2"] = top_pids["category2"].values
 result_df["category3"] = top_pids["category3"].values
 result_df["click_count"] = top_pids["click_count"].values
 
@@ -61,8 +62,8 @@ fig = px.scatter(
     result_df,
     x="x",
     y="y",
-    color="category3",
-    hover_data=["name", "category1", "category3", "click_count"],
+    color="category2",
+    hover_data=["name", "category1", "category2", "category3", "click_count"],
 )
 fig.update_traces(marker_size=8)
 fig.show()
