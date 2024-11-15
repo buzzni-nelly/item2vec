@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
@@ -48,6 +49,10 @@ WANDB_CONFIG = settings.dict()
 def main():
     try:
         volume = Volume(site="aboutpet", model="item2vec", version="v1")
+        volume.migrate_traces(start_date=datetime(2024, 8, 1))
+        volume.migrate_items()
+        volume.generate_pairs_csv()
+        volume.generate_edge_indices_csv()
 
         data_module = SkipGramBPRDataModule(
             volume=volume,

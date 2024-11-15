@@ -1,4 +1,8 @@
+import itertools
+
+import torch
 from sqlalchemy import create_engine, text
+from tqdm import tqdm
 
 from item2vec.models import GraphBPRItem2VecModule
 from item2vec.volume import Volume
@@ -35,14 +39,25 @@ item2vec_module.eval()
 item2vec_module.freeze()
 
 item2vec = item2vec_module.item2vec
+chunk_size = 1000
+total_range = item2vec.embeddings.weight.shape[0]
+chunks = [torch.arange(i, min(i + chunk_size, total_range)) for i in range(0, total_range, chunk_size)]
 
-# Execute the query
+negatives_list = []
+for pids in chunks:
+    _, indices = item2vec.get_similar_pids(pids, k=1000, largest=True)
+    indices = indices[:, -10:]
+    negatives_list.append(indices.tolist())
+
+negatives_list = list(itertools.chain.from_iterable(negatives_list))
+
 with engine.connect() as connection:
     result = connection.execute(query)
 
     count = 0
 
-    for row in result:
+    results = []
+    for row in tqdm(result):
         user_id, pdids, events = row
         pdids = pdids.split(',')
         pids = [volume.pdid2pid(x) for x in pdids]
@@ -53,10 +68,15 @@ with engine.connect() as connection:
 
         pids, events = zipped
         for i in range(1, len(pids)):
-            history_pids, target_pid = pids[:i], pids[i]
-            _, similar_pids = item2vec.get_similar_pids(target_pid, k=10000, largest=True)
-            close_negatives = similar_pids[101:105].tolist()
-            distant_negatives = similar_pids[9995: 10000].tolist()
-            negatives = close_negatives + distant_negatives
-            print(similar_pids)
-    print(count)
+            start_index = max(0, len(pids) - 50)
+            end_index = start_index + i
+            history_pids, positive_pid = pids[start_index:end_index], pids[end_index]
+            history_pids += (-1,) * int(50 - len(history_pids))  # 길이가 50보다 작으면 -1로 패딩
+            _, similar_pids = item2vec.get_similar_pids([positive_pid], k=1000, largest=True)
+            negative_pids = similar_pids[-10:].tolist()
+            encoded_histories = ",".join(map(str, history_pids))
+            encoded_positive = str(positive_pid)
+            encoded_negatives = ",".join(map(str, negative_pids))
+            results.append((encoded_histories, encoded_positive, encoded_negatives))
+
+    print(len(results))

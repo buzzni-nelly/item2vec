@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     datamodule_num_workers: int = 10
     datamodule_negative_k: int = 10
 
-    trainer_max_epochs: int = 15
+    trainer_max_epochs: int = 12
     trainer_limit_val_batches: int | float = 1.0
     trainer_limit_train_batches: int | float = 1.0
     trainer_limit_test_batches: int | float = 1.0

@@ -3,6 +3,7 @@ import pathlib
 import pandas as pd
 import pytorch_lightning as pl
 import torch
+import torch.nn.functional as F
 from torch import nn, optim
 from torch.optim import Optimizer
 from torch_geometric.nn import MessagePassing
@@ -147,12 +148,12 @@ class GraphItem2Vec(nn.Module):
         final_embeddings = torch.mean(torch.stack(all_embeddings, dim=0), dim=0)
         return final_embeddings
 
-    def get_similar_pids(self, pid: int, k: int = 10, largest: bool=True) -> tuple[torch.Tensor, torch.Tensor]:
-        import torch.nn.functional as F
-        embeddings = self.get_graph_embeddings()
-        pid_embedding = embeddings[pid].unsqueeze(0)  # (1, D)로 변환하여 배치 차원 추가
-        scores = F.cosine_similarity(embeddings, pid_embedding, dim=1)
-        similarities, indices = torch.topk(scores, k, largest=largest)
+    def get_similar_pids(self, pids: list[int], k: int = 10, largest: bool = True) -> tuple[torch.Tensor, torch.Tensor]:
+        embeddings = self.get_graph_embeddings()  # [16070, 128]
+        pids = torch.tensor(pids, device=embeddings.device)
+        pid_embeddings = embeddings[pids]  # [len(pids), 128]
+        scores = F.cosine_similarity(embeddings.unsqueeze(0), pid_embeddings.unsqueeze(1), dim=-1)
+        similarities, indices = torch.topk(scores, k, dim=-1, largest=largest)
         return similarities, indices
 
 
