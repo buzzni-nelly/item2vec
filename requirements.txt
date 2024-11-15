@@ -5,3 +5,10 @@ pydantic-settings
 orjson
 python-dateutil
 rank_bm25
+torch_geometric
+pandas
+sqlalchemy
+s3fs
+trino
+pymongo
+redis
