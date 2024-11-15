@@ -21,4 +21,4 @@ popular_items = [{"pdid": x, "score": -1} for x in popular_items]
 print(popular_items)
 print(len(popular_items))
 
-clients.redis.aiaas_6.set("popularity:aboutpet:purchase:v1", json.dumps(popular_items), ex=30 * 24 * 90)
+clients.redis.aiaas_6.set("popularity:aboutpet:purchase:v1", json.dumps(popular_items), ex=60 * 60 * 24 * 90)

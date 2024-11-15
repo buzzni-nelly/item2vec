@@ -1,10 +1,8 @@
 import pathlib
-from typing import Any
 
 import pandas as pd
 import pytorch_lightning as pl
 import torch
-from pytorch_lightning.utilities.types import STEP_OUTPUT
 from torch import nn, optim
 from torch.optim import Optimizer
 from torch_geometric.nn import MessagePassing
@@ -148,6 +146,14 @@ class GraphItem2Vec(nn.Module):
 
         final_embeddings = torch.mean(torch.stack(all_embeddings, dim=0), dim=0)
         return final_embeddings
+
+    def get_similar_pids(self, pid: int, k: int = 10, largest: bool=True) -> tuple[torch.Tensor, torch.Tensor]:
+        import torch.nn.functional as F
+        embeddings = self.get_graph_embeddings()
+        pid_embedding = embeddings[pid].unsqueeze(0)  # (1, D)로 변환하여 배치 차원 추가
+        scores = F.cosine_similarity(embeddings, pid_embedding, dim=1)
+        similarities, indices = torch.topk(scores, k, largest=largest)
+        return similarities, indices
 
 
 class GraphBPRItem2VecModule(pl.LightningModule):

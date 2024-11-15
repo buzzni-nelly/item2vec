@@ -93,6 +93,3 @@ class BERT4Rec(nn.Module):
         hidden_states = F.gelu(hidden_states)
         logits = self.output_layer(hidden_states)
         return logits
-
-
-print(BertModel(BertConfig()))

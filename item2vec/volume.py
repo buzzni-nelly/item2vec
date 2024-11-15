@@ -276,6 +276,7 @@ class Volume:
     def generate_pairs(
         self, window_size: int = 5, chunk_size: int = 3, timestamp: int = 60 * 3
     ):
+        # item_categories = {x.pdid: x.category1 for x in Item.list_items(self.session)}
         traces = Trace.list_traces(self.session, chunk_size=chunk_size)
         linked_list = collections.deque(maxlen=window_size)
         item_pairs = []
@@ -289,15 +290,18 @@ class Volume:
             current = linked_list[pivot]
 
             for i in range(len(linked_list)):
+                compare = linked_list[i]
                 if i == pivot:
                     continue
-                compare = linked_list[i]
-                if abs(current.timestamp - compare.timestamp) <= timestamp:
-                    pid_1, pid_2 = self.pdid2pid(current.pdid), self.pdid2pid(
-                        compare.pdid
-                    )
-                    if pid_1 and pid_2:
-                        item_pairs.append((pid_1, pid_2))
+                if abs(current.timestamp - compare.timestamp) > timestamp:
+                    continue
+
+                # if item_categories.get(current.pdid) != item_categories.get(compare.pdid):
+                #     continue
+
+                pid_1, pid_2 = self.pdid2pid(current.pdid), self.pdid2pid(compare.pdid)
+                if pid_1 and pid_2:
+                    item_pairs.append((pid_1, pid_2))
         return item_pairs
 
     def generate_pairs_csv(self):

@@ -1,3 +1,4 @@
+import collections
 import json
 
 import torch
@@ -122,19 +123,19 @@ def main(embed_dim=128, k: int = 100):
     unknown_pids = [x["pid"] for x in items.values() if x["name"] == "UNKNOWN"]
     embeddings[unknown_pids] = torch.zeros(embed_dim, device=embeddings.device)
 
-    aggregated_predictions = {}
+    aggregated_predictions = collections.defaultdict(list)
     desc = "추천 점수를 계산 및 Redis 할당 중입니다.."
-    for pid in tqdm(range(embeddings.shape[0]), desc=desc):
-        if pid in unknown_pids:
+    for current_pid in tqdm(range(embeddings.shape[0]), desc=desc):
+        if current_pid in unknown_pids:
             continue
 
-        pdid = volume.pid2pdid(pid)
-        query_item = items[pdid]
+        current_pdid = volume.pid2pdid(current_pid)
+        query_item = items[current_pdid]
         category1, category2 = query_item["category1"], query_item["category2"]
 
         cos_top_k_items, cos_top_k_pids, cos_top_k_scores = cosine_topk(
             embeddings=embeddings,
-            target=pid,
+            target=current_pid,
             volume=volume,
             k=k * 10,
         )
@@ -149,9 +150,11 @@ def main(embed_dim=128, k: int = 100):
         for x, s in zip(cos_top_k_items, cos_top_k_scores):
             if category1 != x["category1"]:
                 continue
+            if x["pid"] == current_pid:
+                continue
             value = {"pdid": x["pdid"], "score": round(float(s), 4)}
-            aggregated_predictions[pdid].append(value)
-        aggregated_predictions[pdid] = aggregated_predictions[pdid][:k]
+            aggregated_predictions[current_pdid].append(value)
+        aggregated_predictions[current_pdid] = aggregated_predictions[current_pdid][:k]
 
     pipeline = clients.redis.aiaas_6.pipeline()
     for k, v in aggregated_predictions.items():
