@@ -3,6 +3,7 @@ import json
 
 import torch
 import torch.nn.functional as F
+from retry import retry
 from tqdm import tqdm
 
 import clients
@@ -112,6 +113,7 @@ def rerank(
     return reranked_items, reranked_scores
 
 
+@retry(tries=3)
 def main(embed_dim=128, k: int = 100):
     # Load vocabulary and model
 

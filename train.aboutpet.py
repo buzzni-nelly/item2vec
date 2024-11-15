@@ -1,17 +1,19 @@
 import os
+import pathlib
 from datetime import datetime
 
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from pytorch_lightning.loggers import WandbLogger
 
-import wandb
 from configs import settings
 from item2vec.datasets import SkipGramBPRDataModule
 from item2vec.models import GraphBPRItem2VecModule
 from item2vec.volume import Volume
+from scripts import script_5
 
 os.environ["WANDB_API_KEY"] = settings.wandb_api_key
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 # Models
 EMBED_DIM = settings.embed_dim
@@ -46,8 +48,19 @@ CKPT_PATH = settings.checkpoint_path
 WANDB_CONFIG = settings.dict()
 
 
+def delete_checkpoints():
+    directory = pathlib.Path(settings.checkpoint_path)
+    for file in directory.glob("*"):
+        if file.is_file():
+            file.unlink()
+
+
 def main():
     try:
+        delete_checkpoints()
+
+        settings.print()
+
         volume = Volume(site="aboutpet", model="item2vec", version="v1")
         volume.migrate_traces(start_date=datetime(2024, 8, 1))
         volume.migrate_items()
@@ -69,8 +82,8 @@ def main():
             weight_decay=WEIGHT_DECAY,
         )
 
-        wandb.init(project="item2vec", config=WANDB_CONFIG)
-        wandb.watch(item2vec, log="all", log_freq=1)
+        # wandb.init(project="item2vec", config=WANDB_CONFIG)
+        # wandb.watch(item2vec, log="all", log_freq=1)
 
         trainer = Trainer(
             limit_train_batches=TRAINER_LIMIT_TRAIN_BATCHES,
@@ -95,9 +108,14 @@ def main():
             ],
         )
         trainer.fit(model=item2vec, datamodule=data_module, ckpt_path=CKPT_PATH)
+        script_5.main()
+    except Exception as e:
+        print(e)
     finally:
-        wandb.finish()
+        pass
+        # wandb.finish()
 
 
 if __name__ == "__main__":
-    main()
+    while True:
+        main()

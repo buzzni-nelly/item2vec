@@ -205,20 +205,19 @@ class GraphBPRItem2VecModule(pl.LightningModule):
 
     def validation_step(self, batch: torch.Tensor, batch_idx: int) -> None:
         sources, labels = batch
+        ndcg_20 = self.calc_ndcg(sources, labels, k=20)
+        self.log("val_ndcg@20", ndcg_20.mean(), prog_bar=True, logger=True)
 
+    def calc_ndcg(self, sources: torch.Tensor, labels: torch.Tensor, k: int = 20):
         all_embeddings = self.get_graph_embeddings()
         source_embeddings = all_embeddings[sources]
         all_scores = torch.matmul(source_embeddings, all_embeddings.T)
-
-        top_k = 20
-        _, top_indices = torch.topk(all_scores, top_k, dim=-1)  # [256, 20]
-        top_indices = top_indices.squeeze(1)  # [256, 20]
-
-        relevance = (top_indices == labels).float()  # [256, 20]
-        gains = 1 / torch.log2(torch.arange(2, top_k + 2).float()).to(relevance.device)  # [1, 20]
-
+        _, top_indices = torch.topk(all_scores, k, dim=-1)
+        top_indices = top_indices.squeeze(1)
+        relevance = (top_indices == labels).float()
+        gains = 1 / torch.log2(torch.arange(2, k + 2).float()).to(relevance.device)
         ndcg = (relevance * gains).sum(dim=-1)
-        self.log("val_ndcg@20", ndcg.mean(), prog_bar=True, logger=True)
+        return ndcg
 
     def configure_optimizers(self) -> Optimizer:
         return optim.AdamW(

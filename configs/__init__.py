@@ -29,5 +29,8 @@ class Settings(BaseSettings):
 
     wandb_api_key: str = "7290cd5cb94c29300893438a08b4b6aa844149f3"
 
+    def print(self):
+        for k, v in self.model_dump().items():
+            print(k, v)
 
 settings = Settings()
