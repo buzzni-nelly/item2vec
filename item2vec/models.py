@@ -205,13 +205,30 @@ class GraphBPRItem2VecModule(pl.LightningModule):
 
     def validation_step(self, batch: torch.Tensor, batch_idx: int) -> None:
         sources, labels = batch
-        ndcg_20 = self.calc_ndcg(sources, labels, k=20)
-        self.log("val_ndcg@20", ndcg_20.mean(), prog_bar=True, logger=True)
+        cos_ndcg = self.calc_cosine_ndcg(sources, labels, k=5)
+        dot_ndcg = self.calc_dotproduct_ndcg(sources, labels, k=5)
+        self.log("val_cos_ndcg@5", cos_ndcg.mean(), prog_bar=True, logger=True)
+        self.log("val_dot_ndcg@5", dot_ndcg.mean(), prog_bar=True, logger=True)
 
-    def calc_ndcg(self, sources: torch.Tensor, labels: torch.Tensor, k: int = 20):
+    def calc_cosine_ndcg(self, sources: torch.Tensor, labels: torch.Tensor, k: int = 20):
         all_embeddings = self.get_graph_embeddings()
         source_embeddings = all_embeddings[sources]
+
+        all_scores = F.cosine_similarity(source_embeddings.unsqueeze(1), all_embeddings.unsqueeze(0), dim=-1)
+
+        _, top_indices = torch.topk(all_scores, k, dim=-1)
+        top_indices = top_indices.squeeze(1)
+        relevance = (top_indices == labels).float()
+        gains = 1 / torch.log2(torch.arange(2, k + 2).float()).to(relevance.device)
+        ndcg = (relevance * gains).sum(dim=-1)
+        return ndcg
+
+    def calc_dotproduct_ndcg(self, sources: torch.Tensor, labels: torch.Tensor, k: int = 20):
+        all_embeddings = self.get_graph_embeddings()
+        source_embeddings = all_embeddings[sources]
+
         all_scores = torch.matmul(source_embeddings, all_embeddings.T)
+
         _, top_indices = torch.topk(all_scores, k, dim=-1)
         top_indices = top_indices.squeeze(1)
         relevance = (top_indices == labels).float()
