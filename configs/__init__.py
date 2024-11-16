@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     trainer_profiler: str = "simple"
 
     checkpoint_dirpath: str = "/tmp/checkpoints"
-    checkpoint_monitor: str = "val_ndcg@20"
+    checkpoint_monitor: str = "val_cos_ndcg@5"
     checkpoint_filename: str = "{epoch}-{step}-{train_loss:.2f}"
     checkpoint_mode: str = "max"
     checkpoint_every_n_train_steps: int = 10_000
