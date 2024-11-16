@@ -49,7 +49,7 @@ WANDB_CONFIG = settings.dict()
 
 
 def delete_checkpoints():
-    directory = pathlib.Path(settings.checkpoint_path)
+    directory = pathlib.Path(settings.checkpoint_dirpath)
     for file in directory.glob("*"):
         if file.is_file():
             file.unlink()
