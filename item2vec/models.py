@@ -207,8 +207,8 @@ class GraphBPRItem2VecModule(pl.LightningModule):
         sources, labels = batch
         cos_ndcg = self.calc_cosine_ndcg(sources, labels, k=20)
         dot_ndcg = self.calc_dotproduct_ndcg(sources, labels, k=20)
-        self.log("val_cos_ndcg@5", cos_ndcg.mean(), prog_bar=True, logger=True)
-        self.log("val_dot_ndcg@5", dot_ndcg.mean(), prog_bar=True, logger=True)
+        self.log("val_cos_ndcg@20", cos_ndcg.mean(), prog_bar=True, logger=True)
+        self.log("val_dot_ndcg@20", dot_ndcg.mean(), prog_bar=True, logger=True)
 
     def calc_cosine_ndcg(self, sources: torch.Tensor, labels: torch.Tensor, k: int = 20):
         all_embeddings = self.get_graph_embeddings()
