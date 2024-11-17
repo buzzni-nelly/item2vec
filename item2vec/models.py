@@ -205,8 +205,8 @@ class GraphBPRItem2VecModule(pl.LightningModule):
 
     def validation_step(self, batch: torch.Tensor, batch_idx: int) -> None:
         sources, labels = batch
-        cos_ndcg = self.calc_cosine_ndcg(sources, labels, k=5)
-        dot_ndcg = self.calc_dotproduct_ndcg(sources, labels, k=5)
+        cos_ndcg = self.calc_cosine_ndcg(sources, labels, k=20)
+        dot_ndcg = self.calc_dotproduct_ndcg(sources, labels, k=20)
         self.log("val_cos_ndcg@5", cos_ndcg.mean(), prog_bar=True, logger=True)
         self.log("val_dot_ndcg@5", dot_ndcg.mean(), prog_bar=True, logger=True)
 
