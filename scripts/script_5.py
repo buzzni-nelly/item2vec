@@ -72,8 +72,9 @@ def cosine_topk(
 
 
 def dot_product_topk(
-    embeddings: torch.Tensor, target: int, volume: Volume, items: dict, k=100
+    embeddings: torch.Tensor, target: int, volume: Volume, k=100
 ):
+    items = volume.items()
     similarities = torch.mm(embeddings[target].unsqueeze(0), embeddings.T).squeeze(0)
     top_k_values, top_k_pids = torch.topk(similarities, k)
 
@@ -135,7 +136,7 @@ def main(embed_dim=128, k: int = 100):
         query_item = items[current_pdid]
         category1, category2 = query_item["category1"], query_item["category2"]
 
-        cos_top_k_items, cos_top_k_pids, cos_top_k_scores = cosine_topk(
+        cos_top_k_items, cos_top_k_pids, cos_top_k_scores = dot_product_topk(
             embeddings=embeddings,
             target=current_pid,
             volume=volume,
