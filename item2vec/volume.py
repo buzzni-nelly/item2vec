@@ -119,28 +119,9 @@ class Trace(Base):
     timestamp = Column(Float, nullable=False)
 
     @staticmethod
-    def list_traces(session: Session, chunk_size: int = 10):
-        min_id, max_id = session.query(func.min(Trace.id), func.max(Trace.id)).one()
-        step = (max_id - min_id) // chunk_size
-        for i in range(chunk_size):
-            lower_bound = min_id + i * step
-            upper_bound = (
-                lower_bound + step if i < chunk_size - 1 else max_id
-            )  # 마지막 구간 포함
-            traces = (
-                session.query(Trace)
-                .filter(
-                    Trace.id >= lower_bound,
-                    (
-                        Trace.id < upper_bound
-                        if i < chunk_size - 1
-                        else Trace.id <= max_id
-                    ),
-                )
-                .all()
-            )
-            for trace in traces:
-                yield trace
+    def list_traces(session: Session):
+        traces = session.query(Trace).all()
+        return traces
 
     @staticmethod
     def insert_traces(session: Session, traces: list[dict]):
@@ -274,10 +255,9 @@ class Volume:
         self.session.commit()
 
     def generate_pairs(
-        self, window_size: int = 5, chunk_size: int = 3, timestamp: int = 60 * 3
+        self, window_size: int = 5, time_delta: int = 60 * 3
     ):
-        # item_categories = {x.pdid: x.category1 for x in Item.list_items(self.session)}
-        traces = Trace.list_traces(self.session, chunk_size=chunk_size)
+        traces = Trace.list_traces(self.session)
         linked_list = collections.deque(maxlen=window_size)
         item_pairs = []
         for trace in tqdm(traces, desc="Pair data 를 추출 중 입니다.."):
@@ -293,13 +273,13 @@ class Volume:
                 compare = linked_list[i]
                 if i == pivot:
                     continue
-                if abs(current.timestamp - compare.timestamp) > timestamp:
+                if current.user_id != compare.user_id:
+                    continue
+                if current.timestamp - compare.timestamp > time_delta:
                     continue
 
-                # if item_categories.get(current.pdid) != item_categories.get(compare.pdid):
-                #     continue
-
-                pid_1, pid_2 = self.pdid2pid(current.pdid), self.pdid2pid(compare.pdid)
+                pid_1 = self.pdid2pid(current.pdid)
+                pid_2 = self.pdid2pid(compare.pdid)
                 if pid_1 and pid_2:
                     item_pairs.append((pid_1, pid_2))
         return item_pairs
@@ -310,19 +290,50 @@ class Volume:
         csv_path = self.workspace_path.joinpath(f"item.pairs.csv")
         pairs_df.to_csv(csv_path, index=False)
 
-    def generate_edge_indices(self, chunk_size: int = 3, linked_list_size: int = 10):
-        traces = Trace.list_traces(self.session, chunk_size=chunk_size)
+    def generate_recurrent_edge_indices(self):
+        recurrent_edges = []
+        items = self.items()
+        traces = Trace.list_traces(self.session)
+        prev_order, current_order = None, None
+
+        Order = collections.namedtuple("Order", ["user_id", "pid", "category1", "timestamp"])
+
+        for trace in tqdm(traces, desc="recurrent edges 를 추출 중입니다.."):
+            current_item = items.get(trace.pdid)
+            if not current_item:
+                continue
+
+            prev_order, current_order = current_order, Order(
+                user_id=trace.user_id,
+                pid=current_item["pid"],
+                category1=current_item["category1"],
+                timestamp=trace.timestamp,
+            )
+
+            if not prev_order or not current_order:
+                continue
+            if prev_order.user_id != current_order.user_id:
+                continue
+            if prev_order.category1 != current_order.category1:
+                continue
+
+            recurrent_edges.append((prev_order.pid, current_order.pid))
+
+        return recurrent_edges
+
+
+    def generate_purchase_edge_indices(self, linked_list_size: int = 10):
+        traces = Trace.list_traces(self.session)
         items = self.items()
 
         linked_list = collections.deque(maxlen=linked_list_size)
         edge_indices = []
 
-        Order = collections.namedtuple(
-            "Order", ["user_id", "pid", "category1", "timestamp"]
-        )
+        Order = collections.namedtuple("Order", ["user_id", "pid", "category1", "timestamp"])
 
         for x in traces:
             current_item = items.get(x.pdid)
+
             if not current_item:
                 continue
 
@@ -338,28 +349,26 @@ class Volume:
             if x.event not in [EventType.purchase]:
                 continue
 
-            current, collected_pids = linked_list[-1], []
+            current, prev_pids = linked_list[-1], []
             for prev_idx in range(len(linked_list) - 1, -1, -1):
                 prev = linked_list[prev_idx]
-                if (
-                    current.user_id == prev.user_id
-                    and current.category1 == prev.category1
-                    and current.timestamp - prev.timestamp <= 60 * 10
-                ):
-                    collected_pids.append(prev.pid)
-                else:
+                if current.user_id != prev.user_id:
                     break
+                if current.category1 != prev.category1:
+                    break
+                if current.timestamp - prev.timestamp > 60 * 10:
+                    break
+                prev_pids.append(prev.pid)
 
-            for pid in collected_pids:
-                if pid != current.pid:
-                    edge_indices.append((pid, current.pid))
+            for prev_pid in prev_pids:
+                if prev_pid != current.pid:
+                    edge_indices.append((prev_pid, current.pid))
 
-        edge_indices = list(set(edge_indices))
         print(f"Total edges created: {len(edge_indices)}")
         return edge_indices
 
     def generate_edge_indices_csv(self):
-        edge_indices = self.generate_edge_indices()
+        edge_indices = self.generate_recurrent_edge_indices()
         edges_df = pd.DataFrame(edge_indices, columns=["source", "target"], dtype=int)
         csv_path = self.workspace_path.joinpath(f"edge.indices.csv")
         edges_df.to_csv(csv_path, index=False)

@@ -14,6 +14,7 @@ from scripts import script_5
 
 os.environ["WANDB_API_KEY"] = settings.wandb_api_key
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 # Models
 EMBED_DIM = settings.embed_dim
@@ -56,66 +57,55 @@ def delete_checkpoints():
 
 
 def main():
-    try:
-        delete_checkpoints()
+    delete_checkpoints()
 
-        settings.print()
+    settings.print()
 
-        volume = Volume(site="aboutpet", model="item2vec", version="v1")
-        volume.migrate_traces(start_date=datetime(2024, 8, 1))
-        volume.migrate_items()
-        volume.generate_pairs_csv()
-        volume.generate_edge_indices_csv()
+    volume = Volume(site="aboutpet", model="item2vec", version="v1")
 
-        data_module = SkipGramBPRDataModule(
-            volume=volume,
-            batch_size=DATAMODULE_BATCH_SIZE,
-            num_workers=DATAMODULE_NUM_WORKERS,
-            negative_k=DATAMODULE_NEGATIVE_K,
-        )
+    data_module = SkipGramBPRDataModule(
+        volume=volume,
+        batch_size=DATAMODULE_BATCH_SIZE,
+        num_workers=DATAMODULE_NUM_WORKERS,
+        negative_k=DATAMODULE_NEGATIVE_K,
+    )
 
-        item2vec = GraphBPRItem2VecModule(
-            vocab_size=data_module.vocab_size,
-            edge_index_path=volume.workspace_path.joinpath("edge.indices.csv"),
-            embed_dim=EMBED_DIM,
-            lr=LR,
-            weight_decay=WEIGHT_DECAY,
-        )
+    item2vec = GraphBPRItem2VecModule(
+        vocab_size=data_module.vocab_size,
+        edge_index_path=volume.workspace_path.joinpath("edge.indices.csv"),
+        embed_dim=EMBED_DIM,
+        lr=LR,
+        weight_decay=WEIGHT_DECAY,
+    )
 
-        # wandb.init(project="item2vec", config=WANDB_CONFIG)
-        # wandb.watch(item2vec, log="all", log_freq=1)
+    # wandb.init(project="item2vec", config=WANDB_CONFIG)
+    # wandb.watch(item2vec, log="all", log_freq=1)
 
-        trainer = Trainer(
-            limit_train_batches=TRAINER_LIMIT_TRAIN_BATCHES,
-            max_epochs=TRAINER_MAX_EPOCHS,
-            logger=WandbLogger(),
-            profiler=TRAINER_PROFILER,
-            callbacks=[
-                ModelCheckpoint(
-                    dirpath=CHECKPOINT_DIRPATH,
-                    monitor=CHECKPOINT_MONITOR,
-                    mode=CHECKPOINT_MODE,
-                    every_n_train_steps=CHECKPOINT_EVERY_N_TRAIN_STEPS,
-                    filename=CHECKPOINT_FILENAME,
-                    save_last=True,
-                ),
-                EarlyStopping(
-                    monitor=CHECKPOINT_MONITOR,
-                    mode=CHECKPOINT_MODE,
-                    patience=2,
-                    verbose=True
-                )
-            ],
-        )
-        trainer.fit(model=item2vec, datamodule=data_module, ckpt_path=CKPT_PATH)
-        script_5.main()
-    except Exception as e:
-        print(e)
-    finally:
-        pass
-        # wandb.finish()
+    trainer = Trainer(
+        limit_train_batches=TRAINER_LIMIT_TRAIN_BATCHES,
+        max_epochs=TRAINER_MAX_EPOCHS,
+        logger=WandbLogger(),
+        profiler=TRAINER_PROFILER,
+        callbacks=[
+            ModelCheckpoint(
+                dirpath=CHECKPOINT_DIRPATH,
+                monitor=CHECKPOINT_MONITOR,
+                mode=CHECKPOINT_MODE,
+                every_n_train_steps=CHECKPOINT_EVERY_N_TRAIN_STEPS,
+                filename=CHECKPOINT_FILENAME,
+                save_last=True,
+            ),
+            EarlyStopping(
+                monitor=CHECKPOINT_MONITOR,
+                mode=CHECKPOINT_MODE,
+                patience=5,
+                verbose=True
+            )
+        ],
+    )
+    trainer.fit(model=item2vec, datamodule=data_module, ckpt_path=CKPT_PATH)
+    script_5.main()
 
 
 if __name__ == "__main__":
-    while True:
-        main()
+    main()
