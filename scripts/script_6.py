@@ -11,13 +11,14 @@ items = volume.list_popular_items()
 dogs, cats = [], []
 for item in items:
     if item[2] == "강아지":
-        dogs.append(item[0])
+        dogs.append((item[0], item[1]))
     if item[2] == "고양이":
-        cats.append(item[0])
+        cats.append((item[0], item[1]))
 
 popular_items = list(itertools.chain.from_iterable(zip(dogs, cats)))
-popular_items = [{"pdid": x, "score": -1} for x in popular_items]
+popular_items = [{"pdid": x[0], "score": x[1]} for x in popular_items]
 
+print(items)
 print(popular_items)
 print(len(popular_items))
 

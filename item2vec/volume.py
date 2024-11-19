@@ -1,5 +1,6 @@
 import collections
 import enum
+import time
 from datetime import datetime, timedelta
 
 import pandas as pd
@@ -77,25 +78,6 @@ class Item(Base):
     def count(session: Session) -> int:
         return session.query(func.count(Item.id)).scalar()  # count 쿼리 추가
 
-    @staticmethod
-    def list_popular_items(session: Session):
-        query = """
-        SELECT i.pdid, i.purchase_count, i.category1, i.category2
-        FROM item i
-        JOIN (
-            SELECT category1, category2, MAX(purchase_count) AS max_purchase_count
-            FROM item
-            GROUP BY category1, category2
-        ) max_items
-        ON i.category1 = max_items.category1
-        AND i.category2 = max_items.category2
-        AND i.purchase_count = max_items.max_purchase_count
-        ORDER BY i.category1, i.purchase_count DESC
-        """
-
-        result = session.execute(text(query)).fetchall()
-        return result
-
     def to_dict(self):
         return {
             "id": self.id,
@@ -152,6 +134,28 @@ class Trace(Base):
             .group_by(Trace.pdid)
             .all()
         )
+
+    @staticmethod
+    def list_popular_items(session: Session, criteria: float):
+        query = text("""
+            SELECT pdid, MAX(cnt) as cnt, category1, category2
+            FROM (
+                SELECT a.pdid, a.cnt, b.category1, b.category2
+                FROM (
+                    SELECT pdid, COUNT(pdid) as cnt
+                    FROM trace AS t
+                    WHERE t.event = 'purchase'
+                    AND t.timestamp > :criteria
+                    GROUP BY pdid
+                ) AS a
+                LEFT JOIN item AS b ON a.pdid = b.pdid
+            )
+            WHERE category1 IS NOT NULL AND category2 IS NOT NULL
+            GROUP BY category1, category2
+            ORDER BY category1, cnt DESC ;
+        """)
+        result = session.execute(query, {"criteria": criteria}).fetchall()
+        return result
 
 
 class Volume:
@@ -373,8 +377,9 @@ class Volume:
         csv_path = self.workspace_path.joinpath(f"edge.indices.csv")
         edges_df.to_csv(csv_path, index=False)
 
-    def list_popular_items(self):
-        return Item.list_popular_items(self.session)
+    def list_popular_items(self, days: int=30):
+        criteria = time.time() - days * 24 * 60 * 60
+        return Trace.list_popular_items(self.session, criteria=criteria)
 
     def items(self) -> dict:
         if not self._items:
