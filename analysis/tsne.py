@@ -12,7 +12,7 @@ volume = Volume("aboutpet", "item2vec", "v1")
 item2vec_module = GraphBPRItem2VecModule.load_from_checkpoint(
     model_path,
     vocab_size=volume.vocab_size(),
-    edge_index_path=volume.workspace_path.joinpath("edge.indices.csv"),
+    edge_index_path=volume.workspace_path.joinpath("edge.sequential.indices.csv"),
     embedding_dim=128,
 )
 

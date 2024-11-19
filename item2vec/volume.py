@@ -294,15 +294,15 @@ class Volume:
         csv_path = self.workspace_path.joinpath(f"item.pairs.csv")
         pairs_df.to_csv(csv_path, index=False)
 
-    def generate_recurrent_edge_indices(self):
-        recurrent_edges = []
+    def generate_sequential_edge_indices(self):
+        sequential_edges = []
         items = self.items()
         traces = Trace.list_traces(self.session)
         prev_order, current_order = None, None
 
         Order = collections.namedtuple("Order", ["user_id", "pid", "category1", "timestamp"])
 
-        for trace in tqdm(traces, desc="recurrent edges 를 추출 중입니다.."):
+        for trace in tqdm(traces, desc="sequential edges 를 추출 중입니다.."):
             current_item = items.get(trace.pdid)
             if not current_item:
                 continue
@@ -321,10 +321,9 @@ class Volume:
             if prev_order.category1 != current_order.category1:
                 continue
 
-            recurrent_edges.append((prev_order.pid, current_order.pid))
+            sequential_edges.append((prev_order.pid, current_order.pid))
 
-        return recurrent_edges
-
+        return sequential_edges
 
     def generate_purchase_edge_indices(self, linked_list_size: int = 10):
         traces = Trace.list_traces(self.session)
@@ -372,12 +371,17 @@ class Volume:
         return edge_indices
 
     def generate_edge_indices_csv(self):
-        edge_indices = self.generate_recurrent_edge_indices()
-        edges_df = pd.DataFrame(edge_indices, columns=["source", "target"], dtype=int)
-        csv_path = self.workspace_path.joinpath(f"edge.indices.csv")
-        edges_df.to_csv(csv_path, index=False)
+        sequential_edge_indices = self.generate_sequential_edge_indices()
+        sequential_edges_df = pd.DataFrame(sequential_edge_indices, columns=["source", "target"], dtype=int)
+        sequential_csv_path = self.workspace_path.joinpath(f"edge.sequential.indices.csv")
+        sequential_edges_df.to_csv(sequential_csv_path, index=False)
 
-    def list_popular_items(self, days: int=30):
+        purchase_edge_indices = self.generate_purchase_edge_indices()
+        purchase_edges_df = pd.DataFrame(purchase_edge_indices, columns=["source", "target"], dtype=int)
+        purchase_csv_path = self.workspace_path.joinpath(f"edge.purchase.indices.csv")
+        purchase_edges_df.to_csv(purchase_csv_path, index=False)
+
+    def list_popular_items(self, days: int = 30):
         criteria = time.time() - days * 24 * 60 * 60
         return Trace.list_popular_items(self.session, criteria=criteria)
 

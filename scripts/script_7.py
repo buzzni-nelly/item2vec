@@ -31,7 +31,7 @@ vocab_size = volume.vocab_size()
 item2vec_module = GraphBPRItem2VecModule.load_from_checkpoint(
     "/tmp/checkpoints/last.ckpt",
     vocab_size=vocab_size,
-    edge_index_path=volume.workspace_path.joinpath("edge.indices.csv"),
+    edge_index_path=volume.workspace_path.joinpath("edge.sequential.indices.csv"),
     embedding_dim=128
 )
 item2vec_module.setup()

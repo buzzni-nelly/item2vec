@@ -112,13 +112,13 @@ class GraphItem2Vec(nn.Module):
     def __init__(
         self,
         vocab_size: int,
-        edge_index: torch.Tensor,
+        sequential_edge_index: torch.Tensor,
         embed_dim: int = 128,
         num_layers: int = 2,
     ):
         super(GraphItem2Vec, self).__init__()
         self.vocab_size = vocab_size
-        self.edge_index = edge_index
+        self.sequential_edge_index = sequential_edge_index
         self.embed_dim = embed_dim
         self.num_layers = num_layers
 
@@ -142,7 +142,7 @@ class GraphItem2Vec(nn.Module):
 
         all_embeddings = [x]
         for conv in self.convs:
-            x = conv(x, self.edge_index)
+            x = conv(x, self.sequential_edge_index)
             all_embeddings.append(x)
 
         final_embeddings = torch.mean(torch.stack(all_embeddings, dim=0), dim=0)
@@ -182,7 +182,7 @@ class GraphBPRItem2VecModule(pl.LightningModule):
         )
 
     def setup(self, stage=None):
-        self.item2vec.edge_index = self.item2vec.edge_index.to(self.device)
+        self.item2vec.sequential_edge_index = self.item2vec.sequential_edge_index.to(self.device)
 
     def forward(
         self, focus_items, positive_items, negative_items

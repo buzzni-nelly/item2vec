@@ -47,7 +47,7 @@ def load_embeddings(volume: Volume, embedding_dim: int = 128):
     item2vec_module = GraphBPRItem2VecModule.load_from_checkpoint(
         model_path,
         vocab_size=vocab_size,
-        edge_index_path=volume.workspace_path.joinpath("edge.indices.csv"),
+        edge_index_path=volume.workspace_path.joinpath("edge.sequential.indices.csv"),
         embedding_dim=embedding_dim
     )
     item2vec_module.setup()
