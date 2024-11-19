@@ -21,7 +21,7 @@ item2vec_module.eval()
 item2vec_module.freeze()
 
 # 임베딩 가져오기
-embeddings = item2vec_module.get_graph_embeddings()
+embeddings = item2vec_module.get_sequential_graph_embeddings()
 
 # 아이템 데이터 로드
 items = volume.items().values()

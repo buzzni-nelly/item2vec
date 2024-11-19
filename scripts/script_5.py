@@ -54,7 +54,7 @@ def load_embeddings(volume: Volume, embedding_dim: int = 128):
     item2vec_module.eval()
     item2vec_module.freeze()
 
-    embeddings = item2vec_module.get_graph_embeddings()
+    embeddings = item2vec_module.get_sequential_graph_embeddings()
     return embeddings
 
 
