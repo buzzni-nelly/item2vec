@@ -1,6 +1,8 @@
 while true; do
-    python prep.aboutpet.py
+    python aboutpet.prep.py
     sleep 5
-    python train.aboutpet.py
+    python aboutpet.popular.py
+    sleep 5
+    python aboutpet.train.py
     sleep 5
 done
