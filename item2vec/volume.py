@@ -382,7 +382,7 @@ class Volume:
         purchase_edges_df.to_csv(purchase_csv_path, index=False)
 
     def list_popular_items(self, days: int = 30):
-        criteria = time.time() - days * 24 * 60 * 60
+        criteria = time.time() - days * 24 * 60 * 7
         return Trace.list_popular_items(self.session, criteria=criteria)
 
     def items(self) -> dict:
