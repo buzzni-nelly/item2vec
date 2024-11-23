@@ -15,10 +15,12 @@ for item in items:
     if item[2] == "고양이":
         cats.append((item[0], item[1]))
 
+dogs.sort(key=lambda x: x[1], reverse=True)
+cats.sort(key=lambda x: x[1], reverse=True)
+
 popular_items = list(itertools.chain.from_iterable(zip(dogs, cats)))
 popular_items = [{"pdid": x[0], "score": x[1]} for x in popular_items]
 
-print(items)
 print(popular_items)
 print(len(popular_items))
 
