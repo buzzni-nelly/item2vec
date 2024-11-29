@@ -11,23 +11,32 @@ from item2vec.volume import Volume
 
 class SkipGramBPRTrainDataset(Dataset):
     def __init__(self, volume: Volume, negative_k: int = 10):
-        pairs_csv_path = volume.workspace_path.joinpath("item.pairs.csv")
-        pairs_df = pd.read_csv(pairs_csv_path)
+        seq_pairs_csv_path = volume.workspace_path.joinpath("item.sequential.pairs.csv")
+        seq_pairs_df = pd.read_csv(seq_pairs_csv_path)
 
-        self.pairs = pairs_df.to_numpy().tolist()
+        pcs_pairs_csv_path = volume.workspace_path.joinpath("item.purchase.pairs.csv")
+        pcs_pairs_df = pd.read_csv(pcs_pairs_csv_path)
+
+        self.seq_pairs = seq_pairs_df.to_numpy().tolist()
+        self.pcs_pairs = pcs_pairs_df.to_numpy().tolist()
         self.pids = volume.pids()
         self.negative_k = negative_k
 
     def __len__(self) -> int:
-        return len(self.pairs)
+        return len(self.seq_pairs)
 
     def __getitem__(self, idx):
-        target, positive = self.pairs[idx]
-        negatives = random.sample(self.pids, self.negative_k)
-        target_tensor = torch.LongTensor([target])
-        positive_tensor = torch.LongTensor([positive] * self.negative_k)
-        negative_tensor = torch.LongTensor(negatives)
-        return target_tensor, positive_tensor, negative_tensor
+        seq_target, seq_positive = self.seq_pairs[idx]
+        seq_negatives = random.sample(self.pids, self.negative_k)
+        seq_target_tensor = torch.LongTensor([seq_target])
+        seq_positive_tensor = torch.LongTensor([seq_positive] * self.negative_k)
+        seq_negative_tensor = torch.LongTensor(seq_negatives)
+
+        pcs_target, pcs_positive = self.pcs_pairs[idx // len(self.pcs_pairs)]
+        pcs_target_tensor = torch.LongTensor([pcs_target])
+        pcs_positive_tensor = torch.LongTensor([pcs_positive])
+
+        return seq_target_tensor, seq_positive_tensor, seq_negative_tensor, pcs_target_tensor, pcs_positive_tensor
 
 
 class SkipGramBPRValidDataset(Dataset):
@@ -53,7 +62,7 @@ class SkipGramBPRDataModule(LightningDataModule):
     def __init__(
         self,
         volume: Volume,
-        batch_size: int = 512,
+        batch_size: int = 128,
         num_workers: int = 8,
         negative_k: int = 9,
     ):
@@ -88,7 +97,7 @@ class SkipGramBPRDataModule(LightningDataModule):
     def val_dataloader(self) -> EVAL_DATALOADERS:
         return DataLoader(
             SkipGramBPRValidDataset(volume=self.volume),
-            batch_size=self.batch_size,
+            batch_size=self.batch_size // 2,
             num_workers=self.num_workers,
             persistent_workers=bool(self.num_workers > 0),
             pin_memory=True,

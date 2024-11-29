@@ -1,3 +1,5 @@
+import os
+
 import pandas as pd
 import plotly.express as px
 import torch
@@ -6,22 +8,27 @@ from sklearn.manifold import TSNE
 from item2vec.models import GraphBPRItem2VecModule
 from item2vec.volume import Volume
 
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+
 model_path = "/tmp/checkpoints/last.ckpt"
 volume = Volume("aboutpet", "item2vec", "v1")
 
 item2vec_module = GraphBPRItem2VecModule.load_from_checkpoint(
     model_path,
     vocab_size=volume.vocab_size(),
-    edge_index_path=volume.workspace_path.joinpath("edge.sequential.indices.csv"),
-    embedding_dim=128,
+    sequential_edge_index_path=volume.workspace_path.joinpath("edge.sequential.indices.csv"),
+    purchase_edge_index_path= volume.workspace_path.joinpath("edge.purchase.indices.csv"),
+    embed_dim=128,
 )
 
 item2vec_module.setup()
 item2vec_module.eval()
 item2vec_module.freeze()
+item2vec_module.to("cpu")
 
 # 임베딩 가져오기
-embeddings = item2vec_module.get_sequential_graph_embeddings()
+embeddings = item2vec_module.get_graph_embeddings(num_layers=3)
 
 # 아이템 데이터 로드
 items = volume.items().values()

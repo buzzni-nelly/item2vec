@@ -41,20 +41,21 @@ def debug(
     print("=" * 20)
 
 
-def load_embeddings(volume: Volume, embedding_dim: int = 128):
+def load_embeddings(volume: Volume, embed_dim: int = 256):
     model_path = "/tmp/checkpoints/last.ckpt"
     vocab_size = volume.vocab_size()
     item2vec_module = GraphBPRItem2VecModule.load_from_checkpoint(
         model_path,
         vocab_size=vocab_size,
-        edge_index_path=volume.workspace_path.joinpath("edge.sequential.indices.csv"),
-        embedding_dim=embedding_dim
+        sequential_edge_index_path=volume.workspace_path.joinpath("edge.sequential.indices.csv"),
+        purchase_edge_index_path=volume.workspace_path.joinpath("edge.purchase.indices.csv"),
+        embed_dim=embed_dim
     )
     item2vec_module.setup()
     item2vec_module.eval()
     item2vec_module.freeze()
 
-    embeddings = item2vec_module.get_sequential_graph_embeddings()
+    embeddings = item2vec_module.get_graph_embeddings(num_layers=1)
     return embeddings
 
 
@@ -120,7 +121,7 @@ def main(embed_dim=128, k: int = 100):
 
     volume = Volume(site="aboutpet", model="item2vec", version="v1")
 
-    embeddings = load_embeddings(volume, embedding_dim=embed_dim)
+    embeddings = load_embeddings(volume, embed_dim=embed_dim)
     items = volume.items()
 
     unknown_pids = [x["pid"] for x in items.values() if x["name"] == "UNKNOWN"]

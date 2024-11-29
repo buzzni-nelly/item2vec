@@ -258,7 +258,7 @@ class Volume:
         self.session.bulk_save_objects(items)
         self.session.commit()
 
-    def generate_pairs(
+    def generate_sequential_pairs(
         self, window_size: int = 5, time_delta: int = 60 * 3
     ):
         traces = Trace.list_traces(self.session)
@@ -286,12 +286,65 @@ class Volume:
                 pid_2 = self.pdid2pid(compare.pdid)
                 if pid_1 and pid_2:
                     item_pairs.append((pid_1, pid_2))
+                    item_pairs.append((pid_2, pid_1))
         return item_pairs
 
+    def generate_purchase_pairs(self, linked_list_size: int = 10):
+        traces = Trace.list_traces(self.session)
+        items = self.items()
+
+        linked_list = collections.deque(maxlen=linked_list_size)
+        edge_indices = []
+
+        Order = collections.namedtuple("Order", ["user_id", "pid", "category1", "timestamp"])
+
+        for x in tqdm(traces, desc="purchase edges 를 생성 중입니다."):
+            current_item = items.get(x.pdid)
+
+            if not current_item:
+                continue
+
+            linked_list.append(
+                Order(
+                    user_id=x.user_id,
+                    pid=current_item["pid"],
+                    category1=current_item["category1"],
+                    timestamp=x.timestamp,
+                )
+            )
+
+            if x.event not in [EventType.purchase]:
+                continue
+
+            current, prev_pids = linked_list[-1], []
+            for prev_idx in range(len(linked_list) - 1, -1, -1):
+                prev = linked_list[prev_idx]
+                if current.user_id != prev.user_id:
+                    break
+                if current.category1 != prev.category1:
+                    break
+                if current.timestamp - prev.timestamp > 60 * 10:
+                    break
+                prev_pids.append(prev.pid)
+
+            for idx, prev_pid in enumerate(prev_pids):
+                if prev_pid != current.pid:
+                    edge_indices.append((current.pid, prev_pid))
+                    if idx >= 1:
+                        break
+
+        print(f"Total edges created: {len(edge_indices)}")
+        return edge_indices
+
     def generate_pairs_csv(self):
-        item_pairs = self.generate_pairs()
+        item_pairs = self.generate_sequential_pairs()
         pairs_df = pd.DataFrame(item_pairs, columns=["target", "positive"], dtype=int)
-        csv_path = self.workspace_path.joinpath(f"item.pairs.csv")
+        csv_path = self.workspace_path.joinpath(f"item.sequential.pairs.csv")
+        pairs_df.to_csv(csv_path, index=False)
+
+        item_pairs = self.generate_purchase_pairs()
+        pairs_df = pd.DataFrame(item_pairs, columns=["target", "positive"], dtype=int)
+        csv_path = self.workspace_path.joinpath(f"item.purchase.pairs.csv")
         pairs_df.to_csv(csv_path, index=False)
 
     def generate_sequential_edge_indices(self):
@@ -323,60 +376,70 @@ class Volume:
 
             sequential_edges.append((prev_order.pid, current_order.pid))
 
+        print(f"Total edges created: {len(sequential_edges)}")
         return sequential_edges
 
-    def generate_purchase_edge_indices(self, linked_list_size: int = 10):
-        traces = Trace.list_traces(self.session)
-        items = self.items()
-
-        linked_list = collections.deque(maxlen=linked_list_size)
-        edge_indices = []
-
-        Order = collections.namedtuple("Order", ["user_id", "pid", "category1", "timestamp"])
-
-        for x in traces:
-            current_item = items.get(x.pdid)
-
-            if not current_item:
-                continue
-
-            linked_list.append(
-                Order(
-                    user_id=x.user_id,
-                    pid=current_item["pid"],
-                    category1=current_item["category1"],
-                    timestamp=x.timestamp,
-                )
-            )
-
-            if x.event not in [EventType.purchase]:
-                continue
-
-            current, prev_pids = linked_list[-1], []
-            for prev_idx in range(len(linked_list) - 1, -1, -1):
-                prev = linked_list[prev_idx]
-                if current.user_id != prev.user_id:
-                    break
-                if current.category1 != prev.category1:
-                    break
-                if current.timestamp - prev.timestamp > 60 * 10:
-                    break
-                prev_pids.append(prev.pid)
-
-            for prev_pid in prev_pids:
-                if prev_pid != current.pid:
-                    edge_indices.append((prev_pid, current.pid))
-
-        print(f"Total edges created: {len(edge_indices)}")
-        return edge_indices
+    def generate_purchase_edge_indices(self, linked_list_size: int = 3):
+        # traces = Trace.list_traces(self.session)
+        # items = self.items()
+        #
+        # linked_list = collections.deque(maxlen=linked_list_size)
+        # edge_indices = []
+        #
+        # Order = collections.namedtuple("Order", ["user_id", "pid", "category1", "timestamp"])
+        #
+        # for x in traces:
+        #     current_item = items.get(x.pdid)
+        #
+        #     if not current_item:
+        #         continue
+        #
+        #     linked_list.append(
+        #         Order(
+        #             user_id=x.user_id,
+        #             pid=current_item["pid"],
+        #             category1=current_item["category1"],
+        #             timestamp=x.timestamp,
+        #         )
+        #     )
+        #
+        #     if x.event not in [EventType.purchase]:
+        #         continue
+        #
+        #     current, prev_pids = linked_list[-1], []
+        #     for prev_idx in range(len(linked_list) - 1, -1, -1):
+        #         prev = linked_list[prev_idx]
+        #         if current.user_id != prev.user_id:
+        #             break
+        #         if current.category1 != prev.category1:
+        #             break
+        #         if current.timestamp - prev.timestamp > 60 * 10:
+        #             break
+        #         prev_pids.append(prev.pid)
+        #
+        #     for idx, prev_pid in enumerate(prev_pids):
+        #         if prev_pid != current.pid:
+        #             edge_indices.append((current.pid, prev_pid))
+        #             if idx >= 1:
+        #                 break
+        # print(f"Total edges created: {len(edge_indices)}")
+        # return edge_indices
+        df = pd.read_csv("/home/buzzni/item2vec/workspaces/aboutpet/item2vec/v1/validation.csv")
+        df["target"] = df["source_pdid"].apply(self.pdid2pid)
+        df["source"] = df["label_pdid"].apply(self.pdid2pid)
+        df = df.dropna()
+        df["target"] = df["target"].astype(int)
+        df["source"] = df["source"].astype(int)
+        df = df[["source", "target"]]
+        return df.values.tolist()
 
     def generate_edge_indices_csv(self):
-        sequential_edge_indices = self.generate_sequential_edge_indices()
-        sequential_edges_df = pd.DataFrame(sequential_edge_indices, columns=["source", "target"], dtype=int)
-        sequential_csv_path = self.workspace_path.joinpath(f"edge.sequential.indices.csv")
-        sequential_edges_df.to_csv(sequential_csv_path, index=False)
+        # sequential_edge_indices = self.generate_sequential_edge_indices()
+        # sequential_edges_df = pd.DataFrame(sequential_edge_indices, columns=["source", "target"], dtype=int)
+        # sequential_csv_path = self.workspace_path.joinpath(f"edge.sequential.indices.csv")
+        # sequential_edges_df.to_csv(sequential_csv_path, index=False)
 
-        purchase_edge_indices = self.generate_purchase_edge_indices()
+        purchase_edge_indices = self.generate_purchase_edge_indices(linked_list_size=2)
         purchase_edges_df = pd.DataFrame(purchase_edge_indices, columns=["source", "target"], dtype=int)
         purchase_csv_path = self.workspace_path.joinpath(f"edge.purchase.indices.csv")
         purchase_edges_df.to_csv(purchase_csv_path, index=False)

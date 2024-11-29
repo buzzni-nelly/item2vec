@@ -6,151 +6,65 @@ import torch
 import torch.nn.functional as F
 from torch import nn, optim
 from torch.optim import Optimizer
-from torch_geometric.nn import MessagePassing
-from torch_geometric.utils import add_self_loops, degree
+from torch_geometric.nn import MessagePassing, SAGEConv
+from torch_geometric.utils import degree
 
 
 class Item2Vec(nn.Module):
-    def __init__(self, vocab_size: int, embedding_dim: int = 128):
+    def __init__(self, vocab_size: int, embed_dim: int = 128):
         super(Item2Vec, self).__init__()
-        self.embeddings = nn.Embedding(vocab_size, embedding_dim)
-
-        # Xavier 초기화 적용
+        self.embeddings = nn.Embedding(vocab_size, embed_dim)
         nn.init.xavier_uniform_(self.embeddings.weight)
 
-    def forward(self, items, samples):
-        item_embeddings = self.embeddings(items)
-        sample_embeddings = self.embeddings(samples)
-        sample_embeddings = sample_embeddings.transpose(1, 2)
-        scores = torch.bmm(item_embeddings, sample_embeddings)
-        scores = scores.squeeze(1)
-        return scores
-
-
-class Item2VecModule(pl.LightningModule):
-    def __init__(
-        self,
-        vocab_size: int,
-        embedding_dim: int = 128,
-        lr: float = 1e-3,
-        weight_decay: float = 1e-2,
-    ):
-        super(Item2VecModule, self).__init__()
-        self.lr = lr
-        self.weight_decay = weight_decay
-        self.item2vec = Item2Vec(vocab_size, embedding_dim)
-        self.criterion = nn.BCEWithLogitsLoss()
-
-    def forward(self, focus_items, context_items):
-        return self.item2vec(focus_items, context_items)
-
-    def training_step(self, batch, batch_idx):
-        focus_items, context_items, labels = batch
-        scores = self.forward(focus_items, context_items)
-        loss = self.criterion(scores, labels)
-        self.log("train_loss", loss, prog_bar=True, logger=True)
-        return loss
-
-    def configure_optimizers(self):
-        return optim.AdamW(
-            self.parameters(), lr=self.lr, weight_decay=self.weight_decay
-        )
-
-
-class BPRItem2VecModule(pl.LightningModule):
-    def __init__(
-        self,
-        vocab_size: int,
-        embedding_dim: int = 128,
-        lr: float = 1e-3,
-        weight_decay: float = 1e-2,
-    ):
-        super(BPRItem2VecModule, self).__init__()
-        self.lr = lr
-        self.weight_decay = weight_decay
-        self.item2vec = Item2Vec(vocab_size, embedding_dim)
-
-    def forward(self, focus_items, positive_items, negative_items):
-        pos_scores = self.item2vec(focus_items, positive_items)
-        neg_scores = self.item2vec(focus_items, negative_items)
-        return pos_scores, neg_scores
-
-    def bpr_loss(self, pos_scores, neg_scores):
-        return -torch.mean(torch.log(torch.sigmoid(pos_scores - neg_scores)))
-
-    def training_step(self, batch, batch_idx):
-        focus_items, positive_items, negative_items = batch
-        pos_scores, neg_scores = self.forward(focus_items, positive_items, negative_items)
-        loss = self.bpr_loss(pos_scores, neg_scores)
-        self.log("train_loss", loss, prog_bar=True, logger=True)
-        return loss
-
-    def configure_optimizers(self):
-        return optim.AdamW(self.parameters(), lr=self.lr, weight_decay=self.weight_decay)
+    def forward(self):
+        return self.embeddings.weight
 
 
 class LightGCNConv(MessagePassing):
     def __init__(self):
-        super(LightGCNConv, self).__init__(aggr="mean")  # 평균 집계 방식
+        super(LightGCNConv, self).__init__(aggr='sum')
 
-    def forward(self, x, edge_index) -> torch.Tensor:
-        edge_index, _ = add_self_loops(edge_index, num_nodes=x.size(0))
-        deg = degree(edge_index[0], x.size(0), dtype=x.dtype)
-        deg_inv_sqrt = deg.pow(-0.5)
-        norm = deg_inv_sqrt[edge_index[0]] * deg_inv_sqrt[edge_index[1]]
-        return self.propagate(edge_index, x=x, norm=norm)
+    def forward(self, x, edge_index):
+        # edge_index, _ = add_self_loops(edge_index, num_nodes=x.size(0))
+        row, col = edge_index
 
-    def message(self, x_j, norm) -> torch.Tensor:
-        return norm.view(-1, 1) * x_j
+        col_deg = degree(col, x.size(0))
+        col_deg_inv = col_deg.pow(-1)
+        col_deg_inv[col_deg_inv == float('inf')] = 0.0
+        col_norm = col_deg_inv[col]
 
+        # 인기기반 row 처리
+        # row_deg = degree(row, x.size(0))
+        # row_min, row_max = row_deg.min(), row_deg.max()
+        # row_deg_norm = 1 + (row_deg - row_min) * (2 - 1) / (row_max - row_min + 1e-9)
+        # row_norm = row_deg_norm[row]
 
-class GraphItem2Vec(nn.Module):
-    def __init__(
-        self,
-        vocab_size: int,
-        embed_dim: int = 128,
-        num_layers: int = 2,
-    ):
-        super(GraphItem2Vec, self).__init__()
-        self.vocab_size = vocab_size
-        self.embed_dim = embed_dim
-        self.num_layers = num_layers
+        # idf
+        # row_deg = degree(row, x.size(0))
+        # row_deg_inv = row_deg.pow(-1)
+        # row_deg_inv[row_deg_inv == float('inf')] = 0.0
+        # row_min, row_max = row_deg_inv.min(), row_deg_inv.max()
+        # row_deg_norm = 1 + (row_deg_inv - row_min) * (2 - 1) / (row_max - row_min + 1e-9)
+        # row_norm = row_deg_norm[row]
 
-        self.embeddings = nn.Embedding(vocab_size, embed_dim)
-        nn.init.xavier_uniform_(self.embeddings.weight)
+        # norm = col_norm * row_norm
+        return self.propagate(edge_index, x=x, norm=col_norm)
 
-        self.convs = nn.ModuleList([LightGCNConv() for _ in range(num_layers)])
-
-    def forward(self, items, samples, edge_indices=None) -> torch.Tensor:
-        embeddings = self.embeddings.weight
-        for edge_index in edge_indices:
-            embeddings = self.forward_graph(self.embeddings.weight, edge_index)
-
-        item_embeddings = embeddings[items]
-        sample_embeddings = embeddings[samples]
-
-        sample_embeddings = sample_embeddings.transpose(1, 2)
-        scores = torch.bmm(item_embeddings, sample_embeddings)
-        scores = scores.squeeze(1)
-        return scores
-
-    def forward_graph(self, x: torch.Tensor, edge_index: torch.Tensor) -> torch.Tensor:
-        all_embeddings = [x]
-        for conv in self.convs:
-            x = conv(x, edge_index)
-            all_embeddings.append(x)
-        final_embeddings = torch.mean(torch.stack(all_embeddings, dim=0), dim=0)
-        return final_embeddings
+    def message(self, x_j, norm):
+        msg = norm.view(-1, 1) * x_j
+        return msg
 
 
 class GraphBPRItem2VecModule(pl.LightningModule):
     def __init__(
         self,
         vocab_size: int,
-        edge_index_path: pathlib.Path,
+        sequential_edge_index_path: pathlib.Path,
+        purchase_edge_index_path: pathlib.Path,
         embed_dim: int = 128,
         lr: float = 1e-3,
         weight_decay: float = 1e-2,
+        dropout: float = 0.0
     ):
         super(GraphBPRItem2VecModule, self).__init__()
         self.lr = lr
@@ -158,46 +72,83 @@ class GraphBPRItem2VecModule(pl.LightningModule):
         self.vocab_size = vocab_size
         self.embed_dim = embed_dim
 
-        edge_df = pd.read_csv(edge_index_path.as_posix())
+        edge_df = pd.read_csv(sequential_edge_index_path.as_posix())
         sources, targets = edge_df["source"].values, edge_df["target"].values
         sequential_edge_index = torch.tensor([sources, targets], dtype=torch.long)
         self.register_buffer("sequential_edge_index", sequential_edge_index)
-        self.item2vec = GraphItem2Vec(self.vocab_size, embed_dim=self.embed_dim)
+
+        edge_df = pd.read_csv(purchase_edge_index_path.as_posix())
+        sources, targets = edge_df["source"].values, edge_df["target"].values
+        purchase_edge_index = torch.tensor([sources, targets], dtype=torch.long)
+        self.register_buffer("purchase_edge_index", purchase_edge_index)
+
+        self.item2vec = Item2Vec(self.vocab_size, embed_dim=self.embed_dim)
+        self.conv = LightGCNConv()
+        self.dropout = nn.Dropout(p=dropout)
 
     def setup(self, stage=None):
         self.sequential_edge_index = self.sequential_edge_index.to(self.device)
+        self.purchase_edge_index = self.purchase_edge_index.to(self.device)
 
-    def forward(
-        self, focus_items, positive_items, negative_items
-    ) -> tuple[torch.Tensor, torch.Tensor]:
-        pos_scores = self.item2vec(focus_items, positive_items, [self.sequential_edge_index])
-        neg_scores = self.item2vec(focus_items, negative_items, [self.sequential_edge_index])
-        return pos_scores, neg_scores
+    def forward(self):
+        pass
 
-    def bpr_loss(self, pos_scores, neg_scores) -> torch.Tensor:
+    def dot_product(self, x, y):
+        y = y.transpose(1, 2)
+        scores = torch.bmm(x, y)
+        scores = scores.squeeze(1)
+        return scores
+
+    def bpr_loss(self, pos_scores: torch.Tensor, neg_scores: torch.Tensor) -> torch.Tensor:
         return -torch.mean(torch.log(torch.sigmoid(pos_scores - neg_scores)))
 
-    def training_step(self, batch, batch_idx) -> torch.Tensor:
-        focus_items, positive_items, negative_items = batch
-        pos_scores, neg_scores = self.forward(
-            focus_items, positive_items, negative_items
-        )
-        loss = self.bpr_loss(pos_scores, neg_scores)
-        self.log("train_loss", loss, prog_bar=True, logger=True)
-        return loss
+    def training_step(self, batch: torch.Tensor, batch_idx: int) -> torch.Tensor:
+        seq_focus_items, seq_pos_items, seq_neg_items, pcs_focus_items, pcs_pos_items = batch
+
+        embeddings = self.get_graph_embeddings(num_layers=2)
+        seq_focus_embeddings = embeddings[seq_focus_items]
+        seq_pos_embeddings = embeddings[seq_pos_items]
+        seq_neg_embeddings = embeddings[seq_neg_items]
+
+        seq_pos_scores = self.dot_product(seq_focus_embeddings, seq_pos_embeddings)
+        seq_neg_scores = self.dot_product(seq_focus_embeddings, seq_neg_embeddings)
+
+        train_loss = self.bpr_loss(seq_pos_scores, seq_neg_scores)
+        self.log("train_loss", train_loss, prog_bar=True, logger=True)
+        return train_loss
 
     def validation_step(self, batch: torch.Tensor, batch_idx: int) -> None:
         sources, labels = batch
         cos_ndcg = self.calc_cosine_ndcg(sources, labels, k=20)
-        dot_ndcg = self.calc_dotproduct_ndcg(sources, labels, k=20)
-        self.log("val_cos_ndcg@20", cos_ndcg.mean(), prog_bar=True, logger=True)
-        self.log("val_dot_ndcg@20", dot_ndcg.mean(), prog_bar=True, logger=True)
+        dot_ndcg = self.calc_dot_product_ndcg(sources, labels, k=20)
+        graph_dot_ndcg = self.calc_graph_dot_product_ndcg(sources, labels, num_layers=2,k=20)
+        graph_cos_ndcg = self.calc_graph_cosine_ndcg(sources, labels, num_layers=2, k=20)
+        graph_dot_recall = self.calc_graph_dot_product_recall(sources, labels, num_layers=2, k=20)
+
+        self.log("val_cos_ndcg@20", cos_ndcg.mean(), prog_bar=True, logger=True, sync_dist=True)
+        self.log("val_dot_ndcg@20", dot_ndcg.mean(), prog_bar=True, logger=True, sync_dist=True)
+        self.log("val_graph_dot_ndcg@20", graph_dot_ndcg.mean(), prog_bar=True, logger=True, sync_dist=True)
+        self.log("val_graph_cos_ndcg@20", graph_cos_ndcg.mean(), prog_bar=True, logger=True, sync_dist=True)
+        self.log("val_graph_dot_recall@20", graph_dot_recall.mean(), prog_bar=True, logger=True, sync_dist=True)
 
     def calc_cosine_ndcg(self, sources: torch.Tensor, labels: torch.Tensor, k: int = 20):
-        all_embeddings = self.get_sequential_graph_embeddings()
-        source_embeddings = all_embeddings[sources]
+        embeddings = self.item2vec.forward()
+        source_embeddings = embeddings[sources]
 
-        all_scores = F.cosine_similarity(source_embeddings.unsqueeze(1), all_embeddings.unsqueeze(0), dim=-1)
+        all_scores = F.cosine_similarity(source_embeddings.unsqueeze(1), embeddings.unsqueeze(0), dim=-1)
+
+        _, top_indices = torch.topk(all_scores, k, dim=-1)
+        top_indices = top_indices.squeeze(1)
+        relevance = (top_indices == labels).float()
+        gains = 1 / torch.log2(torch.arange(2, k + 2).float()).to(relevance.device)
+        ndcg = (relevance * gains).sum(dim=-1)
+        return ndcg
+
+    def calc_dot_product_ndcg(self, sources: torch.Tensor, labels: torch.Tensor, k: int = 20):
+        embeddings = self.item2vec()
+        source_embeddings = embeddings[sources]
+
+        all_scores = torch.matmul(source_embeddings, embeddings.T)
 
         _, top_indices = torch.topk(all_scores, k, dim=-1)
         top_indices = top_indices.squeeze(1)
@@ -206,11 +157,11 @@ class GraphBPRItem2VecModule(pl.LightningModule):
         ndcg = (relevance * gains).sum(dim=-1)
         return ndcg
 
-    def calc_dotproduct_ndcg(self, sources: torch.Tensor, labels: torch.Tensor, k: int = 20):
-        all_embeddings = self.get_sequential_graph_embeddings()
-        source_embeddings = all_embeddings[sources]
+    def calc_graph_dot_product_ndcg(self, sources: torch.Tensor, labels: torch.Tensor, num_layers: int = 2, k: int = 20):
+        embeddings = self.get_graph_embeddings(num_layers=num_layers)
+        source_embeddings = embeddings[sources]
 
-        all_scores = torch.matmul(source_embeddings, all_embeddings.T)
+        all_scores = torch.matmul(source_embeddings, embeddings.T)
 
         _, top_indices = torch.topk(all_scores, k, dim=-1)
         top_indices = top_indices.squeeze(1)
@@ -218,12 +169,42 @@ class GraphBPRItem2VecModule(pl.LightningModule):
         gains = 1 / torch.log2(torch.arange(2, k + 2).float()).to(relevance.device)
         ndcg = (relevance * gains).sum(dim=-1)
         return ndcg
+
+    def calc_graph_cosine_ndcg(self, sources: torch.Tensor, labels: torch.Tensor, num_layers: int = 2, k: int = 20):
+        embeddings = self.get_graph_embeddings(num_layers=num_layers)
+        source_embeddings = embeddings[sources]
+
+        all_scores = F.cosine_similarity(source_embeddings.unsqueeze(1), embeddings.unsqueeze(0), dim=-1)
+
+        _, top_indices = torch.topk(all_scores, k, dim=-1)
+        top_indices = top_indices.squeeze(1)
+        relevance = (top_indices == labels).float()
+        gains = 1 / torch.log2(torch.arange(2, k + 2).float()).to(relevance.device)
+        ndcg = (relevance * gains).sum(dim=-1)
+        return ndcg
+
+    def calc_graph_dot_product_recall(self, sources: torch.Tensor, labels: torch.Tensor, num_layers: int = 2, k: int = 20):
+        embeddings = self.get_graph_embeddings(num_layers=num_layers)
+        source_embeddings = embeddings[sources]
+
+        all_scores = torch.matmul(source_embeddings, embeddings.T)
+
+        _, top_indices = torch.topk(all_scores, k, dim=-1)
+        top_indices = top_indices.squeeze(1)
+        relevance = (top_indices == labels).float()
+        recall, _ = relevance.max(dim=-1)
+        return recall
 
     def configure_optimizers(self) -> Optimizer:
-        return optim.AdamW(
-            self.parameters(), lr=self.lr, weight_decay=self.weight_decay
-        )
+        return optim.AdamW(self.parameters(), lr=self.lr, weight_decay=self.weight_decay)
 
-    def get_sequential_graph_embeddings(self) -> torch.Tensor:
-        embeddings = self.item2vec.embeddings.weight
-        return self.item2vec.forward_graph(embeddings, self.sequential_edge_index)
+    def get_graph_embeddings(self, num_layers: int = 2):
+        initial_embeddings = self.item2vec()
+        x = initial_embeddings
+        layers = []
+        for _ in range(num_layers):
+            weights = self.conv(x, self.purchase_edge_index)
+            layers.append(weights)
+            x = x + weights
+        mean_weights = torch.mean(torch.stack(layers, dim=-1), dim=-1)
+        return initial_embeddings + self.dropout(mean_weights)

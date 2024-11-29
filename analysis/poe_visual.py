@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-from item2vec.formers import PositionalEncoding
+from reranker.formers import PositionalEncoding
 
 embed_dim = 128
 max_len = 50

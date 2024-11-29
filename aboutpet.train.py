@@ -1,6 +1,9 @@
 import os
+
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+
 import pathlib
-from datetime import datetime
 
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
@@ -13,8 +16,6 @@ from item2vec.volume import Volume
 from scripts import script_5
 
 os.environ["WANDB_API_KEY"] = settings.wandb_api_key
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
-os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 # Models
 EMBED_DIM = settings.embed_dim
@@ -72,20 +73,19 @@ def main():
 
     item2vec = GraphBPRItem2VecModule(
         vocab_size=data_module.vocab_size,
-        edge_index_path=volume.workspace_path.joinpath("edge.sequential.indices.csv"),
+        sequential_edge_index_path=volume.workspace_path.joinpath("edge.sequential.indices.csv"),
+        purchase_edge_index_path=volume.workspace_path.joinpath("edge.purchase.indices.csv"),
         embed_dim=EMBED_DIM,
         lr=LR,
         weight_decay=WEIGHT_DECAY,
     )
-
-    # wandb.init(project="item2vec", config=WANDB_CONFIG)
-    # wandb.watch(item2vec, log="all", log_freq=1)
 
     trainer = Trainer(
         limit_train_batches=TRAINER_LIMIT_TRAIN_BATCHES,
         max_epochs=TRAINER_MAX_EPOCHS,
         logger=WandbLogger(),
         profiler=TRAINER_PROFILER,
+        precision=TRAINER_PRECISION,
         callbacks=[
             ModelCheckpoint(
                 dirpath=CHECKPOINT_DIRPATH,
