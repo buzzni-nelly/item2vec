@@ -59,7 +59,6 @@ class GraphBPRItem2VecModule(pl.LightningModule):
     def __init__(
         self,
         vocab_size: int,
-        sequential_edge_index_path: pathlib.Path,
         purchase_edge_index_path: pathlib.Path,
         embed_dim: int = 128,
         lr: float = 1e-3,
@@ -72,11 +71,6 @@ class GraphBPRItem2VecModule(pl.LightningModule):
         self.vocab_size = vocab_size
         self.embed_dim = embed_dim
 
-        edge_df = pd.read_csv(sequential_edge_index_path.as_posix())
-        sources, targets = edge_df["source"].values, edge_df["target"].values
-        sequential_edge_index = torch.tensor([sources, targets], dtype=torch.long)
-        self.register_buffer("sequential_edge_index", sequential_edge_index)
-
         edge_df = pd.read_csv(purchase_edge_index_path.as_posix())
         sources, targets = edge_df["source"].values, edge_df["target"].values
         purchase_edge_index = torch.tensor([sources, targets], dtype=torch.long)
@@ -84,10 +78,10 @@ class GraphBPRItem2VecModule(pl.LightningModule):
 
         self.item2vec = Item2Vec(self.vocab_size, embed_dim=self.embed_dim)
         self.conv = LightGCNConv()
+        self.layer_norm = nn.LayerNorm(embed_dim)
         self.dropout = nn.Dropout(p=dropout)
 
     def setup(self, stage=None):
-        self.sequential_edge_index = self.sequential_edge_index.to(self.device)
         self.purchase_edge_index = self.purchase_edge_index.to(self.device)
 
     def forward(self):
@@ -99,13 +93,31 @@ class GraphBPRItem2VecModule(pl.LightningModule):
         scores = scores.squeeze(1)
         return scores
 
-    def bpr_loss(self, pos_scores: torch.Tensor, neg_scores: torch.Tensor) -> torch.Tensor:
-        return -torch.mean(torch.log(torch.sigmoid(pos_scores - neg_scores)))
+    def bpr_loss(
+        self, pos_scores: torch.Tensor, neg_scores: torch.Tensor, margins: torch.Tensor, boost_factor: float = 2.0
+    ) -> torch.Tensor:
+        """
+        Modified BPR Loss with dynamic margin adjustment for purchased samples.
+
+        Args:
+            pos_scores: Positive sample scores (S_pos)
+            neg_scores: Negative sample scores (S_neg)
+            margins: Tensor of margins (1 for purchase, 0 otherwise)
+            boost_factor: Additional factor to amplify purchased samples
+
+        Returns:
+            Computed BPR loss as a tensor
+        """
+        base_loss = -torch.log(torch.sigmoid(pos_scores - neg_scores - margins))
+        boosted_loss = base_loss + (margins * boost_factor * (1 - torch.sigmoid(pos_scores - neg_scores)))
+        return boosted_loss.mean()
 
     def training_step(self, batch: torch.Tensor, batch_idx: int) -> torch.Tensor:
-        seq_focus_items, seq_pos_items, seq_neg_items, pcs_focus_items, pcs_pos_items = batch
+        seq_focus_items, seq_pos_items, seq_margins, seq_neg_items = batch
+        # seq_margins = 5 * seq_margins # val_graph_dot_ndcg@20=0.360
+        seq_margins = 1 * seq_margins
 
-        embeddings = self.get_graph_embeddings(num_layers=2)
+        embeddings = self.get_graph_embeddings(num_layers=3)
         seq_focus_embeddings = embeddings[seq_focus_items]
         seq_pos_embeddings = embeddings[seq_pos_items]
         seq_neg_embeddings = embeddings[seq_neg_items]
@@ -113,7 +125,7 @@ class GraphBPRItem2VecModule(pl.LightningModule):
         seq_pos_scores = self.dot_product(seq_focus_embeddings, seq_pos_embeddings)
         seq_neg_scores = self.dot_product(seq_focus_embeddings, seq_neg_embeddings)
 
-        train_loss = self.bpr_loss(seq_pos_scores, seq_neg_scores)
+        train_loss = self.bpr_loss(seq_pos_scores, seq_neg_scores, seq_margins)
         self.log("train_loss", train_loss, prog_bar=True, logger=True)
         return train_loss
 
@@ -121,9 +133,9 @@ class GraphBPRItem2VecModule(pl.LightningModule):
         sources, labels = batch
         cos_ndcg = self.calc_cosine_ndcg(sources, labels, k=20)
         dot_ndcg = self.calc_dot_product_ndcg(sources, labels, k=20)
-        graph_dot_ndcg = self.calc_graph_dot_product_ndcg(sources, labels, num_layers=2,k=20)
-        graph_cos_ndcg = self.calc_graph_cosine_ndcg(sources, labels, num_layers=2, k=20)
-        graph_dot_recall = self.calc_graph_dot_product_recall(sources, labels, num_layers=2, k=20)
+        graph_dot_ndcg = self.calc_graph_dot_product_ndcg(sources, labels, num_layers=3, k=20)
+        graph_cos_ndcg = self.calc_graph_cosine_ndcg(sources, labels, num_layers=3, k=20)
+        graph_dot_recall = self.calc_graph_dot_product_recall(sources, labels, num_layers=3, k=20)
 
         self.log("val_cos_ndcg@20", cos_ndcg.mean(), prog_bar=True, logger=True, sync_dist=True)
         self.log("val_dot_ndcg@20", dot_ndcg.mean(), prog_bar=True, logger=True, sync_dist=True)
@@ -201,10 +213,12 @@ class GraphBPRItem2VecModule(pl.LightningModule):
     def get_graph_embeddings(self, num_layers: int = 2):
         initial_embeddings = self.item2vec()
         x = initial_embeddings
-        layers = []
+        # layers = []
+        layers = [initial_embeddings]
         for _ in range(num_layers):
             weights = self.conv(x, self.purchase_edge_index)
             layers.append(weights)
             x = x + weights
         mean_weights = torch.mean(torch.stack(layers, dim=-1), dim=-1)
+        # mean_weights = self.layer_norm(mean_weights)
         return initial_embeddings + self.dropout(mean_weights)

@@ -2,11 +2,12 @@ import collections
 import enum
 import time
 from datetime import datetime, timedelta
+from typing import Literal
 
 import pandas as pd
 import sqlalchemy.orm
 import sqlalchemy.orm
-from sqlalchemy import Column, Integer, String, Float, Enum, func, case, text
+from sqlalchemy import Column, Integer, String, Float, Enum, func, case, text, Sequence
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from tqdm import tqdm
@@ -55,8 +56,7 @@ class EventType(enum.Enum):
 
 class Item(Base):
     __tablename__ = "item"
-    id = Column(Integer, primary_key=True)
-    pid = Column(Integer, index=True)
+    pidx = Column(Integer, primary_key=True)
     pdid = Column(String, index=True, nullable=False)
     purchase_count = Column(Integer, nullable=False)
     click_count = Column(Integer, nullable=False)
@@ -70,25 +70,74 @@ class Item(Base):
         return session.query(Item).all()
 
     @staticmethod
-    def dict_items(session: Session):
+    def dict_items(session: Session, by:Literal["pdid", "pidx"]=""):
         items = session.query(Item).all()
-        return {item.pdid: item for item in items}
+        if by == "pdid":
+            return {item.pdid: item for item in items}
+        elif by == "pidx":
+            return {item.pidx: item for item in items}
+        else:
+            raise ValueError("by must be one of pdid or idx.")
 
     @staticmethod
     def count(session: Session) -> int:
-        return session.query(func.count(Item.id)).scalar()  # count 쿼리 추가
+        return session.query(func.count(Item.pidx)).scalar()  # count 쿼리 추가
+
+    @staticmethod
+    def reset_table(session: Session):
+        Item.__table__.drop(session.bind, checkfirst=True)
+        Item.__table__.create(session.bind, checkfirst=True)
 
     def to_dict(self):
         return {
-            "id": self.id,
+            "pidx": self.pidx,
             "pdid": self.pdid,
-            "pid": self.pid,
             "purchase_count": self.purchase_count,
             "click_count": self.click_count,
             "name": self.name,
             "category1": self.category1,
             "category2": self.category2,
             "category3": self.category3,
+        }
+
+
+
+class User(Base):
+    __tablename__ = "user"
+    uidx = Column(Integer, primary_key=True)
+    user_id = Column(String, index=True, nullable=False)
+    purchase_count = Column(Integer, nullable=False, default=0)
+    click_count = Column(Integer, nullable=False, default=0)
+
+    @staticmethod
+    def list_users(session: Session):
+        return session.query(User).all()
+
+    @staticmethod
+    def dict_users(session: Session):
+        users = session.query(User).all()
+        return {x.user_id: x for x in users}
+
+    @staticmethod
+    def count(session: Session) -> int:
+        return session.query(func.count(User.uidx)).scalar()
+
+    @staticmethod
+    def reset_table(session: Session):
+        User.__table__.drop(session.bind, checkfirst=True)
+        User.__table__.create(session.bind, checkfirst=True)
+
+    @staticmethod
+    def reset_table(session: Session):
+        User.__table__.drop(session.bind, checkfirst=True)
+        User.__table__.create(session.bind, checkfirst=True)
+
+    def to_dict(self):
+        return {
+            "uidx": self.uidx,
+            "user_id": self.user_id,
+            "purchase_count": self.purchase_count,
+            "click_count": self.click_count,
         }
 
 
@@ -102,8 +151,26 @@ class Trace(Base):
 
     @staticmethod
     def list_traces(session: Session):
-        traces = session.query(Trace).all()
-        return traces
+        raw_query = text("""
+            SELECT 
+                user.uidx AS uidx,
+                item.pidx AS pidx,
+                trace.event AS event,
+                trace.timestamp AS timestamp
+            FROM trace
+            INNER JOIN user ON trace.user_id = user.user_id
+            INNER JOIN item ON trace.pdid = item.pdid
+        """)
+        results = session.execute(raw_query).fetchall()
+        return [
+            {
+                "uidx": row.uidx,
+                "pidx": row.pidx,
+                "event": row.event,
+                "timestamp": row.timestamp,
+            }
+            for row in results
+        ]
 
     @staticmethod
     def insert_traces(session: Session, traces: list[dict]):
@@ -122,16 +189,31 @@ class Trace(Base):
         session.commit()
 
     @staticmethod
-    def get_event_counts_by_pdid(session: Session):
+    def aggregate_items(session: Session):
         return (
             session.query(
                 Trace.pdid,
                 func.sum(
                     case((Trace.event == EventType.purchase.value, 1), else_=0)
                 ).label("purchase_count"),
-                func.count().label("total_count"),
+                func.count().label("click_count"),
             )
             .group_by(Trace.pdid)
+            .all()
+        )
+
+    @staticmethod
+    def aggregate_users(session: Session, click_count_threshold: int = 5):
+        return (
+            session.query(
+                Trace.user_id,
+                func.sum(
+                    case((Trace.event == EventType.purchase.value, 1), else_=0)
+                ).label("purchase_count"),
+                func.count().label("click_count"),
+            )
+            .group_by(Trace.user_id)
+            .having(func.count() >= click_count_threshold)
             .all()
         )
 
@@ -177,11 +259,8 @@ class Volume:
         Base.metadata.create_all(self.engine)
 
         self._items = None
-        self._pid2pdid = None
-        self._pdid2pid = None
-
-    def aggregate(self):
-        return Trace.get_event_counts_by_pdid(self.session)
+        self._pidx2pdid = None
+        self._pdid2pidx = None
 
     def migrate_traces(self, start_date: datetime):
         current_date = start_date
@@ -212,16 +291,11 @@ class Volume:
             current_date += timedelta(days=1)
 
     def migrate_items(self):
-        # 집계된 데이터를 가져옵니다
-        Item.__table__.drop(self.session.bind, checkfirst=True)
-        Item.__table__.create(self.session.bind, checkfirst=True)
+        Item.reset_table(self.session)
 
-        aggregates = self.aggregate()
-
+        aggregates = Trace.aggregate_items(self.session)
         pdids, purchase_counts, click_counts = zip(*aggregates)
-
         products = clients.mongo.p32712.list_products(pdids)
-
         products_dict = {
             x["_id"]: {
                 "name": x.get("name"),
@@ -238,211 +312,133 @@ class Volume:
             for x in products
         }
 
-        items, pid = [], 0
+        items, pidx = [], 0
         for pdid, purchase_count, click_count in aggregates:
-            if pdid in products_dict:
-                items.append(
-                    Item(
-                        pdid=pdid,
-                        pid=pid,
-                        purchase_count=purchase_count,
-                        click_count=click_count,
-                        name=products_dict[pdid]["name"],
-                        category1=products_dict[pdid]["category1"],
-                        category2=products_dict[pdid]["category2"],
-                        category3=products_dict[pdid]["category3"],
-                    )
+            if pdid not in products_dict:
+                continue
+            items.append(
+                Item(
+                    pidx=pidx,
+                    pdid=pdid,
+                    purchase_count=purchase_count,
+                    click_count=click_count,
+                    name=products_dict[pdid]["name"],
+                    category1=products_dict[pdid]["category1"],
+                    category2=products_dict[pdid]["category2"],
+                    category3=products_dict[pdid]["category3"],
                 )
-                pid += 1
+            )
+            pidx += 1
 
         self.session.bulk_save_objects(items)
         self.session.commit()
 
-    def generate_sequential_pairs(
-        self, window_size: int = 5, time_delta: int = 60 * 3
-    ):
-        traces = Trace.list_traces(self.session)
-        linked_list = collections.deque(maxlen=window_size)
-        item_pairs = []
-        for trace in tqdm(traces, desc="Pair data 를 추출 중 입니다.."):
-            linked_list.append(trace)
+    def migrate_users(self):
+        User.reset_table(self.session)
 
-            if len(linked_list) < window_size:
-                continue
+        aggregates = Trace.aggregate_users(self.session)
 
-            pivot = window_size // 2
-            current = linked_list[pivot]
-
-            for i in range(len(linked_list)):
-                compare = linked_list[i]
-                if i == pivot:
-                    continue
-                if current.user_id != compare.user_id:
-                    continue
-                if current.timestamp - compare.timestamp > time_delta:
-                    continue
-
-                pid_1 = self.pdid2pid(current.pdid)
-                pid_2 = self.pdid2pid(compare.pdid)
-                if pid_1 and pid_2:
-                    item_pairs.append((pid_1, pid_2))
-                    item_pairs.append((pid_2, pid_1))
-        return item_pairs
-
-    def generate_purchase_pairs(self, linked_list_size: int = 10):
-        traces = Trace.list_traces(self.session)
-        items = self.items()
-
-        linked_list = collections.deque(maxlen=linked_list_size)
-        edge_indices = []
-
-        Order = collections.namedtuple("Order", ["user_id", "pid", "category1", "timestamp"])
-
-        for x in tqdm(traces, desc="purchase edges 를 생성 중입니다."):
-            current_item = items.get(x.pdid)
-
-            if not current_item:
-                continue
-
-            linked_list.append(
-                Order(
-                    user_id=x.user_id,
-                    pid=current_item["pid"],
-                    category1=current_item["category1"],
-                    timestamp=x.timestamp,
+        users = []
+        for uidx, (user_id, purchase_count, click_count) in enumerate(aggregates):
+            users.append(
+                User(
+                    uidx=uidx,
+                    user_id=user_id,
+                    purchase_count=purchase_count,
+                    click_count=click_count,
                 )
             )
 
-            if x.event not in [EventType.purchase]:
+        self.session.bulk_save_objects(users)
+        self.session.commit()
+
+    def generate_sequential_pairs(self, window_size: int = 5, time_delta: int = 60 * 3):
+        traces = Trace.list_traces(self.session)
+        queue = collections.deque(maxlen=window_size)
+        item_pairs = []
+        for trace in tqdm(traces, desc="Sequence Pair data 를 추출 중 입니다.."):
+            queue.append(trace)
+
+            if len(queue) < window_size:
                 continue
 
-            current, prev_pids = linked_list[-1], []
-            for prev_idx in range(len(linked_list) - 1, -1, -1):
-                prev = linked_list[prev_idx]
-                if current.user_id != prev.user_id:
-                    break
-                if current.category1 != prev.category1:
-                    break
-                if current.timestamp - prev.timestamp > 60 * 10:
-                    break
-                prev_pids.append(prev.pid)
+            pivot = window_size // 2
+            current = queue[pivot]
 
-            for idx, prev_pid in enumerate(prev_pids):
-                if prev_pid != current.pid:
-                    edge_indices.append((current.pid, prev_pid))
-                    if idx >= 1:
-                        break
+            for i in range(len(queue)):
+                compare = queue[i]
+                if i == pivot:
+                    continue
+                if current["uidx"] != compare["uidx"]:
+                    continue
+                if current["timestamp"] - compare["timestamp"] > time_delta:
+                    continue
 
-        print(f"Total edges created: {len(edge_indices)}")
-        return edge_indices
+                pidx_1 = current["pidx"]
+                pidx_2 = compare["pidx"]
+                weight = 1 if 'purchase' in [current["event"], compare["event"]] else 0
+
+                if pidx_1 and pidx_2:
+                    item_pairs.append((pidx_1, pidx_2, weight))
+                    item_pairs.append((pidx_2, pidx_1, weight))
+
+        return item_pairs
 
     def generate_pairs_csv(self):
         item_pairs = self.generate_sequential_pairs()
-        pairs_df = pd.DataFrame(item_pairs, columns=["target", "positive"], dtype=int)
+        pairs_df = pd.DataFrame(item_pairs, columns=["target", "positive", "is_purchased"], dtype=int)
         csv_path = self.workspace_path.joinpath(f"item.sequential.pairs.csv")
         pairs_df.to_csv(csv_path, index=False)
 
-        item_pairs = self.generate_purchase_pairs()
-        pairs_df = pd.DataFrame(item_pairs, columns=["target", "positive"], dtype=int)
-        csv_path = self.workspace_path.joinpath(f"item.purchase.pairs.csv")
-        pairs_df.to_csv(csv_path, index=False)
-
-    def generate_sequential_edge_indices(self):
-        sequential_edges = []
-        items = self.items()
-        traces = Trace.list_traces(self.session)
-        prev_order, current_order = None, None
-
-        Order = collections.namedtuple("Order", ["user_id", "pid", "category1", "timestamp"])
-
-        for trace in tqdm(traces, desc="sequential edges 를 추출 중입니다.."):
-            current_item = items.get(trace.pdid)
-            if not current_item:
-                continue
-
-            prev_order, current_order = current_order, Order(
-                user_id=trace.user_id,
-                pid=current_item["pid"],
-                category1=current_item["category1"],
-                timestamp=trace.timestamp,
-            )
-
-            if not prev_order or not current_order:
-                continue
-            if prev_order.user_id != current_order.user_id:
-                continue
-            if prev_order.category1 != current_order.category1:
-                continue
-
-            sequential_edges.append((prev_order.pid, current_order.pid))
-
-        print(f"Total edges created: {len(sequential_edges)}")
-        return sequential_edges
-
-    def generate_purchase_edge_indices(self, linked_list_size: int = 3):
-        # traces = Trace.list_traces(self.session)
-        # items = self.items()
-        #
-        # linked_list = collections.deque(maxlen=linked_list_size)
-        # edge_indices = []
-        #
-        # Order = collections.namedtuple("Order", ["user_id", "pid", "category1", "timestamp"])
-        #
-        # for x in traces:
-        #     current_item = items.get(x.pdid)
-        #
-        #     if not current_item:
-        #         continue
-        #
-        #     linked_list.append(
-        #         Order(
-        #             user_id=x.user_id,
-        #             pid=current_item["pid"],
-        #             category1=current_item["category1"],
-        #             timestamp=x.timestamp,
-        #         )
-        #     )
-        #
-        #     if x.event not in [EventType.purchase]:
-        #         continue
-        #
-        #     current, prev_pids = linked_list[-1], []
-        #     for prev_idx in range(len(linked_list) - 1, -1, -1):
-        #         prev = linked_list[prev_idx]
-        #         if current.user_id != prev.user_id:
-        #             break
-        #         if current.category1 != prev.category1:
-        #             break
-        #         if current.timestamp - prev.timestamp > 60 * 10:
-        #             break
-        #         prev_pids.append(prev.pid)
-        #
-        #     for idx, prev_pid in enumerate(prev_pids):
-        #         if prev_pid != current.pid:
-        #             edge_indices.append((current.pid, prev_pid))
-        #             if idx >= 1:
-        #                 break
-        # print(f"Total edges created: {len(edge_indices)}")
-        # return edge_indices
+    def generate_purchase_edge_indices(self):
         df = pd.read_csv("/home/buzzni/item2vec/workspaces/aboutpet/item2vec/v1/validation.csv")
-        df["target"] = df["source_pdid"].apply(self.pdid2pid)
-        df["source"] = df["label_pdid"].apply(self.pdid2pid)
+        df["target"] = df["source_pdid"].apply(self.pdid2pidx)
+        df["source"] = df["label_pdid"].apply(self.pdid2pidx)
         df = df.dropna()
         df["target"] = df["target"].astype(int)
         df["source"] = df["source"].astype(int)
         df = df[["source", "target"]]
         return df.values.tolist()
 
-    def generate_edge_indices_csv(self):
-        # sequential_edge_indices = self.generate_sequential_edge_indices()
-        # sequential_edges_df = pd.DataFrame(sequential_edge_indices, columns=["source", "target"], dtype=int)
-        # sequential_csv_path = self.workspace_path.joinpath(f"edge.sequential.indices.csv")
-        # sequential_edges_df.to_csv(sequential_csv_path, index=False)
+        # traces = Trace.list_traces(self.session)
+        # items = Item.dict_items(self.session, by="pidx")
+        #
+        # edge_indices = []
+        # for t1, t2 in tqdm(zip(traces[:-1], traces[1:]), desc="Purchase edge indices 를 추출 중입니다.."):
+        #     pidx_1, pidx_2 = t1["pidx"], t2["pidx"]
+        #     if t2["event"] != "purchase":
+        #         continue
+        #     if t1["uidx"] != t2["uidx"]:
+        #         continue
+        #
+        #     item_1, item_2 = items.get(pidx_1), items.get(pidx_2)
+        #     if not item_1 or not item_2:
+        #         continue
+        #     if item_1.category1 != item_2.category1:
+        #         continue
+        #     edge_indices.append((item_2.pidx, item_1.pidx))
+        # return edge_indices
 
-        purchase_edge_indices = self.generate_purchase_edge_indices(linked_list_size=2)
+    def generate_edge_indices_csv(self):
+        purchase_edge_indices = self.generate_purchase_edge_indices()
         purchase_edges_df = pd.DataFrame(purchase_edge_indices, columns=["source", "target"], dtype=int)
         purchase_csv_path = self.workspace_path.joinpath(f"edge.purchase.indices.csv")
         purchase_edges_df.to_csv(purchase_csv_path, index=False)
+
+    def generate_source_to_targets(self):
+        df = pd.read_csv("/home/buzzni/item2vec/workspaces/aboutpet/item2vec/v1/validation.csv")
+        df["target"] = df["label_pdid"].apply(self.pdid2pidx)
+        df["source"] = df["source_pdid"].apply(self.pdid2pidx)
+        df = df.dropna()
+        df["target"] = df["target"].astype(int)
+        df["source"] = df["source"].astype(int)
+        df = df[["source", "target"]]
+        source_to_targets = df.groupby("source")["target"].apply(list).to_dict()
+        sorted_source_to_targets = {
+            source: sorted(set(targets), key=lambda x: targets.count(x), reverse=True)
+            for source, targets in source_to_targets.items()
+        }
+        return sorted_source_to_targets
 
     def list_popular_items(self, days: int = 30):
         criteria = time.time() - days * 24 * 60 * 7
@@ -454,17 +450,17 @@ class Volume:
             self._items = {x.pdid: x.to_dict() for x in Item.list_items(self.session)}
         return self._items
 
-    def pid2pdid(self, pid: int) -> str | None:
-        if not self._pid2pdid:
-            print("Caching pid2pdid..")
-            self._pid2pdid = {x["pid"]: x["pdid"] for x in self.items().values()}
-        return self._pid2pdid.get(pid)
+    def pidx2pdid(self, pidx: int) -> str | None:
+        if not self._pidx2pdid:
+            print("Caching idx2pdid..")
+            self._pidx2pdid = {x["pidx"]: x["pdid"] for x in self.items().values()}
+        return self._pidx2pdid.get(pidx)
 
-    def pdid2pid(self, pdid: str) -> int | None:
-        if not self._pdid2pid:
-            print("Caching pdid2pid..")
-            self._pdid2pid = {x["pdid"]: x["pid"] for x in self.items().values()}
-        return self._pdid2pid.get(pdid)
+    def pdid2pidx(self, pdid: str) -> int | None:
+        if not self._pdid2pidx:
+            print("Caching pdid2idx..")
+            self._pdid2pidx = {x["pdid"]: x["pidx"] for x in self.items().values()}
+        return self._pdid2pidx.get(pdid)
 
     def vocab_size(self) -> int:
         return Item.count(self.session)
@@ -472,13 +468,15 @@ class Volume:
     def pdids(self):
         return sorted(self.items().values())
 
-    def pids(self):
-        return sorted(item["pid"] for item in self.items().values())
+    def pidxs(self):
+        return sorted(item["pidx"] for item in self.items().values())
 
 
 if __name__ == "__main__":
     volume = Volume(site="aboutpet", model="item2vec", version="v1")
-    volume.migrate_traces(start_date=datetime(2024, 8, 1))
-    volume.migrate_items()
-    volume.generate_pairs_csv()
-    volume.generate_edge_indices_csv()
+    # volume.migrate_traces(start_date=datetime(2024, 8, 1))
+    # volume.migrate_items()
+    # volume.migrate_users()
+    # volume.generate_pairs_csv()
+    # volume.generate_edge_indices_csv()
+    volume.generate_source_to_targets_csv()

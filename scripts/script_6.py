@@ -6,7 +6,7 @@ from item2vec.volume import Volume
 
 volume = Volume(site="aboutpet", model="item2vec", version="v1")
 
-items = volume.list_popular_items()
+items = volume.list_popular_items(days=30)
 
 dogs, cats = [], []
 for item in items:

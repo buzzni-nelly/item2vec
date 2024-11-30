@@ -47,7 +47,6 @@ def load_embeddings(volume: Volume, embed_dim: int = 256):
     item2vec_module = GraphBPRItem2VecModule.load_from_checkpoint(
         model_path,
         vocab_size=vocab_size,
-        sequential_edge_index_path=volume.workspace_path.joinpath("edge.sequential.indices.csv"),
         purchase_edge_index_path=volume.workspace_path.joinpath("edge.purchase.indices.csv"),
         embed_dim=embed_dim
     )
@@ -66,23 +65,18 @@ def cosine_topk(
     similarities = F.cosine_similarity(embeddings[target].unsqueeze(0), embeddings, dim=1)
     top_k_values, top_k_pids = torch.topk(similarities, k)
 
-    top_k_pdids = [volume.pid2pdid(int(x)) for x in top_k_pids]
+    top_k_pdids = [volume.pidx2pdid(int(x)) for x in top_k_pids]
     top_k_items = [items[pdid] for pdid in top_k_pdids]
     top_k_scores = top_k_values
     return top_k_items, top_k_pids, top_k_scores
 
 
 def dot_product_topk(
-    embeddings: torch.Tensor, target: int, volume: Volume, k=100
+    embeddings: torch.Tensor, target: int, k=100
 ):
-    items = volume.items()
     similarities = torch.mm(embeddings[target].unsqueeze(0), embeddings.T).squeeze(0)
-    top_k_values, top_k_pids = torch.topk(similarities, k)
-
-    top_k_pdids = [volume.pid2pdid(int(x)) for x in top_k_pids]
-    top_k_items = [items[pdid] for pdid in top_k_pdids]
-    top_k_scores = top_k_values
-    return top_k_items, top_k_pids, top_k_scores
+    top_k_scores, top_k_pids = torch.topk(similarities, k)
+    return top_k_pids, top_k_scores
 
 
 def rerank(
@@ -124,45 +118,56 @@ def main(embed_dim=128, k: int = 100):
     embeddings = load_embeddings(volume, embed_dim=embed_dim)
     items = volume.items()
 
-    unknown_pids = [x["pid"] for x in items.values() if x["name"] == "UNKNOWN"]
-    embeddings[unknown_pids] = torch.zeros(embed_dim, device=embeddings.device)
+    unknown_pidxs = [x["pidx"] for x in items.values() if x["name"] == "UNKNOWN"]
+    embeddings[unknown_pidxs] = torch.zeros(embed_dim, device=embeddings.device)
+
+    source_to_targets = volume.generate_source_to_targets()
 
     aggregated_predictions = collections.defaultdict(list)
     desc = "추천 점수를 계산 및 Redis 할당 중입니다.."
-    for current_pid in tqdm(range(embeddings.shape[0]), desc=desc):
-        if current_pid in unknown_pids:
+    for current_pidx in tqdm(range(embeddings.shape[0]), desc=desc):
+        if current_pidx in unknown_pidxs:
             continue
 
-        current_pdid = volume.pid2pdid(current_pid)
+        current_pdid = volume.pidx2pdid(current_pidx)
         query_item = items[current_pdid]
         category1, category2 = query_item["category1"], query_item["category2"]
 
-        cos_top_k_items, cos_top_k_pids, cos_top_k_scores = dot_product_topk(
+        cos_top_k_pids, cos_top_k_scores = dot_product_topk(
             embeddings=embeddings,
-            target=current_pid,
-            volume=volume,
-            k=k * 10,
+            target=current_pidx,
+            k=5000,
         )
 
-        debug(
-            query_item,
-            cos_top_k_items,
-            cos_top_k_scores,
-            show=False,
-        )
+        cos_top_k_pids, cos_top_k_scores = cos_top_k_pids.to("cpu"), cos_top_k_scores.to("cpu")
+        if current_pidx in source_to_targets:
+            target_pids = torch.tensor(source_to_targets[current_pidx])
+            indices = torch.nonzero(torch.isin(cos_top_k_pids, target_pids), as_tuple=True)[0]
+            cos_top_k_scores[indices] *= 10
 
-        for x, s in zip(cos_top_k_items, cos_top_k_scores):
-            if category1 != x["category1"]:
+            sorted_indices = torch.argsort(cos_top_k_scores, descending=True)
+            cos_top_k_pids = list(cos_top_k_pids[sorted_indices][:k])
+            cos_top_k_scores = list(cos_top_k_scores[sorted_indices][:k])
+
+        for pidx, score in zip(cos_top_k_pids, cos_top_k_scores):
+            pdid = volume.pidx2pdid(int(pidx))
+            item = items.get(pdid)
+
+            if not item:
                 continue
-            if x["pid"] == current_pid:
+            if category1 != item["category1"]:
                 continue
-            value = {"pdid": x["pdid"], "score": round(float(s), 4)}
+            if pidx == current_pidx:
+                continue
+
+            value = {"pdid": pdid, "score": round(float(score), 4)}
             aggregated_predictions[current_pdid].append(value)
+
         aggregated_predictions[current_pdid] = aggregated_predictions[current_pdid][:k]
 
     pipeline = clients.redis.aiaas_6.pipeline()
     for k, v in aggregated_predictions.items():
-        key = f"i2i:aboutpet:i2v:v2:{k}"
+        key = f"i2i:aboutpet:i2v:v1:{k}"
         pipeline.set(key, json.dumps(v))
         pipeline.expire(key, 30 * 24 * 60 * 60)
 

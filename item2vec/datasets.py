@@ -14,29 +14,22 @@ class SkipGramBPRTrainDataset(Dataset):
         seq_pairs_csv_path = volume.workspace_path.joinpath("item.sequential.pairs.csv")
         seq_pairs_df = pd.read_csv(seq_pairs_csv_path)
 
-        pcs_pairs_csv_path = volume.workspace_path.joinpath("item.purchase.pairs.csv")
-        pcs_pairs_df = pd.read_csv(pcs_pairs_csv_path)
-
         self.seq_pairs = seq_pairs_df.to_numpy().tolist()
-        self.pcs_pairs = pcs_pairs_df.to_numpy().tolist()
-        self.pids = volume.pids()
+        self.idxs = volume.pidxs()
         self.negative_k = negative_k
 
     def __len__(self) -> int:
         return len(self.seq_pairs)
 
     def __getitem__(self, idx):
-        seq_target, seq_positive = self.seq_pairs[idx]
-        seq_negatives = random.sample(self.pids, self.negative_k)
+        # is_purchased is 0 or 1
+        seq_target, seq_positive, margin = self.seq_pairs[idx]
+        seq_negatives = random.sample(self.idxs, self.negative_k)
         seq_target_tensor = torch.LongTensor([seq_target])
         seq_positive_tensor = torch.LongTensor([seq_positive] * self.negative_k)
+        seq_margin_tensor = torch.LongTensor([margin] * self.negative_k)
         seq_negative_tensor = torch.LongTensor(seq_negatives)
-
-        pcs_target, pcs_positive = self.pcs_pairs[idx // len(self.pcs_pairs)]
-        pcs_target_tensor = torch.LongTensor([pcs_target])
-        pcs_positive_tensor = torch.LongTensor([pcs_positive])
-
-        return seq_target_tensor, seq_positive_tensor, seq_negative_tensor, pcs_target_tensor, pcs_positive_tensor
+        return seq_target_tensor, seq_positive_tensor, seq_margin_tensor, seq_negative_tensor
 
 
 class SkipGramBPRValidDataset(Dataset):
@@ -45,7 +38,7 @@ class SkipGramBPRValidDataset(Dataset):
         pairs_df = pd.read_csv(pairs_csv_path)
 
         pairs = pairs_df.to_numpy().tolist()
-        pairs = [(volume.pdid2pid(x), volume.pdid2pid(y)) for x, y in pairs]
+        pairs = [(volume.pdid2pidx(x), volume.pdid2pidx(y)) for x, y in pairs]
         self.pairs = [(x, y) for x, y in pairs if x and y]
 
     def __len__(self) -> int:
@@ -78,9 +71,7 @@ class SkipGramBPRDataModule(LightningDataModule):
 
     def setup(self, stage=None):
         if stage == "fit" or stage is None:
-            self.train_dataset = SkipGramBPRTrainDataset(
-                volume=self.volume, negative_k=self.negative_k
-            )
+            self.train_dataset = SkipGramBPRTrainDataset(volume=self.volume, negative_k=self.negative_k)
         elif stage == "valid":
             self.valid_dataset = SkipGramBPRValidDataset(volume=self.volume)
 
