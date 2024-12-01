@@ -6,7 +6,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn, optim
 from torch.optim import Optimizer
-from torch_geometric.nn import MessagePassing, SAGEConv
+from torch_geometric.nn import MessagePassing
 from torch_geometric.utils import degree
 
 

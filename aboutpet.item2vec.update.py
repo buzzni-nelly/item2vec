@@ -57,10 +57,19 @@ def load_embeddings(volume: Volume, embed_dim: int = 256):
     return embeddings
 
 
+def upload(aggregated_predictions: dict):
+    pipeline = clients.redis.aiaas_6.pipeline()
+    for k, v in aggregated_predictions.items():
+        key = f"i2i:aboutpet:i2v:v2:{k}"
+        pipeline.set(key, json.dumps(v))
+        pipeline.expire(key, 30 * 24 * 60 * 60)
+
+    pipeline.execute()
+    print(len(aggregated_predictions))
+
+
 @retry(tries=3)
 def main(embed_dim=128, k: int = 100, batch_size: int = 1000):
-    # Load vocabulary and model
-
     volume = Volume(site="aboutpet", model="item2vec", version="v1")
 
     embeddings = load_embeddings(volume, embed_dim=embed_dim)
@@ -127,14 +136,7 @@ def main(embed_dim=128, k: int = 100, batch_size: int = 1000):
 
             aggregated_predictions[current_pdid] = aggregated_predictions[current_pdid][:k]
 
-    pipeline = clients.redis.aiaas_6.pipeline()
-    for k, v in aggregated_predictions.items():
-        key = f"i2i:aboutpet:i2v:v2:{k}"
-        pipeline.set(key, json.dumps(v))
-        pipeline.expire(key, 30 * 24 * 60 * 60)
-
-    pipeline.execute()
-    print(len(aggregated_predictions))
+    upload(aggregated_predictions)
 
 
 if __name__ == "__main__":

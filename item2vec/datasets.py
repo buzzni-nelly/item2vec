@@ -13,7 +13,6 @@ class SkipGramBPRTrainDataset(Dataset):
     def __init__(self, volume: Volume, negative_k: int = 10):
         seq_pairs_csv_path = volume.workspace_path.joinpath("item.sequential.pairs.csv")
         seq_pairs_df = pd.read_csv(seq_pairs_csv_path)
-
         self.seq_pairs = seq_pairs_df.to_numpy().tolist()
         self.idxs = volume.pidxs()
         self.negative_k = negative_k
@@ -22,7 +21,6 @@ class SkipGramBPRTrainDataset(Dataset):
         return len(self.seq_pairs)
 
     def __getitem__(self, idx):
-        # is_purchased is 0 or 1
         seq_target, seq_positive, margin = self.seq_pairs[idx]
         seq_negatives = random.sample(self.idxs, self.negative_k)
         seq_target_tensor = torch.LongTensor([seq_target])
@@ -36,7 +34,6 @@ class SkipGramBPRValidDataset(Dataset):
     def __init__(self, volume: Volume):
         pairs_csv_path = volume.workspace_path.joinpath("validation.csv")
         pairs_df = pd.read_csv(pairs_csv_path)
-
         pairs = pairs_df.to_numpy().tolist()
         pairs = [(volume.pdid2pidx(x), volume.pdid2pidx(y)) for x, y in pairs]
         self.pairs = [(x, y) for x, y in pairs if x and y]

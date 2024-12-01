@@ -2,7 +2,7 @@ import os
 
 from pytorch_lightning.callbacks import ModelCheckpoint
 
-from configs import settings
+from item2vec.configs import settings
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"

@@ -258,7 +258,8 @@ class Volume:
 
         Base.metadata.create_all(self.engine)
 
-        self._items = None
+        self._items_by_pdid = None
+        self._items_by_pidx = None
         self._pidx2pdid = None
         self._pdid2pidx = None
 
@@ -393,7 +394,7 @@ class Volume:
     def generate_purchase_edge_indices(self):
         df = pd.read_csv("/home/buzzni/item2vec/workspaces/aboutpet/item2vec/v1/validation.csv")
         df["target"] = df["source_pdid"].apply(self.pdid2pidx)
-        df["source"] = df["label_pdid"].apply(self.pdid2pidx)
+        df["source"] = df["target_pdid"].apply(self.pdid2pidx)
         df = df.dropna()
         df["target"] = df["target"].astype(int)
         df["source"] = df["source"].astype(int)
@@ -444,11 +445,17 @@ class Volume:
         criteria = time.time() - days * 24 * 60 * 7
         return Trace.list_popular_items(self.session, criteria=criteria)
 
-    def items(self) -> dict:
-        if not self._items:
-            print("Loading items into memory from persistent volume..")
-            self._items = {x.pdid: x.to_dict() for x in Item.list_items(self.session)}
-        return self._items
+    def items(self, by="pdid") -> dict:
+        if "pdid" == by:
+            if not self._items_by_pdid:
+                print("Loading items into memory from persistent volume..")
+                self._items_by_pdid = {x.pdid: x.to_dict() for x in Item.list_items(self.session)}
+            return self._items_by_pdid
+        else:
+            if not self._items_by_pidx:
+                print("Loading items into memory from persistent volume..")
+                self._items_by_pidx = {x.pidx: x.to_dict() for x in Item.list_items(self.session)}
+            return self._items_by_pidx
 
     def pidx2pdid(self, pidx: int) -> str | None:
         if not self._pidx2pdid:

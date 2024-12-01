@@ -3,17 +3,14 @@ import os
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
-import pathlib
-
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from pytorch_lightning.loggers import WandbLogger
 
-from configs import settings
+from item2vec.configs import settings
 from item2vec.datasets import SkipGramBPRDataModule
 from item2vec.models import GraphBPRItem2VecModule
 from item2vec.volume import Volume
-from scripts import script_5
 
 os.environ["WANDB_API_KEY"] = settings.wandb_api_key
 
@@ -50,16 +47,8 @@ CKPT_PATH = settings.checkpoint_path
 WANDB_CONFIG = settings.dict()
 
 
-def delete_checkpoints():
-    directory = pathlib.Path(settings.checkpoint_dirpath)
-    for file in directory.glob("*"):
-        if file.is_file():
-            file.unlink()
-
 
 def main():
-    delete_checkpoints()
-
     settings.print()
 
     volume = Volume(site="aboutpet", model="item2vec", version="v1")
@@ -103,7 +92,6 @@ def main():
         ],
     )
     trainer.fit(model=item2vec, datamodule=data_module, ckpt_path=CKPT_PATH)
-    script_5.main()
 
 
 if __name__ == "__main__":
