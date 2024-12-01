@@ -428,7 +428,7 @@ class Volume:
 
     def generate_source_to_targets(self):
         df = pd.read_csv("/home/buzzni/item2vec/workspaces/aboutpet/item2vec/v1/validation.csv")
-        df["target"] = df["label_pdid"].apply(self.pdid2pidx)
+        df["target"] = df["target_pdid"].apply(self.pdid2pidx)
         df["source"] = df["source_pdid"].apply(self.pdid2pidx)
         df = df.dropna()
         df["target"] = df["target"].astype(int)

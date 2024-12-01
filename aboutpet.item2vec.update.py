@@ -122,8 +122,8 @@ def main(embed_dim=128, k: int = 100, batch_size: int = 1000):
             for pidx, score in zip(top_k_pidxs, top_k_scores):
                 if int(pidx) == current_pidx:
                     continue
-                pdid = volume.pidx2pdid(pidx)
-                item = items.get(pdid)
+                pdid = volume.pidx2pdid(int(pidx))
+                item = items.get(int(pidx))
                 if not item:
                     continue
                 if current_category_1 != item["category1"]:
