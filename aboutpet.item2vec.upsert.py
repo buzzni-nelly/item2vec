@@ -84,8 +84,6 @@ def main(embed_dim=128, k: int = 100, batch_size: int = 1000):
     unknown_pidxs = [x["pidx"] for x in items.values() if x["name"] == "UNKNOWN"]
     embeddings[unknown_pidxs] = torch.zeros(embed_dim, device=embeddings.device)
 
-    source_to_targets = volume.generate_source_to_targets_with_purchase()
-
     aggregated_scores = collections.defaultdict(list)
     desc = "추천 점수를 계산 및 Redis 할당 중입니다.."
     num_items = embeddings.shape[0]
@@ -113,14 +111,6 @@ def main(embed_dim=128, k: int = 100, batch_size: int = 1000):
             sims = similarities[pidx_in_batch]
             top_k_scores, top_k_pidxs = torch.topk(sims, k * 100)
             top_k_pidxs, top_k_scores = top_k_pidxs.cpu(), top_k_scores.cpu()
-
-            if current_pidx in source_to_targets:
-                target_pids = torch.tensor(source_to_targets[current_pidx])
-                indices = torch.nonzero(torch.isin(top_k_pidxs, target_pids), as_tuple=True)[0]
-                top_k_scores[indices] *= 10
-                sorted_indices = torch.argsort(top_k_scores, descending=True)
-                top_k_pidxs = top_k_pidxs[sorted_indices]
-                top_k_scores = top_k_scores[sorted_indices]
 
             top_k_pidxs, top_k_scores = top_k_pidxs.tolist(), top_k_scores.tolist()
             assert len(top_k_pidxs) == len(top_k_scores)
