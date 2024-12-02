@@ -9,4 +9,5 @@ while true; do
     sleep 3
     python aboutpet.item2vec.update.py
     sleep 3
+    python aboutpet.item2item.pastbias.py
 done
