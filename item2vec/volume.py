@@ -402,6 +402,47 @@ class Volume:
         csv_path = self.workspace_path.joinpath(f"item.sequential.pairs.csv")
         pairs_df.to_csv(csv_path, index=False)
 
+    def fetch_click_purchase_footstep(self, begin_date: datetime) -> list:
+        begin_date = begin_date.strftime("%Y-%m-%d")
+        query = queries.ABOUTPET_CLICK_PURCHASE_FOOTSTEP.format(date=begin_date)
+        rows, columns = clients.trinox.fetch(query)
+        df = pd.DataFrame(rows, columns=columns)
+        df = df.dropna(subset=["pid", "target_pid"])
+        df = df[df["purchase_time"].notna()]
+
+        df["source_pdid"] = df["pid"].apply(lambda x: f"aboutpet_{x}")
+        df["target_pdid"] = df["target_pid"].apply(lambda x: f"aboutpet_{x}")
+        df = df[["source_pdid", "target_pdid"]]
+        df = df[df["source_pdid"] != df["target_pdid"]]
+        return df.values.tolist()
+
+    def generate_click_purchase_footstep_csv(self, begin_date: datetime):
+        print("Extracting click-and-purchase item footsteps.")
+        item_pairs = self.fetch_click_purchase_footstep(begin_date=begin_date)
+        pairs_df = pd.DataFrame(item_pairs, columns=["source_pdid", "target_pdid"], dtype=str)
+        save_path = self.workspace_path.joinpath("click-purchase.footstep.csv")
+        pairs_df.to_csv(save_path.as_posix(), index=False)
+
+    def fetch_click_click_footstep(self, begin_date: datetime) -> list:
+        begin_date = begin_date.strftime("%Y-%m-%d")
+        query = queries.ABOUTPET_CLICK_CLICK_FOOTSTEP.format(date=begin_date)
+        rows, columns = clients.trinox.fetch(query)
+        df = pd.DataFrame(rows, columns=columns)
+        df = df.dropna(subset=["pid", "target_pid"])
+
+        df["source_pdid"] = df["pid"].apply(lambda x: f"aboutpet_{x}")
+        df["target_pdid"] = df["target_pid"].apply(lambda x: f"aboutpet_{x}")
+        df = df[["source_pdid", "target_pdid"]]
+        df = df[df["source_pdid"] != df["target_pdid"]]
+        return df.values.tolist()
+
+    def generate_click_click_footstep_csv(self, begin_date: datetime):
+        print("Extracting click-and-click item footsteps.")
+        item_pairs = self.fetch_click_click_footstep(begin_date=begin_date)
+        pairs_df = pd.DataFrame(item_pairs, columns=["source_pdid", "target_pdid"], dtype=str)
+        save_path = self.workspace_path.joinpath("click-click.footstep.csv")
+        pairs_df.to_csv(save_path.as_posix(), index=False)
+
     def generate_purchase_edge_indices(self):
         footstep_path = self.workspace_path.joinpath("click-purchase.footstep.csv")
         df = pd.read_csv(footstep_path.as_posix())
