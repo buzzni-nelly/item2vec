@@ -64,14 +64,14 @@ def load_embeddings(volume: Volume, embed_dim: int = 256):
     return embeddings
 
 
-def upload(aggregated_predictions: dict):
+def upload(aggregated_scores: dict):
     pipeline = clients.redis.aiaas_6.pipeline()
-    for pdid, scores in aggregated_predictions.items():
+    for pdid, scores in aggregated_scores.items():
         key = f"{RELEASE}:{SITE_NAME}:{MODEL_NAME}:{VERSION}:{pdid}"
         pipeline.set(key, json.dumps(scores))
         pipeline.expire(key, 30 * 24 * 60 * 60)
     pipeline.execute()
-    print(f"Total {len(aggregated_predictions)} items updated on redis")
+    print(f"Total {len(aggregated_scores)} items updated on redis")
 
 
 @retry(tries=3)
@@ -86,7 +86,7 @@ def main(embed_dim=128, k: int = 100, batch_size: int = 1000):
 
     source_to_targets = volume.generate_source_to_targets()
 
-    aggregated_predictions = collections.defaultdict(list)
+    aggregated_scores = collections.defaultdict(list)
     desc = "추천 점수를 계산 및 Redis 할당 중입니다.."
     num_items = embeddings.shape[0]
     for batch_start in tqdm(range(0, num_items, batch_size), desc=desc):
@@ -97,13 +97,9 @@ def main(embed_dim=128, k: int = 100, batch_size: int = 1000):
             continue
 
         batch_items = [items.get(pidx) for pidx in batch_pidxs]
-        batch_categories_1 = [
-            item["category1"] if item else None for item in batch_items
-        ]
+        batch_categories_1 = [x["category1"] if x else None for x in batch_items]
 
-        similarities = torch.mm(
-            embeddings[batch_pidxs], embeddings.T
-        )  # (batch_size, num_items)
+        similarities = torch.mm(embeddings[batch_pidxs], embeddings.T)
 
         # Process each item in the batch
         for pidx_in_batch, current_pidx in enumerate(batch_pidxs):
@@ -114,44 +110,38 @@ def main(embed_dim=128, k: int = 100, batch_size: int = 1000):
             if not current_item:
                 continue
 
-            sim = similarities[pidx_in_batch]
-            top_k_scores, top_k_pidxs = torch.topk(sim, k * 100)
+            sims = similarities[pidx_in_batch]
+            top_k_scores, top_k_pidxs = torch.topk(sims, k * 100)
             top_k_pidxs, top_k_scores = top_k_pidxs.cpu(), top_k_scores.cpu()
 
             if current_pidx in source_to_targets:
                 target_pids = torch.tensor(source_to_targets[current_pidx])
-                indices = torch.nonzero(
-                    torch.isin(top_k_pidxs, target_pids), as_tuple=True
-                )[0]
+                indices = torch.nonzero(torch.isin(top_k_pidxs, target_pids), as_tuple=True)[0]
                 top_k_scores[indices] *= 10
                 sorted_indices = torch.argsort(top_k_scores, descending=True)
                 top_k_pidxs = top_k_pidxs[sorted_indices]
                 top_k_scores = top_k_scores[sorted_indices]
 
-            top_k_pidxs, top_k_scores = list(top_k_pidxs[: 10 * k]), list(
-                top_k_scores[: 10 * k]
-            )
-            for pidx_t, score in zip(top_k_pidxs, top_k_scores):
-                pidx = int(pidx_t)
-                if pidx == current_pidx:
-                    continue
+            top_k_pidxs, top_k_scores = top_k_pidxs.tolist(), top_k_scores.tolist()
+            assert len(top_k_pidxs) == len(top_k_scores)
+            for pidx, score in zip(top_k_pidxs, top_k_scores):
                 pdid = volume.pidx2pdid(pidx)
                 item = items.get(pidx)
+                if pidx == current_pidx:
+                    continue
                 if not item:
                     continue
                 if current_category_1 != item["category1"]:
                     continue
 
-                value = {"pdid": pdid, "score": round(float(score), 4)}
-                aggregated_predictions[current_pdid].append(value)
-                if len(aggregated_predictions[current_pdid]) >= k:
+                value = {"pdid": pdid, "score": f"{score:.4}"}
+                aggregated_scores[current_pdid].append(value)
+                if len(aggregated_scores[current_pdid]) >= k:
                     break
 
-            aggregated_predictions[current_pdid] = aggregated_predictions[current_pdid][
-                :k
-            ]
+            aggregated_scores[current_pdid] = aggregated_scores[current_pdid][:k]
 
-    upload(aggregated_predictions)
+    upload(aggregated_scores)
 
 
 if __name__ == "__main__":
