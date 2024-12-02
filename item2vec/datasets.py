@@ -37,7 +37,7 @@ class SkipGramBPRTrainDataset(Dataset):
 
 class SkipGramBPRValidDataset(Dataset):
     def __init__(self, volume: Volume):
-        pairs_csv_path = volume.workspace_path.joinpath("validation.csv")
+        pairs_csv_path = volume.workspace_path.joinpath("click-purchase.footstep.csv")
         pairs_df = pd.read_csv(pairs_csv_path)
         pairs = pairs_df.to_numpy().tolist()
         pairs = [(volume.pdid2pidx(x), volume.pdid2pidx(y)) for x, y in pairs]

@@ -402,13 +402,12 @@ class Volume:
         csv_path = self.workspace_path.joinpath(f"item.sequential.pairs.csv")
         pairs_df.to_csv(csv_path, index=False)
 
-    def generate_purchase_pairs(self, begin_date: datetime) -> list:
+    def fetch_click_purchase_footstep(self, begin_date: datetime) -> list:
         begin_date = begin_date.strftime("%Y-%m-%d")
-        query = queries.ABOUTPET_ITEM2ITEM.format(date=begin_date)
+        query = queries.ABOUTPET_CLICK_PURCHASE_FOOTSTEP.format(date=begin_date)
         rows, columns = clients.trinox.fetch(query)
         df = pd.DataFrame(rows, columns=columns)
-        df = df.dropna(subset=["target_pid"])
-
+        df = df.dropna(subset=["pid", "target_pid"])
         df = df[df["purchase_time"].notna()]
 
         df["source_pdid"] = df["pid"].apply(lambda x: f"aboutpet_{x}")
@@ -417,22 +416,38 @@ class Volume:
         df = df[df["source_pdid"] != df["target_pdid"]]
         return df.values.tolist()
 
-    def generate_purchase_pairs_csv(self, begin_date: datetime):
-        print("Extracting click-and-purchase item pairs data before purchase.")
-        item_pairs = self.generate_purchase_pairs(begin_date=begin_date)
-        pairs_df = pd.DataFrame(
-            item_pairs, columns=["source_pdid", "target_pdid"], dtype=str
-        )
-        save_path = self.workspace_path.joinpath("validation.csv")
+    def generate_click_purchase_footstep_csv(self, begin_date: datetime):
+        print("Extracting click-and-purchase item footsteps before purchase.")
+        item_pairs = self.fetch_click_purchase_footstep(begin_date=begin_date)
+        pairs_df = pd.DataFrame(item_pairs, columns=["source_pdid", "target_pdid"], dtype=str)
+        save_path = self.workspace_path.joinpath("click-purchase.footstep.csv")
+        pairs_df.to_csv(save_path.as_posix(), index=False)
+
+    def fetch_click_click_footstep(self, begin_date: datetime) -> list:
+        begin_date = begin_date.strftime("%Y-%m-%d")
+        query = queries.ABOUTPET_CLICK_CLICK_FOOTSTEP.format(date=begin_date)
+        rows, columns = clients.trinox.fetch(query)
+        df = pd.DataFrame(rows, columns=columns)
+        df = df.dropna(subset=["pid", "target_pid"])
+
+        df["source_pdid"] = df["pid"].apply(lambda x: f"aboutpet_{x}")
+        df["target_pdid"] = df["target_pid"].apply(lambda x: f"aboutpet_{x}")
+        df = df[["source_pdid", "target_pdid"]]
+        df = df[df["source_pdid"] != df["target_pdid"]]
+        return df.values.tolist()
+
+    def generate_click_click_footstep_csv(self, begin_date: datetime):
+        print("Extracting click-and-click item footsteps before purchase.")
+        item_pairs = self.fetch_click_click_footstep(begin_date=begin_date)
+        pairs_df = pd.DataFrame(item_pairs, columns=["source_pdid", "target_pdid"], dtype=str)
+        save_path = self.workspace_path.joinpath("click-click.footstep.csv")
         pairs_df.to_csv(save_path.as_posix(), index=False)
 
     def generate_purchase_edge_indices(self):
-        validation_path = self.workspace_path.joinpath("validation.csv")
-        df = pd.read_csv(validation_path.as_posix())
-
+        footstep_path = self.workspace_path.joinpath("click-purchase.footstep.csv")
+        df = pd.read_csv(footstep_path.as_posix())
         df["target"] = df["source_pdid"].apply(self.pdid2pidx)
         df["source"] = df["target_pdid"].apply(self.pdid2pidx)
-        df = df.dropna()
         df["target"] = df["target"].astype(int)
         df["source"] = df["source"].astype(int)
         df = df[["source", "target"]]
@@ -446,10 +461,25 @@ class Volume:
         purchase_csv_path = self.workspace_path.joinpath(f"edge.purchase.indices.csv")
         purchase_edges_df.to_csv(purchase_csv_path, index=False)
 
-    def generate_source_to_targets(self):
-        df = pd.read_csv(
-            "/home/buzzni/item2vec/workspaces/aboutpet/item2vec/v1/validation.csv"
-        )
+    def generate_source_to_targets_with_purchase(self):
+        filepath = self.workspace_path.joinpath("click-purchase.footstep.csv").as_posix()
+        df = pd.read_csv(filepath)
+        df["source"] = df["source_pdid"].apply(self.pdid2pidx)
+        df["target"] = df["target_pdid"].apply(self.pdid2pidx)
+        df = df.dropna()
+        df["source"] = df["source"].astype(int)
+        df["target"] = df["target"].astype(int)
+        df = df[["source", "target"]]
+        source_to_targets = df.groupby("source")["target"].apply(list).to_dict()
+        sorted_source_to_targets = {
+            source: sorted(set(targets), key=lambda x: targets.count(x), reverse=True)
+            for source, targets in source_to_targets.items()
+        }
+        return sorted_source_to_targets
+
+    def generate_source_to_targets_with_click(self):
+        filepath = self.workspace_path.joinpath("click-click.footstep.csv").as_posix()
+        df = pd.read_csv(filepath)
         df["source"] = df["source_pdid"].apply(self.pdid2pidx)
         df["target"] = df["target_pdid"].apply(self.pdid2pidx)
         df = df.dropna()

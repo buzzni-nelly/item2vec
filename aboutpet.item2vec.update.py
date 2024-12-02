@@ -84,7 +84,7 @@ def main(embed_dim=128, k: int = 100, batch_size: int = 1000):
     unknown_pidxs = [x["pidx"] for x in items.values() if x["name"] == "UNKNOWN"]
     embeddings[unknown_pidxs] = torch.zeros(embed_dim, device=embeddings.device)
 
-    source_to_targets = volume.generate_source_to_targets()
+    source_to_targets = volume.generate_source_to_targets_with_purchase()
 
     aggregated_scores = collections.defaultdict(list)
     desc = "추천 점수를 계산 및 Redis 할당 중입니다.."
