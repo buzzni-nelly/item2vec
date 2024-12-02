@@ -21,11 +21,15 @@ Base = sqlalchemy.orm.declarative_base()
 
 def get_start_and_end_timestamps(target_date: datetime):
     # 날짜의 시작 시간 (00:00:00)
-    start_of_day = datetime(target_date.year, target_date.month, target_date.day, 0, 0, 0)
+    start_of_day = datetime(
+        target_date.year, target_date.month, target_date.day, 0, 0, 0
+    )
     start_timestamp = start_of_day.timestamp()
 
     # 날짜의 종료 시간 (23:59:59.999999)
-    end_of_day = datetime(target_date.year, target_date.month, target_date.day, 23, 59, 59, 999999)
+    end_of_day = datetime(
+        target_date.year, target_date.month, target_date.day, 23, 59, 59, 999999
+    )
     end_timestamp = end_of_day.timestamp()
 
     return start_timestamp, end_timestamp
@@ -44,7 +48,9 @@ def fetch_trino_query(query: str):
     df = df.sort_values(by=["user_id", "timestamp"])
     df = df[["user_id", "pdid", "timestamp", "event"]]
 
-    df = df[(df["user_id"] != df["user_id"].shift()) | (df["pdid"] != df["pdid"].shift())]
+    df = df[
+        (df["user_id"] != df["user_id"].shift()) | (df["pdid"] != df["pdid"].shift())
+    ]
     return df
 
 
@@ -70,7 +76,7 @@ class Item(Base):
         return session.query(Item).all()
 
     @staticmethod
-    def dict_items(session: Session, by:Literal["pdid", "pidx"]=""):
+    def dict_items(session: Session, by: Literal["pdid", "pidx"] = ""):
         items = session.query(Item).all()
         if by == "pdid":
             return {item.pdid: item for item in items}
@@ -99,7 +105,6 @@ class Item(Base):
             "category2": self.category2,
             "category3": self.category3,
         }
-
 
 
 class User(Base):
@@ -151,7 +156,8 @@ class Trace(Base):
 
     @staticmethod
     def list_traces(session: Session):
-        raw_query = text("""
+        raw_query = text(
+            """
             SELECT 
                 user.uidx AS uidx,
                 item.pidx AS pidx,
@@ -160,7 +166,8 @@ class Trace(Base):
             FROM trace
             INNER JOIN user ON trace.user_id = user.user_id
             INNER JOIN item ON trace.pdid = item.pdid
-        """)
+        """
+        )
         results = session.execute(raw_query).fetchall()
         return [
             {
@@ -219,7 +226,8 @@ class Trace(Base):
 
     @staticmethod
     def list_popular_items(session: Session, criteria: float):
-        query = text("""
+        query = text(
+            """
             SELECT pdid, MAX(cnt) as cnt, category1, category2
             FROM (
                 SELECT a.pdid, a.cnt, b.category1, b.category2
@@ -235,7 +243,8 @@ class Trace(Base):
             WHERE category1 IS NOT NULL AND category2 IS NOT NULL
             GROUP BY category1, category2
             ORDER BY category1, cnt DESC ;
-        """)
+        """
+        )
         result = session.execute(query, {"criteria": criteria}).fetchall()
         return result
 
@@ -377,7 +386,7 @@ class Volume:
 
                 pidx_1 = current["pidx"]
                 pidx_2 = compare["pidx"]
-                weight = 1 if 'purchase' in [current["event"], compare["event"]] else 0
+                weight = 1 if "purchase" in [current["event"], compare["event"]] else 0
 
                 if pidx_1 and pidx_2:
                     item_pairs.append((pidx_1, pidx_2, weight))
@@ -387,7 +396,9 @@ class Volume:
 
     def generate_sequential_pairs_csv(self):
         item_pairs = self.generate_sequential_pairs()
-        pairs_df = pd.DataFrame(item_pairs, columns=["target", "positive", "is_purchased"], dtype=int)
+        pairs_df = pd.DataFrame(
+            item_pairs, columns=["target", "positive", "is_purchased"], dtype=int
+        )
         csv_path = self.workspace_path.joinpath(f"item.sequential.pairs.csv")
         pairs_df.to_csv(csv_path, index=False)
 
@@ -409,7 +420,9 @@ class Volume:
     def generate_purchase_pairs_csv(self, begin_date: datetime):
         print("Extracting click-and-purchase item pairs data before purchase.")
         item_pairs = self.generate_purchase_pairs(begin_date=begin_date)
-        pairs_df = pd.DataFrame(item_pairs, columns=["source_pdid", "target_pdid"], dtype=str)
+        pairs_df = pd.DataFrame(
+            item_pairs, columns=["source_pdid", "target_pdid"], dtype=str
+        )
         save_path = self.workspace_path.joinpath("validation.csv")
         pairs_df.to_csv(save_path.as_posix(), index=False)
 
@@ -427,12 +440,16 @@ class Volume:
 
     def generate_edge_indices_csv(self):
         purchase_edge_indices = self.generate_purchase_edge_indices()
-        purchase_edges_df = pd.DataFrame(purchase_edge_indices, columns=["source", "target"], dtype=int)
+        purchase_edges_df = pd.DataFrame(
+            purchase_edge_indices, columns=["source", "target"], dtype=int
+        )
         purchase_csv_path = self.workspace_path.joinpath(f"edge.purchase.indices.csv")
         purchase_edges_df.to_csv(purchase_csv_path, index=False)
 
     def generate_source_to_targets(self):
-        df = pd.read_csv("/home/buzzni/item2vec/workspaces/aboutpet/item2vec/v1/validation.csv")
+        df = pd.read_csv(
+            "/home/buzzni/item2vec/workspaces/aboutpet/item2vec/v1/validation.csv"
+        )
         df["source"] = df["source_pdid"].apply(self.pdid2pidx)
         df["target"] = df["target_pdid"].apply(self.pdid2pidx)
         df = df.dropna()
@@ -454,12 +471,16 @@ class Volume:
         if "pdid" == by:
             if not self._items_by_pdid:
                 print("Loading items into memory from persistent volume..")
-                self._items_by_pdid = {x.pdid: x.to_dict() for x in Item.list_items(self.session)}
+                self._items_by_pdid = {
+                    x.pdid: x.to_dict() for x in Item.list_items(self.session)
+                }
             return self._items_by_pdid
         else:
             if not self._items_by_pidx:
                 print("Loading items into memory from persistent volume..")
-                self._items_by_pidx = {x.pidx: x.to_dict() for x in Item.list_items(self.session)}
+                self._items_by_pidx = {
+                    x.pidx: x.to_dict() for x in Item.list_items(self.session)
+                }
             return self._items_by_pidx
 
     def pidx2pdid(self, pidx: int) -> str | None:

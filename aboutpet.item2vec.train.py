@@ -47,7 +47,6 @@ CKPT_PATH = settings.checkpoint_path
 WANDB_CONFIG = settings.dict()
 
 
-
 def main():
     settings.print()
 
@@ -62,7 +61,9 @@ def main():
 
     item2vec = GraphBPRItem2VecModule(
         vocab_size=data_module.vocab_size,
-        purchase_edge_index_path=volume.workspace_path.joinpath("edge.purchase.indices.csv"),
+        purchase_edge_index_path=volume.workspace_path.joinpath(
+            "edge.purchase.indices.csv"
+        ),
         embed_dim=EMBED_DIM,
         lr=LR,
         weight_decay=WEIGHT_DECAY,
@@ -87,8 +88,8 @@ def main():
                 monitor=CHECKPOINT_MONITOR,
                 mode=CHECKPOINT_MODE,
                 patience=5,
-                verbose=True
-            )
+                verbose=True,
+            ),
         ],
     )
     trainer.fit(model=item2vec, datamodule=data_module, ckpt_path=CKPT_PATH)

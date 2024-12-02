@@ -11,7 +11,7 @@ from lightgcn.volume import Volume
 model_path = "/tmp/checkpoints/last.ckpt"
 volume = Volume("aboutpet", "lightgcn", "v1")
 
-edge_index = os.path.join(volume.workspace_path, 'edge.click.indices.csv')
+edge_index = os.path.join(volume.workspace_path, "edge.click.indices.csv")
 edge_df = pd.read_csv(edge_index)
 sources = edge_df["source"].values
 targets = edge_df["target"].values

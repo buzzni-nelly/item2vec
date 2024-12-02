@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
 
-    embed_dim: int = 128 # 32
+    embed_dim: int = 128  # 32
 
     lr: float = 1e-3
     weight_decay: float = 1e-2
@@ -32,5 +32,6 @@ class Settings(BaseSettings):
     def print(self):
         for k, v in self.model_dump().items():
             print(k, v)
+
 
 settings = Settings()

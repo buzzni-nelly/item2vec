@@ -23,18 +23,19 @@ from lightgcn.volume import Volume
 # LightGCNConv 클래스 정의
 class LightGCNConv(MessagePassing):
     def __init__(self):
-        super().__init__(aggr='add')  # 합산 집계
+        super().__init__(aggr="add")  # 합산 집계
 
     def forward(self, x, edge_index):
         row, col = edge_index
         deg = degree(col, x.size(0), dtype=x.dtype)
         deg_inv_sqrt = deg.pow(-0.5)
-        deg_inv_sqrt[deg_inv_sqrt == float('inf')] = 0
+        deg_inv_sqrt[deg_inv_sqrt == float("inf")] = 0
         norm = deg_inv_sqrt[row] * deg_inv_sqrt[col]
         return self.propagate(edge_index, x=x, norm=norm)
 
     def message(self, x_j, norm):
         return norm.view(-1, 1) * x_j
+
 
 # LightGCN 모델 정의
 class LightGCN(nn.Module):
@@ -59,7 +60,7 @@ class LightGCN(nn.Module):
             x = conv(x, edge_index)
             all_embeddings.append(x)
         embeddings = torch.stack(all_embeddings, dim=0).mean(0)
-        return embeddings[:self.num_users], embeddings[self.num_users:]
+        return embeddings[: self.num_users], embeddings[self.num_users :]
 
 
 class LightGCNModel(pl.LightningModule):
@@ -81,16 +82,16 @@ class LightGCNModel(pl.LightningModule):
         users, pos_items, neg_items = batch
         user_embeddings, item_embeddings = self.model(self.edge_index)
 
-        user_embeddings = user_embeddings[users] # [1024, 10, 64]
-        pos_item_embeddings = item_embeddings[pos_items] # [1024, 10, 64]
-        neg_item_embeddings = item_embeddings[neg_items] # [1024, 10, 64]
+        user_embeddings = user_embeddings[users]  # [1024, 10, 64]
+        pos_item_embeddings = item_embeddings[pos_items]  # [1024, 10, 64]
+        neg_item_embeddings = item_embeddings[neg_items]  # [1024, 10, 64]
 
         pos_scores = (user_embeddings * pos_item_embeddings).sum(dim=-1)  # [1024, 10]
         neg_scores = (user_embeddings * neg_item_embeddings).sum(dim=-1)  # [1024, 10]
 
         loss = torch.nn.functional.softplus(neg_scores - pos_scores).mean()
 
-        self.log('train_loss', loss, prog_bar=True)
+        self.log("train_loss", loss, prog_bar=True)
         return loss
 
     def configure_optimizers(self):
@@ -165,7 +166,7 @@ if __name__ == "__main__":
     num_users = volume.count_users()
     num_items = volume.count_items()
 
-    click_edge_path = os.path.join(volume.workspace_path, 'edge.click.indices.csv')
+    click_edge_path = os.path.join(volume.workspace_path, "edge.click.indices.csv")
     edge_df = pd.read_csv(click_edge_path)
     sources = edge_df["source"].values
     targets = edge_df["target"].values

@@ -22,7 +22,7 @@ class Item2Vec(nn.Module):
 
 class LightGCNConv(MessagePassing):
     def __init__(self):
-        super(LightGCNConv, self).__init__(aggr='sum')
+        super(LightGCNConv, self).__init__(aggr="sum")
 
     def forward(self, x, edge_index):
         # edge_index, _ = add_self_loops(edge_index, num_nodes=x.size(0))
@@ -30,7 +30,7 @@ class LightGCNConv(MessagePassing):
 
         col_deg = degree(col, x.size(0))
         col_deg_inv = col_deg.pow(-1)
-        col_deg_inv[col_deg_inv == float('inf')] = 0.0
+        col_deg_inv[col_deg_inv == float("inf")] = 0.0
         col_norm = col_deg_inv[col]
 
         # 인기기반 row 처리
@@ -63,7 +63,7 @@ class GraphBPRItem2VecModule(pl.LightningModule):
         embed_dim: int = 128,
         lr: float = 1e-3,
         weight_decay: float = 1e-2,
-        dropout: float = 0.0
+        dropout: float = 0.0,
     ):
         super(GraphBPRItem2VecModule, self).__init__()
         self.lr = lr
@@ -94,7 +94,11 @@ class GraphBPRItem2VecModule(pl.LightningModule):
         return scores
 
     def bpr_loss(
-        self, pos_scores: torch.Tensor, neg_scores: torch.Tensor, margins: torch.Tensor, boost_factor: float = 2.0
+        self,
+        pos_scores: torch.Tensor,
+        neg_scores: torch.Tensor,
+        margins: torch.Tensor,
+        boost_factor: float = 2.0,
     ) -> torch.Tensor:
         """
         Modified BPR Loss with dynamic margin adjustment for purchased samples.
@@ -109,7 +113,9 @@ class GraphBPRItem2VecModule(pl.LightningModule):
             Computed BPR loss as a tensor
         """
         base_loss = -torch.log(torch.sigmoid(pos_scores - neg_scores - margins))
-        boosted_loss = base_loss + (margins * boost_factor * (1 - torch.sigmoid(pos_scores - neg_scores)))
+        boosted_loss = base_loss + (
+            margins * boost_factor * (1 - torch.sigmoid(pos_scores - neg_scores))
+        )
         return boosted_loss.mean()
 
     def training_step(self, batch: torch.Tensor, batch_idx: int) -> torch.Tensor:
@@ -133,21 +139,61 @@ class GraphBPRItem2VecModule(pl.LightningModule):
         sources, labels = batch
         cos_ndcg = self.calc_cosine_ndcg(sources, labels, k=20)
         dot_ndcg = self.calc_dot_product_ndcg(sources, labels, k=20)
-        graph_dot_ndcg = self.calc_graph_dot_product_ndcg(sources, labels, num_layers=3, k=20)
-        graph_cos_ndcg = self.calc_graph_cosine_ndcg(sources, labels, num_layers=3, k=20)
-        graph_dot_recall = self.calc_graph_dot_product_recall(sources, labels, num_layers=3, k=20)
+        graph_dot_ndcg = self.calc_graph_dot_product_ndcg(
+            sources, labels, num_layers=3, k=20
+        )
+        graph_cos_ndcg = self.calc_graph_cosine_ndcg(
+            sources, labels, num_layers=3, k=20
+        )
+        graph_dot_recall = self.calc_graph_dot_product_recall(
+            sources, labels, num_layers=3, k=20
+        )
 
-        self.log("val_cos_ndcg@20", cos_ndcg.mean(), prog_bar=True, logger=True, sync_dist=True)
-        self.log("val_dot_ndcg@20", dot_ndcg.mean(), prog_bar=True, logger=True, sync_dist=True)
-        self.log("val_graph_dot_ndcg@20", graph_dot_ndcg.mean(), prog_bar=True, logger=True, sync_dist=True)
-        self.log("val_graph_cos_ndcg@20", graph_cos_ndcg.mean(), prog_bar=True, logger=True, sync_dist=True)
-        self.log("val_graph_dot_recall@20", graph_dot_recall.mean(), prog_bar=True, logger=True, sync_dist=True)
+        self.log(
+            "val_cos_ndcg@20",
+            cos_ndcg.mean(),
+            prog_bar=True,
+            logger=True,
+            sync_dist=True,
+        )
+        self.log(
+            "val_dot_ndcg@20",
+            dot_ndcg.mean(),
+            prog_bar=True,
+            logger=True,
+            sync_dist=True,
+        )
+        self.log(
+            "val_graph_dot_ndcg@20",
+            graph_dot_ndcg.mean(),
+            prog_bar=True,
+            logger=True,
+            sync_dist=True,
+        )
+        self.log(
+            "val_graph_cos_ndcg@20",
+            graph_cos_ndcg.mean(),
+            prog_bar=True,
+            logger=True,
+            sync_dist=True,
+        )
+        self.log(
+            "val_graph_dot_recall@20",
+            graph_dot_recall.mean(),
+            prog_bar=True,
+            logger=True,
+            sync_dist=True,
+        )
 
-    def calc_cosine_ndcg(self, sources: torch.Tensor, labels: torch.Tensor, k: int = 20):
+    def calc_cosine_ndcg(
+        self, sources: torch.Tensor, labels: torch.Tensor, k: int = 20
+    ):
         embeddings = self.item2vec.forward()
         source_embeddings = embeddings[sources]
 
-        all_scores = F.cosine_similarity(source_embeddings.unsqueeze(1), embeddings.unsqueeze(0), dim=-1)
+        all_scores = F.cosine_similarity(
+            source_embeddings.unsqueeze(1), embeddings.unsqueeze(0), dim=-1
+        )
 
         _, top_indices = torch.topk(all_scores, k, dim=-1)
         top_indices = top_indices.squeeze(1)
@@ -156,7 +202,9 @@ class GraphBPRItem2VecModule(pl.LightningModule):
         ndcg = (relevance * gains).sum(dim=-1)
         return ndcg
 
-    def calc_dot_product_ndcg(self, sources: torch.Tensor, labels: torch.Tensor, k: int = 20):
+    def calc_dot_product_ndcg(
+        self, sources: torch.Tensor, labels: torch.Tensor, k: int = 20
+    ):
         embeddings = self.item2vec()
         source_embeddings = embeddings[sources]
 
@@ -169,7 +217,13 @@ class GraphBPRItem2VecModule(pl.LightningModule):
         ndcg = (relevance * gains).sum(dim=-1)
         return ndcg
 
-    def calc_graph_dot_product_ndcg(self, sources: torch.Tensor, labels: torch.Tensor, num_layers: int = 2, k: int = 20):
+    def calc_graph_dot_product_ndcg(
+        self,
+        sources: torch.Tensor,
+        labels: torch.Tensor,
+        num_layers: int = 2,
+        k: int = 20,
+    ):
         embeddings = self.get_graph_embeddings(num_layers=num_layers)
         source_embeddings = embeddings[sources]
 
@@ -182,11 +236,19 @@ class GraphBPRItem2VecModule(pl.LightningModule):
         ndcg = (relevance * gains).sum(dim=-1)
         return ndcg
 
-    def calc_graph_cosine_ndcg(self, sources: torch.Tensor, labels: torch.Tensor, num_layers: int = 2, k: int = 20):
+    def calc_graph_cosine_ndcg(
+        self,
+        sources: torch.Tensor,
+        labels: torch.Tensor,
+        num_layers: int = 2,
+        k: int = 20,
+    ):
         embeddings = self.get_graph_embeddings(num_layers=num_layers)
         source_embeddings = embeddings[sources]
 
-        all_scores = F.cosine_similarity(source_embeddings.unsqueeze(1), embeddings.unsqueeze(0), dim=-1)
+        all_scores = F.cosine_similarity(
+            source_embeddings.unsqueeze(1), embeddings.unsqueeze(0), dim=-1
+        )
 
         _, top_indices = torch.topk(all_scores, k, dim=-1)
         top_indices = top_indices.squeeze(1)
@@ -195,7 +257,13 @@ class GraphBPRItem2VecModule(pl.LightningModule):
         ndcg = (relevance * gains).sum(dim=-1)
         return ndcg
 
-    def calc_graph_dot_product_recall(self, sources: torch.Tensor, labels: torch.Tensor, num_layers: int = 2, k: int = 20):
+    def calc_graph_dot_product_recall(
+        self,
+        sources: torch.Tensor,
+        labels: torch.Tensor,
+        num_layers: int = 2,
+        k: int = 20,
+    ):
         embeddings = self.get_graph_embeddings(num_layers=num_layers)
         source_embeddings = embeddings[sources]
 
@@ -208,7 +276,9 @@ class GraphBPRItem2VecModule(pl.LightningModule):
         return recall
 
     def configure_optimizers(self) -> Optimizer:
-        return optim.AdamW(self.parameters(), lr=self.lr, weight_decay=self.weight_decay)
+        return optim.AdamW(
+            self.parameters(), lr=self.lr, weight_decay=self.weight_decay
+        )
 
     def get_graph_embeddings(self, num_layers: int = 2):
         initial_embeddings = self.item2vec()

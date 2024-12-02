@@ -22,4 +22,6 @@ print(items)
 print(popular_items)
 print(len(popular_items))
 
-clients.redis.aiaas_6.set("popularity:aboutpet:purchase:v1", json.dumps(popular_items), ex=60 * 60 * 24 * 365)
+clients.redis.aiaas_6.set(
+    "popularity:aboutpet:purchase:v1", json.dumps(popular_items), ex=60 * 60 * 24 * 365
+)

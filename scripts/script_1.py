@@ -46,8 +46,10 @@ def load_embeddings(volume: Volume, embed_dim: int = 256):
     item2vec_module = GraphBPRItem2VecModule.load_from_checkpoint(
         model_path,
         vocab_size=vocab_size,
-        purchase_edge_index_path=volume.workspace_path.joinpath("edge.purchase.indices.csv"),
-        embed_dim=embed_dim
+        purchase_edge_index_path=volume.workspace_path.joinpath(
+            "edge.purchase.indices.csv"
+        ),
+        embed_dim=embed_dim,
     )
     item2vec_module.setup()
     item2vec_module.eval()
@@ -82,7 +84,9 @@ def main(embed_dim=128, k: int = 100, batch_size: int = 1000):
             continue
 
         batch_items = [items.get(pidx) for pidx in batch_pidxs]
-        batch_categories_1 = [item["category1"] if item else None for item in batch_items]
+        batch_categories_1 = [
+            item["category1"] if item else None for item in batch_items
+        ]
 
         # Compute similarities
         similarities = torch.mm(embeddings[batch_pidxs], embeddings.T)
@@ -103,13 +107,17 @@ def main(embed_dim=128, k: int = 100, batch_size: int = 1000):
 
             if current_pidx in source_to_targets:
                 target_pids = torch.tensor(source_to_targets[current_pidx])
-                indices = torch.nonzero(torch.isin(top_k_pidxs, target_pids), as_tuple=True)[0]
+                indices = torch.nonzero(
+                    torch.isin(top_k_pidxs, target_pids), as_tuple=True
+                )[0]
                 top_k_scores[indices] *= 10
                 sorted_indices = torch.argsort(top_k_scores, descending=True)
                 top_k_pidxs = top_k_pidxs[sorted_indices]
                 top_k_scores = top_k_scores[sorted_indices]
 
-            top_k_pidxs, top_k_scores = list(top_k_pidxs[:10*k]), list(top_k_scores[:10*k])
+            top_k_pidxs, top_k_scores = list(top_k_pidxs[: 10 * k]), list(
+                top_k_scores[: 10 * k]
+            )
             for pidx, score in zip(top_k_pidxs, top_k_scores):
                 if int(pidx) == current_pidx:
                     continue
@@ -125,7 +133,9 @@ def main(embed_dim=128, k: int = 100, batch_size: int = 1000):
                 if len(aggregated_predictions[current_pdid]) >= k:
                     break
 
-            aggregated_predictions[current_pdid] = aggregated_predictions[current_pdid][:k]
+            aggregated_predictions[current_pdid] = aggregated_predictions[current_pdid][
+                :k
+            ]
 
     pipeline = clients.redis.aiaas_6.pipeline()
     for k, v in aggregated_predictions.items():

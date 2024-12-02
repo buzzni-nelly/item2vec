@@ -27,7 +27,12 @@ class SkipGramBPRTrainDataset(Dataset):
         seq_positive_tensor = torch.LongTensor([seq_positive] * self.negative_k)
         seq_margin_tensor = torch.LongTensor([margin] * self.negative_k)
         seq_negative_tensor = torch.LongTensor(seq_negatives)
-        return seq_target_tensor, seq_positive_tensor, seq_margin_tensor, seq_negative_tensor
+        return (
+            seq_target_tensor,
+            seq_positive_tensor,
+            seq_margin_tensor,
+            seq_negative_tensor,
+        )
 
 
 class SkipGramBPRValidDataset(Dataset):
@@ -68,7 +73,9 @@ class SkipGramBPRDataModule(LightningDataModule):
 
     def setup(self, stage=None):
         if stage == "fit" or stage is None:
-            self.train_dataset = SkipGramBPRTrainDataset(volume=self.volume, negative_k=self.negative_k)
+            self.train_dataset = SkipGramBPRTrainDataset(
+                volume=self.volume, negative_k=self.negative_k
+            )
         elif stage == "valid":
             self.valid_dataset = SkipGramBPRValidDataset(volume=self.volume)
 

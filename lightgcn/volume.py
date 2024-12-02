@@ -20,11 +20,15 @@ Base = sqlalchemy.orm.declarative_base()
 
 def get_start_and_end_timestamps(target_date: datetime):
     # 날짜의 시작 시간 (00:00:00)
-    start_of_day = datetime(target_date.year, target_date.month, target_date.day, 0, 0, 0)
+    start_of_day = datetime(
+        target_date.year, target_date.month, target_date.day, 0, 0, 0
+    )
     start_timestamp = start_of_day.timestamp()
 
     # 날짜의 종료 시간 (23:59:59.999999)
-    end_of_day = datetime(target_date.year, target_date.month, target_date.day, 23, 59, 59, 999999)
+    end_of_day = datetime(
+        target_date.year, target_date.month, target_date.day, 23, 59, 59, 999999
+    )
     end_timestamp = end_of_day.timestamp()
 
     return start_timestamp, end_timestamp
@@ -43,7 +47,9 @@ def fetch_trino_query(query: str):
     df = df.sort_values(by=["user_id", "timestamp"])
     df = df[["user_id", "pdid", "timestamp", "event"]]
 
-    df = df[(df["user_id"] != df["user_id"].shift()) | (df["pdid"] != df["pdid"].shift())]
+    df = df[
+        (df["user_id"] != df["user_id"].shift()) | (df["pdid"] != df["pdid"].shift())
+    ]
     return df
 
 
@@ -55,7 +61,9 @@ class EventType(enum.Enum):
 
 class Item(Base):
     __tablename__ = "item"
-    id = Column(Integer,Sequence('id_sequence', start=0, increment=1), primary_key=True)
+    id = Column(
+        Integer, Sequence("id_sequence", start=0, increment=1), primary_key=True
+    )
     pdid = Column(String, index=True, nullable=False)
     purchase_count = Column(Integer, nullable=False, default=0)
     click_count = Column(Integer, nullable=False, default=0)
@@ -97,7 +105,9 @@ class Item(Base):
 
 class User(Base):
     __tablename__ = "user"
-    id = Column(Integer,Sequence('id_sequence', start=-1, increment=1), primary_key=True)
+    id = Column(
+        Integer, Sequence("id_sequence", start=-1, increment=1), primary_key=True
+    )
     user_id = Column(String, index=True, nullable=False)
     purchase_count = Column(Integer, nullable=False, default=0)
     click_count = Column(Integer, nullable=False, default=0)
@@ -131,7 +141,9 @@ class User(Base):
 
 class Trace(Base):
     __tablename__ = "trace"
-    id = Column(Integer, Sequence('id_sequence', start=0, increment=1), primary_key=True)
+    id = Column(
+        Integer, Sequence("id_sequence", start=0, increment=1), primary_key=True
+    )
     user_id = Column(String, index=True, nullable=False)
     pdid = Column(String, nullable=False)
     event = Column(Enum(EventType), nullable=False)
@@ -140,7 +152,8 @@ class Trace(Base):
     @staticmethod
     def list_traces(session: Session):
         # SQL 쿼리 작성
-        raw_query = text("""
+        raw_query = text(
+            """
             SELECT 
                 user.id AS user_id,
                 item.id AS item_id,
@@ -149,7 +162,8 @@ class Trace(Base):
             FROM trace
             INNER JOIN user ON trace.user_id = user.user_id
             INNER JOIN item ON trace.pdid = item.pdid
-        """)
+        """
+        )
 
         # 실행 및 데이터 반환
         results = session.execute(raw_query).fetchall()
@@ -184,7 +198,6 @@ class Trace(Base):
             synchronize_session=False,
         )
         session.commit()
-
 
     @staticmethod
     def aggregate_items(session: Session):
@@ -369,12 +382,16 @@ class Volume:
 
     def generate_edge_indices_csv(self):
         click_edge_indices = self.generate_click_edge_indices()
-        click_edges_df = pd.DataFrame(click_edge_indices, columns=["source", "target"], dtype=int)
+        click_edges_df = pd.DataFrame(
+            click_edge_indices, columns=["source", "target"], dtype=int
+        )
         click_csv_path = self.workspace_path.joinpath(f"edge.click.indices.csv")
         click_edges_df.to_csv(click_csv_path, index=False)
 
         purchase_edge_indices = self.generate_purchase_edge_indices()
-        purchase_edges_df = pd.DataFrame(purchase_edge_indices, columns=["source", "target"], dtype=int)
+        purchase_edges_df = pd.DataFrame(
+            purchase_edge_indices, columns=["source", "target"], dtype=int
+        )
         purchase_csv_path = self.workspace_path.joinpath(f"edge.purchase.indices.csv")
         purchase_edges_df.to_csv(purchase_csv_path, index=False)
 

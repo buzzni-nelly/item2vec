@@ -5,7 +5,7 @@ from torch_geometric.utils import degree, add_self_loops
 
 class LightGCNConv(MessagePassing):
     def __init__(self):
-        super(LightGCNConv, self).__init__(aggr='sum')
+        super(LightGCNConv, self).__init__(aggr="sum")
 
     def forward(self, x, edge_index):
         row, col = edge_index
@@ -13,7 +13,7 @@ class LightGCNConv(MessagePassing):
         # Column degree normalization
         col_deg = degree(col, x.size(0))
         col_deg_inv_sqrt = col_deg.pow(-1)  # Use square root for normalization
-        col_deg_inv_sqrt[col_deg_inv_sqrt == float('inf')] = 0.0
+        col_deg_inv_sqrt[col_deg_inv_sqrt == float("inf")] = 0.0
         col_norm = col_deg_inv_sqrt[col]
 
         # # Row degree normalization with log transformation
@@ -23,7 +23,7 @@ class LightGCNConv(MessagePassing):
         # row_norm = row_deg_normalized[row]
 
         # Combine normalizations
-        norm = col_norm # * row_norm
+        norm = col_norm  # * row_norm
         return self.propagate(edge_index, x=x, norm=norm)
 
     def message(self, x_j, norm):
@@ -31,12 +31,17 @@ class LightGCNConv(MessagePassing):
         msg = norm.view(-1, 1) * x_j
         return msg
 
+
 # 예제 데이터
-edge_index = torch.tensor([
-    [0, 1, 2, 1, 1, 1],
-    [3, 3, 3, 3, 3, 3],
-])
-x = torch.tensor([[1, 1, 0], [0.0, 0.3, 0], [0.5, 0, 0], [1, -1, 0]])  # 4개의 노드 임베딩
+edge_index = torch.tensor(
+    [
+        [0, 1, 2, 1, 1, 1],
+        [3, 3, 3, 3, 3, 3],
+    ]
+)
+x = torch.tensor(
+    [[1, 1, 0], [0.0, 0.3, 0], [0.5, 0, 0], [1, -1, 0]]
+)  # 4개의 노드 임베딩
 
 # LightGCNConv 실행
 conv = LightGCNConv()
