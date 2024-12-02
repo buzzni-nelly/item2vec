@@ -9,6 +9,10 @@ import clients
 from item2vec.models import GraphBPRItem2VecModule
 from item2vec.volume import Volume
 
+RELEASE = "i2i"
+SITE_NAME = "aboutpet"
+MODEL_NAME = "i2v"
+VERSION = "v1"
 
 def debug(
     target_item,
@@ -59,13 +63,12 @@ def load_embeddings(volume: Volume, embed_dim: int = 256):
 
 def upload(aggregated_predictions: dict):
     pipeline = clients.redis.aiaas_6.pipeline()
-    for k, v in aggregated_predictions.items():
-        key = f"i2i:aboutpet:i2v:v2:{k}"
-        pipeline.set(key, json.dumps(v))
+    for pdid, scores in aggregated_predictions.items():
+        key = f"{RELEASE}:{SITE_NAME}:{MODEL_NAME}:{VERSION}:{pdid}"
+        pipeline.set(key, json.dumps(scores))
         pipeline.expire(key, 30 * 24 * 60 * 60)
-
     pipeline.execute()
-    print(len(aggregated_predictions))
+    print(f"Total {len(aggregated_predictions)} items updated on redis")
 
 
 @retry(tries=3)
@@ -93,9 +96,7 @@ def main(embed_dim=128, k: int = 100, batch_size: int = 1000):
         batch_items = [items.get(pidx) for pidx in batch_pidxs]
         batch_categories_1 = [item["category1"] if item else None for item in batch_items]
 
-        # Compute similarities
-        similarities = torch.mm(embeddings[batch_pidxs], embeddings.T)
-        # similarities is of shape (batch_size, num_items)
+        similarities = torch.mm(embeddings[batch_pidxs], embeddings.T)  # (batch_size, num_items)
 
         # Process each item in the batch
         for pidx_in_batch, current_pidx in enumerate(batch_pidxs):
@@ -119,11 +120,12 @@ def main(embed_dim=128, k: int = 100, batch_size: int = 1000):
                 top_k_scores = top_k_scores[sorted_indices]
 
             top_k_pidxs, top_k_scores = list(top_k_pidxs[:10*k]), list(top_k_scores[:10*k])
-            for pidx, score in zip(top_k_pidxs, top_k_scores):
-                if int(pidx) == current_pidx:
+            for pidx_t, score in zip(top_k_pidxs, top_k_scores):
+                pidx = int(pidx_t)
+                if pidx == current_pidx:
                     continue
-                pdid = volume.pidx2pdid(int(pidx))
-                item = items.get(int(pidx))
+                pdid = volume.pidx2pdid(pidx)
+                item = items.get(pidx)
                 if not item:
                     continue
                 if current_category_1 != item["category1"]:

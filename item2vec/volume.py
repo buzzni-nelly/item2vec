@@ -263,8 +263,8 @@ class Volume:
         self._pidx2pdid = None
         self._pdid2pidx = None
 
-    def migrate_traces(self, start_date: datetime):
-        current_date = start_date
+    def migrate_traces(self, begin_date: datetime):
+        current_date = begin_date
 
         while current_date <= datetime.now():
             start_criteria, end_criteria = get_start_and_end_timestamps(current_date)
@@ -385,14 +385,38 @@ class Volume:
 
         return item_pairs
 
-    def generate_pairs_csv(self):
+    def generate_sequential_pairs_csv(self):
         item_pairs = self.generate_sequential_pairs()
         pairs_df = pd.DataFrame(item_pairs, columns=["target", "positive", "is_purchased"], dtype=int)
         csv_path = self.workspace_path.joinpath(f"item.sequential.pairs.csv")
         pairs_df.to_csv(csv_path, index=False)
 
+    def generate_purchase_pairs(self, begin_date: datetime) -> list:
+        begin_date = begin_date.strftime("%Y-%m-%d")
+        query = queries.ABOUTPET_ITEM2ITEM.format(date=begin_date)
+        rows, columns = clients.trinox.fetch(query)
+        df = pd.DataFrame(rows, columns=columns)
+        df = df.dropna(subset=["target_pid"])
+
+        df = df[df["purchase_time"].notna()]
+
+        df["source_pdid"] = df["pid"].apply(lambda x: f"aboutpet_{x}")
+        df["target_pdid"] = df["target_pid"].apply(lambda x: f"aboutpet_{x}")
+        df = df[["source_pdid", "target_pdid"]]
+        df = df[df["source_pdid"] != df["target_pdid"]]
+        return df.values.tolist()
+
+    def generate_purchase_pairs_csv(self, begin_date: datetime):
+        print("Extracting click-and-purchase item pairs data before purchase.")
+        item_pairs = self.generate_purchase_pairs(begin_date=begin_date)
+        pairs_df = pd.DataFrame(item_pairs, columns=["source_pdid", "target_pdid"], dtype=str)
+        save_path = self.workspace_path.joinpath("validation.csv")
+        pairs_df.to_csv(save_path.as_posix(), index=False)
+
     def generate_purchase_edge_indices(self):
-        df = pd.read_csv("/home/buzzni/item2vec/workspaces/aboutpet/item2vec/v1/validation.csv")
+        validation_path = self.workspace_path.joinpath("validation.csv")
+        df = pd.read_csv(validation_path.as_posix())
+
         df["target"] = df["source_pdid"].apply(self.pdid2pidx)
         df["source"] = df["target_pdid"].apply(self.pdid2pidx)
         df = df.dropna()
@@ -400,25 +424,6 @@ class Volume:
         df["source"] = df["source"].astype(int)
         df = df[["source", "target"]]
         return df.values.tolist()
-
-        # traces = Trace.list_traces(self.session)
-        # items = Item.dict_items(self.session, by="pidx")
-        #
-        # edge_indices = []
-        # for t1, t2 in tqdm(zip(traces[:-1], traces[1:]), desc="Purchase edge indices 를 추출 중입니다.."):
-        #     pidx_1, pidx_2 = t1["pidx"], t2["pidx"]
-        #     if t2["event"] != "purchase":
-        #         continue
-        #     if t1["uidx"] != t2["uidx"]:
-        #         continue
-        #
-        #     item_1, item_2 = items.get(pidx_1), items.get(pidx_2)
-        #     if not item_1 or not item_2:
-        #         continue
-        #     if item_1.category1 != item_2.category1:
-        #         continue
-        #     edge_indices.append((item_2.pidx, item_1.pidx))
-        # return edge_indices
 
     def generate_edge_indices_csv(self):
         purchase_edge_indices = self.generate_purchase_edge_indices()
@@ -428,11 +433,11 @@ class Volume:
 
     def generate_source_to_targets(self):
         df = pd.read_csv("/home/buzzni/item2vec/workspaces/aboutpet/item2vec/v1/validation.csv")
-        df["target"] = df["target_pdid"].apply(self.pdid2pidx)
         df["source"] = df["source_pdid"].apply(self.pdid2pidx)
+        df["target"] = df["target_pdid"].apply(self.pdid2pidx)
         df = df.dropna()
-        df["target"] = df["target"].astype(int)
         df["source"] = df["source"].astype(int)
+        df["target"] = df["target"].astype(int)
         df = df[["source", "target"]]
         source_to_targets = df.groupby("source")["target"].apply(list).to_dict()
         sorted_source_to_targets = {
