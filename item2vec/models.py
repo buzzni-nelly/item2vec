@@ -135,11 +135,14 @@ class GraphBPRItem2VecModule(pl.LightningModule):
 
     def validation_step(self, batch: torch.Tensor, batch_idx: int) -> None:
         sources, labels = batch
-        cos_ndcg = self.calc_cosine_ndcg(sources, labels, k=20)
-        dot_ndcg = self.calc_dot_product_ndcg(sources, labels, k=20)
-        graph_dot_ndcg = self.calc_graph_dot_product_ndcg(sources, labels, num_layers=3, k=20)
-        graph_cos_ndcg = self.calc_graph_cosine_ndcg(sources, labels, num_layers=3, k=20)
-        graph_dot_recall = self.calc_graph_dot_product_recall(sources, labels, num_layers=3, k=20)
+        vanilla_embeddings = self.item2vec()
+        graph_embeddings = self.get_graph_embeddings(num_layers=3)
+
+        cos_ndcg = self.calc_cosine_ndcg(vanilla_embeddings, sources, labels, k=20)
+        dot_ndcg = self.calc_dot_product_ndcg(vanilla_embeddings, sources, labels, k=20)
+        graph_dot_ndcg = self.calc_dot_product_ndcg(graph_embeddings, sources, labels, k=20)
+        graph_cos_ndcg = self.calc_cosine_ndcg(graph_embeddings, sources, labels, k=20)
+        graph_dot_recall = self.calc_dot_product_ndcg(graph_embeddings, sources, labels, k=20)
 
         self.log("val_cos_ndcg@20", cos_ndcg.mean(), prog_bar=True, logger=True, sync_dist=True)
         self.log("val_dot_ndcg@20", dot_ndcg.mean(), prog_bar=True, logger=True, sync_dist=True)
@@ -147,12 +150,9 @@ class GraphBPRItem2VecModule(pl.LightningModule):
         self.log("val_graph_cos_ndcg@20", graph_cos_ndcg.mean(), prog_bar=True, logger=True, sync_dist=True)
         self.log("val_graph_dot_recall@20", graph_dot_recall.mean(), prog_bar=True, logger=True, sync_dist=True)
 
-    def calc_cosine_ndcg(self, sources: torch.Tensor, labels: torch.Tensor, k: int = 20):
-        embeddings = self.item2vec.forward()
+    def calc_cosine_ndcg(self, embeddings: torch.Tensor, sources: torch.Tensor, labels: torch.Tensor, k: int = 20):
         source_embeddings = embeddings[sources]
-
         all_scores = F.cosine_similarity(source_embeddings.unsqueeze(1), embeddings.unsqueeze(0), dim=-1)
-
         _, top_indices = torch.topk(all_scores, k, dim=-1)
         top_indices = top_indices.squeeze(1)
         relevance = (top_indices == labels).float()
@@ -160,74 +160,15 @@ class GraphBPRItem2VecModule(pl.LightningModule):
         ndcg = (relevance * gains).sum(dim=-1)
         return ndcg
 
-    def calc_dot_product_ndcg(self, sources: torch.Tensor, labels: torch.Tensor, k: int = 20):
-        embeddings = self.item2vec()
+    def calc_dot_product_ndcg(self, embeddings: torch.Tensor, sources: torch.Tensor, labels: torch.Tensor, k: int = 20):
         source_embeddings = embeddings[sources]
-
         all_scores = torch.matmul(source_embeddings, embeddings.T)
-
         _, top_indices = torch.topk(all_scores, k, dim=-1)
         top_indices = top_indices.squeeze(1)
         relevance = (top_indices == labels).float()
         gains = 1 / torch.log2(torch.arange(2, k + 2).float()).to(relevance.device)
         ndcg = (relevance * gains).sum(dim=-1)
         return ndcg
-
-    def calc_graph_dot_product_ndcg(
-        self,
-        sources: torch.Tensor,
-        labels: torch.Tensor,
-        num_layers: int = 2,
-        k: int = 20,
-    ):
-        embeddings = self.get_graph_embeddings(num_layers=num_layers)
-        source_embeddings = embeddings[sources]
-
-        all_scores = torch.matmul(source_embeddings, embeddings.T)
-
-        _, top_indices = torch.topk(all_scores, k, dim=-1)
-        top_indices = top_indices.squeeze(1)
-        relevance = (top_indices == labels).float()
-        gains = 1 / torch.log2(torch.arange(2, k + 2).float()).to(relevance.device)
-        ndcg = (relevance * gains).sum(dim=-1)
-        return ndcg
-
-    def calc_graph_cosine_ndcg(
-        self,
-        sources: torch.Tensor,
-        labels: torch.Tensor,
-        num_layers: int = 2,
-        k: int = 20,
-    ):
-        embeddings = self.get_graph_embeddings(num_layers=num_layers)
-        source_embeddings = embeddings[sources]
-
-        all_scores = F.cosine_similarity(source_embeddings.unsqueeze(1), embeddings.unsqueeze(0), dim=-1)
-
-        _, top_indices = torch.topk(all_scores, k, dim=-1)
-        top_indices = top_indices.squeeze(1)
-        relevance = (top_indices == labels).float()
-        gains = 1 / torch.log2(torch.arange(2, k + 2).float()).to(relevance.device)
-        ndcg = (relevance * gains).sum(dim=-1)
-        return ndcg
-
-    def calc_graph_dot_product_recall(
-        self,
-        sources: torch.Tensor,
-        labels: torch.Tensor,
-        num_layers: int = 2,
-        k: int = 20,
-    ):
-        embeddings = self.get_graph_embeddings(num_layers=num_layers)
-        source_embeddings = embeddings[sources]
-
-        all_scores = torch.matmul(source_embeddings, embeddings.T)
-
-        _, top_indices = torch.topk(all_scores, k, dim=-1)
-        top_indices = top_indices.squeeze(1)
-        relevance = (top_indices == labels).float()
-        recall, _ = relevance.max(dim=-1)
-        return recall
 
     def configure_optimizers(self) -> Optimizer:
         return optim.AdamW(self.parameters(), lr=self.lr, weight_decay=self.weight_decay)
@@ -235,12 +176,10 @@ class GraphBPRItem2VecModule(pl.LightningModule):
     def get_graph_embeddings(self, num_layers: int = 2):
         initial_embeddings = self.item2vec()
         x = initial_embeddings
-        # layers = []
-        layers = [initial_embeddings]
+        layers = [initial_embeddings]  # layers = []
         for _ in range(num_layers):
             weights = self.conv(x, self.purchase_edge_index)
             layers.append(weights)
             x = x + weights
-        mean_weights = torch.mean(torch.stack(layers, dim=-1), dim=-1)
-        # mean_weights = self.layer_norm(mean_weights)
+        mean_weights = torch.mean(torch.stack(layers, dim=-1), dim=-1)  # mean_weights = self.layer_norm(mean_weights)
         return initial_embeddings + self.dropout(mean_weights)
