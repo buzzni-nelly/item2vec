@@ -21,15 +21,11 @@ Base = sqlalchemy.orm.declarative_base()
 
 def get_start_and_end_timestamps(target_date: datetime):
     # 날짜의 시작 시간 (00:00:00)
-    start_of_day = datetime(
-        target_date.year, target_date.month, target_date.day, 0, 0, 0
-    )
+    start_of_day = datetime(target_date.year, target_date.month, target_date.day, 0, 0, 0)
     start_timestamp = start_of_day.timestamp()
 
     # 날짜의 종료 시간 (23:59:59.999999)
-    end_of_day = datetime(
-        target_date.year, target_date.month, target_date.day, 23, 59, 59, 999999
-    )
+    end_of_day = datetime(target_date.year, target_date.month, target_date.day, 23, 59, 59, 999999)
     end_timestamp = end_of_day.timestamp()
 
     return start_timestamp, end_timestamp
@@ -48,9 +44,7 @@ def fetch_trino_query(query: str):
     df = df.sort_values(by=["user_id", "timestamp"])
     df = df[["user_id", "pdid", "timestamp", "event"]]
 
-    df = df[
-        (df["user_id"] != df["user_id"].shift()) | (df["pdid"] != df["pdid"].shift())
-    ]
+    df = df[(df["user_id"] != df["user_id"].shift()) | (df["pdid"] != df["pdid"].shift())]
     return df
 
 
@@ -200,9 +194,7 @@ class Trace(Base):
         return (
             session.query(
                 Trace.pdid,
-                func.sum(
-                    case((Trace.event == EventType.purchase.value, 1), else_=0)
-                ).label("purchase_count"),
+                func.sum(case((Trace.event == EventType.purchase.value, 1), else_=0)).label("purchase_count"),
                 func.count().label("click_count"),
             )
             .group_by(Trace.pdid)
@@ -214,9 +206,7 @@ class Trace(Base):
         return (
             session.query(
                 Trace.user_id,
-                func.sum(
-                    case((Trace.event == EventType.purchase.value, 1), else_=0)
-                ).label("purchase_count"),
+                func.sum(case((Trace.event == EventType.purchase.value, 1), else_=0)).label("purchase_count"),
                 func.count().label("click_count"),
             )
             .group_by(Trace.user_id)
@@ -294,9 +284,7 @@ class Volume:
 
             print(f"Inserting new traces after timestamp: {delete_criteria}")
             df.to_sql(name="trace", con=self.engine, index=False, if_exists="append")
-            print(
-                f"Data for {date_str} has been successfully saved to the trace table."
-            )
+            print(f"Data for {date_str} has been successfully saved to the trace table.")
 
             current_date += timedelta(days=1)
 
@@ -309,15 +297,9 @@ class Volume:
         products_dict = {
             x["_id"]: {
                 "name": x.get("name"),
-                "category1": x.get("category1", "UNKNOWN")
-                .replace("*", "")
-                .replace("_", ""),
-                "category2": x.get("category2", "UNKNOWN")
-                .replace("*", "")
-                .replace("_", ""),
-                "category3": x.get("category3", "UNKNOWN")
-                .replace("*", "")
-                .replace("_", ""),
+                "category1": x.get("category1", "UNKNOWN").replace("*", "").replace("_", ""),
+                "category2": x.get("category2", "UNKNOWN").replace("*", "").replace("_", ""),
+                "category3": x.get("category3", "UNKNOWN").replace("*", "").replace("_", ""),
             }
             for x in products
         }
@@ -396,9 +378,7 @@ class Volume:
 
     def generate_sequential_pairs_csv(self):
         item_pairs = self.generate_sequential_pairs()
-        pairs_df = pd.DataFrame(
-            item_pairs, columns=["target", "positive", "is_purchased"], dtype=int
-        )
+        pairs_df = pd.DataFrame(item_pairs, columns=["target", "positive", "is_purchased"], dtype=int)
         csv_path = self.workspace_path.joinpath(f"item.sequential.pairs.csv")
         pairs_df.to_csv(csv_path, index=False)
 
@@ -456,9 +436,7 @@ class Volume:
 
     def generate_edge_indices_csv(self):
         purchase_edge_indices = self.generate_purchase_edge_indices()
-        purchase_edges_df = pd.DataFrame(
-            purchase_edge_indices, columns=["source", "target"], dtype=int
-        )
+        purchase_edges_df = pd.DataFrame(purchase_edge_indices, columns=["source", "target"], dtype=int)
         purchase_csv_path = self.workspace_path.joinpath(f"edge.purchase.indices.csv")
         purchase_edges_df.to_csv(purchase_csv_path, index=False)
 
@@ -502,16 +480,12 @@ class Volume:
         if "pdid" == by:
             if not self._items_by_pdid:
                 print("Loading items into memory from persistent volume..")
-                self._items_by_pdid = {
-                    x.pdid: x.to_dict() for x in Item.list_items(self.session)
-                }
+                self._items_by_pdid = {x.pdid: x.to_dict() for x in Item.list_items(self.session)}
             return self._items_by_pdid
         else:
             if not self._items_by_pidx:
                 print("Loading items into memory from persistent volume..")
-                self._items_by_pidx = {
-                    x.pidx: x.to_dict() for x in Item.list_items(self.session)
-                }
+                self._items_by_pidx = {x.pidx: x.to_dict() for x in Item.list_items(self.session)}
             return self._items_by_pidx
 
     def pidx2pdid(self, pidx: int) -> str | None:

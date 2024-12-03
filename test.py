@@ -39,9 +39,7 @@ edge_index = torch.tensor(
         [3, 3, 3, 3, 3, 3],
     ]
 )
-x = torch.tensor(
-    [[1, 1, 0], [0.0, 0.3, 0], [0.5, 0, 0], [1, -1, 0]]
-)  # 4개의 노드 임베딩
+x = torch.tensor([[1, 1, 0], [0.0, 0.3, 0], [0.5, 0, 0], [1, -1, 0]])  # 4개의 노드 임베딩
 
 # LightGCNConv 실행
 conv = LightGCNConv()

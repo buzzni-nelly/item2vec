@@ -36,6 +36,7 @@ def fetch_click_click_footsteps(begin_date: datetime) -> list:
     df = df[df["source_pdid"] != df["target_pdid"]]
     return df.values.tolist()
 
+
 def main():
     pipeline = clients.redis.aiaas_6.pipeline()
 

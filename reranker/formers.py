@@ -19,10 +19,7 @@ class PositionalEncoding(nn.Module):
 
         pe = torch.zeros(max_len, embed_dim)
         position = torch.arange(0, max_len).unsqueeze(1)
-        div_term = torch.exp(
-            torch.arange(0, embed_dim, 2)
-            * -(torch.log(torch.Tensor([scale])) / embed_dim)
-        )
+        div_term = torch.exp(torch.arange(0, embed_dim, 2) * -(torch.log(torch.Tensor([scale])) / embed_dim))
         pe[:, 0::2] = torch.sin(position * div_term)
         pe[:, 1::2] = torch.cos(position * div_term)
         pe = pe.unsqueeze(0)
@@ -53,9 +50,7 @@ class BERT4Rec(nn.Module):
         self.item_embedding.weight.data.copy_(item2vec.embeddings)
         self.item_embedding.weight.requires_grad = not freeze_item_embeddings
 
-        self.position_embedding = PositionalEncoding(
-            embed_dim=embed_dim, max_len=max_len
-        )
+        self.position_embedding = PositionalEncoding(embed_dim=embed_dim, max_len=max_len)
 
         encoder_layer = nn.TransformerEncoderLayer(
             d_model=embed_dim,
@@ -65,18 +60,14 @@ class BERT4Rec(nn.Module):
             activation="gelu",
             batch_first=True,
         )
-        self.transformer_encoder = nn.TransformerEncoder(
-            encoder_layer, num_layers=num_layers
-        )
+        self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
 
         self.projection = nn.Linear(embed_dim, embed_dim // 2)
         self.output_layer = nn.Linear(embed_dim // 2, 1)
 
         self.dropout = nn.Dropout(dropout)
 
-    def forward(
-        self, input_ids: torch.Tensor, src_key_padding_mask: torch.Tensor = None
-    ):
+    def forward(self, input_ids: torch.Tensor, src_key_padding_mask: torch.Tensor = None):
         seq_len = input_ids.size(1)
         position_ids = torch.arange(seq_len, dtype=torch.long, device=input_ids.device)
         position_ids = position_ids.unsqueeze(0).expand_as(input_ids)
@@ -85,9 +76,7 @@ class BERT4Rec(nn.Module):
         position_embeddings = self.position_embedding(position_ids)
         embeddings = self.dropout(item_embeddings + position_embeddings)
 
-        transformer_output = self.transformer_encoder(
-            embeddings, src_key_padding_mask=src_key_padding_mask
-        )
+        transformer_output = self.transformer_encoder(embeddings, src_key_padding_mask=src_key_padding_mask)
 
         hidden_states = self.projection(transformer_output)
         hidden_states = F.gelu(hidden_states)

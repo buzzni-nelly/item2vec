@@ -20,9 +20,7 @@ DEFAULT_PROJECTION = {
 }
 
 
-def get_product(
-    pdid: str, projection: Optional[Dict] = None, company_id: str = "aboutpet"
-) -> Optional[Dict]:
+def get_product(pdid: str, projection: Optional[Dict] = None, company_id: str = "aboutpet") -> Optional[Dict]:
     db = client["aiaas-search"]
     collection = db[f"search-product-{company_id}"]
 
@@ -32,9 +30,7 @@ def get_product(
     return item
 
 
-def list_products(
-    pdids: List[str], projection: Optional[Dict] = None, company_id: str = "aboutpet"
-) -> List[Dict]:
+def list_products(pdids: List[str], projection: Optional[Dict] = None, company_id: str = "aboutpet") -> List[Dict]:
     db = client["aiaas-search"]
     collection = db[f"search-product-{company_id}"]
 

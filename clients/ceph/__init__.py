@@ -38,9 +38,7 @@ class S3fsS3Client:
             self.fs.put_file(file_path, full_path, callback=callback)
         return f"{self.fs.client_kwargs['endpoint_url']}/{full_path}"
 
-    def upload_directory(
-        self, directory_path: str, bucket_name: str, prefix: str, verbose: bool = False
-    ) -> str:
+    def upload_directory(self, directory_path: str, bucket_name: str, prefix: str, verbose: bool = False) -> str:
         for root, dirs, files in os.walk(directory_path):
             relative_path = os.path.relpath(root, directory_path)
             for file in files:
@@ -60,9 +58,7 @@ class S3fsS3Client:
         with TqdmCallback(tqdm_kwargs={"unit": "B", "unit_scale": True}) as callback:
             self.fs.get_file(full_path, file_path, callback=callback)
 
-    def download_directory(
-        self, bucket_name: str, prefix: str, directory_path: str, recursive: bool = True
-    ):
+    def download_directory(self, bucket_name: str, prefix: str, directory_path: str, recursive: bool = True):
         full_path = f"{bucket_name}/{prefix}"
         if recursive:
             self.fs.get(full_path, directory_path, recursive=True)
@@ -74,9 +70,7 @@ class S3fsS3Client:
                         os.path.join(directory_path, os.path.basename(file["name"])),
                     )
                 else:
-                    logger.warning(
-                        f"Skipping directory {file['name']} because recursive=False"
-                    )
+                    logger.warning(f"Skipping directory {file['name']} because recursive=False")
 
     def copy_file(
         self,
@@ -138,18 +132,14 @@ class S3fsS3Client:
         full_path = f"{bucket_name}/{key}"
         return self.fs.exists(full_path)
 
-    def list_directory_contents(
-        self, bucket_name: str, prefix: str = "", tail_only: bool = True
-    ) -> List[str]:
+    def list_directory_contents(self, bucket_name: str, prefix: str = "", tail_only: bool = True) -> List[str]:
         full_path = f"{bucket_name}/{prefix}"
         contents = self.fs.ls(full_path)
         if tail_only:
             return [os.path.basename(path) for path in contents]
         return contents
 
-    def list_top_level_directories(
-        self, bucket_name: str, prefix: str = "", tail_only: bool = True
-    ) -> List[str]:
+    def list_top_level_directories(self, bucket_name: str, prefix: str = "", tail_only: bool = True) -> List[str]:
         full_path = f"{bucket_name}/{prefix}"
         dirs = self.fs.ls(full_path, detail=True)
         top_level_dirs = [d["name"] for d in dirs if d["type"] == "directory"]
@@ -157,9 +147,7 @@ class S3fsS3Client:
             return [os.path.basename(d.rstrip("/")) for d in top_level_dirs]
         return top_level_dirs
 
-    def list_top_level_files(
-        self, bucket_name: str, prefix: str = "", tail_only: bool = True
-    ) -> List[str]:
+    def list_top_level_files(self, bucket_name: str, prefix: str = "", tail_only: bool = True) -> List[str]:
         full_path = f"{bucket_name}/{prefix}"
         files = self.fs.ls(full_path, detail=True)
         top_level_files = [f["name"] for f in files if f["type"] == "file"]
@@ -198,11 +186,7 @@ class S3fsS3Client:
         self.fs.rmdir(bucket_name)
 
     def list_buckets(self) -> List[str]:
-        buckets = [
-            file["name"]
-            for file in self.fs.ls("", detail=True)
-            if file["type"] == "directory"
-        ]
+        buckets = [file["name"] for file in self.fs.ls("", detail=True) if file["type"] == "directory"]
         return [os.path.basename(bucket) for bucket in buckets]
 
     def open(self, bucket_name: str, path: str, mode: str):
@@ -237,16 +221,12 @@ class CephClient:
     def cp(self, src: str, dst: str, force: bool = False):
         if not force:
             self._block_clobber(dst)
-        self.s3_client.copy_file(
-            self.bucket, self._prefix(src), self.bucket, self._prefix(dst)
-        )
+        self.s3_client.copy_file(self.bucket, self._prefix(src), self.bucket, self._prefix(dst))
 
     def mv(self, src: str, dst: str, force: bool = False):
         if not force:
             self._block_clobber(dst)
-        self.s3_client.copy_file(
-            self.bucket, self._prefix(src), self.bucket, self._prefix(dst)
-        )
+        self.s3_client.copy_file(self.bucket, self._prefix(src), self.bucket, self._prefix(dst))
 
     def upload_file(self, src: str, dst: str, force: bool = False):
         if not force:

@@ -17,10 +17,7 @@ class PositionalEncoding(nn.Module):
 
         pe = torch.zeros(max_len, embed_dim)
         position = torch.arange(0, max_len).unsqueeze(1)
-        div_term = torch.exp(
-            torch.arange(0, embed_dim, 2)
-            * -(torch.log(torch.Tensor([scale])) / embed_dim)
-        )
+        div_term = torch.exp(torch.arange(0, embed_dim, 2) * -(torch.log(torch.Tensor([scale])) / embed_dim))
         pe[:, 0::2] = torch.sin(position * div_term)
         pe[:, 1::2] = torch.cos(position * div_term)
         pe = pe.unsqueeze(0)
@@ -72,9 +69,7 @@ class BERT4Rec(nn.Module):
 
         # Embedding layers
         self.item_embedding = nn.Embedding(vocab_size, embed_dim)
-        self.position_embedding = PositionalEncoding(
-            embed_dim=embed_dim, max_len=max_len
-        )
+        self.position_embedding = PositionalEncoding(embed_dim=embed_dim, max_len=max_len)
 
         # Transformer Encoder
         self.attention = ScaledDotProductAttention(embed_dim, num_heads)

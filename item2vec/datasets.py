@@ -73,9 +73,7 @@ class SkipGramBPRDataModule(LightningDataModule):
 
     def setup(self, stage=None):
         if stage == "fit" or stage is None:
-            self.train_dataset = SkipGramBPRTrainDataset(
-                volume=self.volume, negative_k=self.negative_k
-            )
+            self.train_dataset = SkipGramBPRTrainDataset(volume=self.volume, negative_k=self.negative_k)
         elif stage == "valid":
             self.valid_dataset = SkipGramBPRValidDataset(volume=self.volume)
 
