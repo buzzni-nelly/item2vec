@@ -33,7 +33,7 @@ class ScaledDotProductAttention(nn.Module):
         super(ScaledDotProductAttention, self).__init__()
         self.temperature = sqrt(embed_dim / num_heads)
 
-    def forward(self, Q: torch.Tensor, K: torch.Tensor, V: torch.Tensor, mask: torch.Tensor=None):
+    def forward(self, Q: torch.Tensor, K: torch.Tensor, V: torch.Tensor, mask: torch.Tensor = None):
         attn = torch.matmul(Q, K.transpose(-2, -1)) / self.temperature
         if mask is not None:
             attn = attn.masked_fill(mask == 0, -1e9)
