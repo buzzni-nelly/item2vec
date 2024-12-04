@@ -1,12 +1,11 @@
-import random
-
 import pytorch_lightning as pl
 import torch
 import torch.nn as nn
-from pytorch_lightning import Trainer
 from torch import optim
 from torch.optim import Optimizer
 from torch.utils.data import Dataset, DataLoader
+
+from item2vec.volume import Volume
 
 
 class PositionalEncoding(nn.Module):
@@ -34,7 +33,15 @@ class PositionalEncoding(nn.Module):
 
 
 class BERT4Rec(nn.Module):
-    def __init__(self, num_items: int, embed_dim: int, num_heads: int, num_layers: int, max_len: int, dropout=0.1):
+    def __init__(
+        self,
+        num_items: int,
+        embed_dim: int,
+        num_heads: int,
+        num_layers: int,
+        max_len: int,
+        dropout=0.1,
+    ):
         super(BERT4Rec, self).__init__()
         self.num_items = num_items
         self.mask_token_idx = self.num_items + 0
@@ -57,9 +64,7 @@ class BERT4Rec(nn.Module):
     def forward(self, input_seqs: torch.Tensor, src_key_padding_mask: torch.Tensor):
         embeddings = self.item_embeddings(input_seqs)
         embeddings = self.position_embeddings(embeddings)
-        encoder_output = self.transformer_encoder(
-            embeddings, src_key_padding_mask=src_key_padding_mask
-        )
+        encoder_output = self.transformer_encoder(embeddings, src_key_padding_mask=src_key_padding_mask)
         return encoder_output
 
 
@@ -73,6 +78,8 @@ class Bert4RecModule(pl.LightningModule):
         num_layers: int,
         max_len: int = 50,
         dropout: float = 0.1,
+        lr: float = 0.001,
+        weight_decay: float = 0.001,
     ):
         super(Bert4RecModule, self).__init__()
         self.num_items = num_items
@@ -83,6 +90,8 @@ class Bert4RecModule(pl.LightningModule):
         self.num_layers = num_layers
         self.max_len = max_len
         self.dropout = dropout
+        self.lr = lr
+        self.weight_decay = weight_decay
 
         self.bert4rec = BERT4Rec(
             num_items=num_items,
@@ -117,7 +126,7 @@ class Bert4RecModule(pl.LightningModule):
 
         # BPR Loss 계산
         train_loss = self.bpr_loss(positive_scores, negative_scores)
-        self.log("train_loss", train_loss)
+        self.log("train_loss", train_loss, prog_bar=True)
         return train_loss
 
     def forward(self):
@@ -128,50 +137,54 @@ class Bert4RecModule(pl.LightningModule):
         return loss
 
     def configure_optimizers(self) -> Optimizer:
-        return optim.AdamW(self.parameters(), lr=0.1, weight_decay=0.001)
+        return optim.AdamW(self.parameters(), lr=self.lr, weight_decay=self.weight_decay)
 
 
 class Bert4RecTrainDataset(Dataset):
-    def __init__(self, negative_k: int = 10):
-        self.negative_k = negative_k
-        self.num_items = 10
+    def __init__(self, volume: Volume, max_len: int = 50):
+        self.histories = volume.migrate_user_histories()
+        self.num_items = volume.vocab_size()
         self.mask_token_idx = self.num_items + 0
         self.pad_token_idx = self.num_items + 1
-        self.max_len = 20
+        self.max_len = max_len
 
     def __len__(self) -> int:
-        return 10
+        return len(self.histories)
 
-    def __getitem__(self, idx):
-        num_pads = random.randint(1, 3)
-        input_seqs = torch.randint(0, self.num_items, (self.max_len,))
-        input_seqs[-num_pads:] = self.pad_token_idx
+    def __getitem__(self, idx: int):
+        history_pidxs = self.histories[idx]
+        pad_len = self.max_len - len(history_pidxs)
+
+        input_seqs = history_pidxs + ([self.pad_token_idx] * pad_len)
+        input_seqs = torch.tensor(input_seqs, dtype=torch.long)
         padding_mask = input_seqs == self.pad_token_idx
 
         last_idx = (~padding_mask).sum(dim=0) - 1
 
         # Sampling positive_idx & masking process
-        positive_idx = input_seqs[last_idx].item()
+        positive_pidx = input_seqs[last_idx].item()
         input_seqs[last_idx] = self.mask_token_idx
 
         # Sampling a negative_idx
-        negative_idx = positive_idx
-        while negative_idx == positive_idx:
-            negative_idx = torch.randint(0, self.num_items, ()).item()
+        negative_pidx = positive_pidx
+        while negative_pidx == positive_pidx:
+            negative_pidx = torch.randint(0, self.num_items, ()).item()
 
-        return input_seqs, padding_mask, last_idx, positive_idx, negative_idx
+        return input_seqs, padding_mask, last_idx, positive_pidx, negative_pidx
 
 
 class Bert4RecDataModule(pl.LightningDataModule):
-    def __init__(self):
+    def __init__(self, volume: Volume, batch_size: int = 32, num_workers: int = 2, max_len: int = 50):
         super().__init__()
-        self.batch_size = 4
-        self.num_workers = 2
+        self.volume = volume
+        self.batch_size = batch_size
+        self.max_len = max_len
+        self.num_workers = num_workers
         self.train_dataset = None
 
     def setup(self, stage=None):
         if stage == "fit" or stage is None:
-            self.train_dataset = Bert4RecTrainDataset()
+            self.train_dataset = Bert4RecTrainDataset(volume=self.volume, max_len=self.max_len)
 
     def train_dataloader(self):
         return DataLoader(
@@ -182,28 +195,3 @@ class Bert4RecDataModule(pl.LightningDataModule):
             pin_memory=True,
             shuffle=True,
         )
-
-
-def main():
-
-    data_module = Bert4RecDataModule()
-
-    bert4rec = Bert4RecModule(
-        num_items=10,
-        embed_dim=16,
-        num_heads=2,
-        num_layers=2,
-        max_len=20,
-        dropout=0.1,
-    )
-
-    trainer = Trainer(
-        limit_train_batches=10,
-        max_epochs=5,
-    )
-    trainer.fit(model=bert4rec, datamodule=data_module)
-
-
-if __name__ == "__main__":
-    torch.manual_seed(42)
-    main()

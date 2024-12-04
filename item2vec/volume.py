@@ -215,6 +215,47 @@ class Trace(Base):
         )
 
     @staticmethod
+    def aggregate_user_histories(session: Session):
+        query = text(
+            """
+            SELECT
+                user_id,
+                GROUP_CONCAT(pidx, ',') AS pidxs,
+                GROUP_CONCAT(event, ',') AS events
+            --     GROUP_CONCAT(category1, ',') AS category1,
+            --     GROUP_CONCAT(category2, ',') AS category2,
+            --     GROUP_CONCAT(category3, ',') AS category3,
+            --     GROUP_CONCAT(timestamp, ',') AS timestamps,
+            FROM (
+                SELECT
+                    t.user_id as user_id,
+                    i.pidx as pidx,
+                    t.event as event
+            --         i.category1 as category1,
+            --         i.category2 as category2,
+            --         i.category3 as category3,
+            --         t.timestamp as timestamp
+                FROM
+                    trace AS t
+                INNER JOIN item AS i ON t.pdid = i.pdid
+                INNER JOIN user AS u ON t.user_id = u.user_id
+                WHERE u.purchase_count >= 1
+            )
+            GROUP BY
+                user_id
+        """
+        )
+        results = session.execute(query).fetchall()
+        return [
+            {
+                "user_id": row.user_id,
+                "pidxs": row.pidxs,
+                "events": row.events,
+            }
+            for row in results
+        ]
+
+    @staticmethod
     def list_popular_items(session: Session, criteria: float):
         query = text(
             """
@@ -343,6 +384,16 @@ class Volume:
 
         self.session.bulk_save_objects(users)
         self.session.commit()
+
+    def migrate_user_histories(self):
+        histories = Trace.aggregate_user_histories(self.session)
+        histories = [x["pidxs"].split(",") for x in histories]
+        result = []
+        for history in histories:
+            for i in range(2, len(history)):
+                cumulative_ids = history[max(0, i - 50) : i]
+                result.append(list(map(int, cumulative_ids)))
+        return result
 
     def generate_sequential_pairs(self, window_size: int = 5, time_delta: int = 60 * 3):
         traces = Trace.list_traces(self.session)
@@ -512,10 +563,11 @@ class Volume:
 
 if __name__ == "__main__":
     volume = Volume(site="aboutpet", model="item2vec", version="v1")
-    volume.migrate_traces(begin_date=datetime(2024, 8, 1))
-    volume.migrate_items()
-    volume.migrate_users()
-    volume.generate_sequential_pairs_csv()
-    volume.generate_click_purchase_footstep_csv(begin_date=datetime.now() - timedelta(days=7))
-    volume.generate_click_click_footstep_csv(begin_date=datetime.now() - timedelta(days=4))
-    volume.generate_edge_indices_csv()
+    # volume.migrate_traces(begin_date=datetime(2024, 8, 1))
+    # volume.migrate_items()
+    # volume.migrate_users()
+    # volume.generate_sequential_pairs_csv()
+    # volume.generate_click_purchase_footstep_csv(begin_date=datetime.now() - timedelta(days=7))
+    # volume.generate_click_click_footstep_csv(begin_date=datetime.now() - timedelta(days=4))
+    # volume.generate_edge_indices_csv()
+    volume.migrate_user_histories()
