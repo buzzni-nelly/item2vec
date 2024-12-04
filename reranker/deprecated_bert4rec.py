@@ -29,11 +29,11 @@ class PositionalEncoding(nn.Module):
 
 
 class ScaledDotProductAttention(nn.Module):
-    def __init__(self, embed_dim, num_heads):
+    def __init__(self, embed_dim: int, num_heads: int):
         super(ScaledDotProductAttention, self).__init__()
         self.temperature = sqrt(embed_dim / num_heads)
 
-    def forward(self, Q, K, V, mask=None):
+    def forward(self, Q: torch.Tensor, K: torch.Tensor, V: torch.Tensor, mask: torch.Tensor=None):
         attn = torch.matmul(Q, K.transpose(-2, -1)) / self.temperature
         if mask is not None:
             attn = attn.masked_fill(mask == 0, -1e9)
@@ -92,7 +92,7 @@ class BERT4Rec(nn.Module):
 
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self, input_ids, mask=None):
+    def forward(self, input_ids, mask: torch.Tensor | None = None):
         seq_len = input_ids.size(1)
         position_ids = torch.arange(seq_len, dtype=torch.long, device=input_ids.device)
         position_ids = position_ids.unsqueeze(0).expand_as(input_ids)
@@ -114,3 +114,26 @@ class BERT4Rec(nn.Module):
         logits = self.output_layer(hidden_states)
 
         return logits
+
+
+if __name__ == "__main__":
+    embed_dim = 10
+    num_heads = 2
+    batch_size = 1
+    seq_length = 5
+    Q = torch.randn(batch_size, seq_length, embed_dim)
+    K = torch.randn(batch_size, seq_length, embed_dim)
+    V = torch.randn(batch_size, seq_length, embed_dim)
+
+    mask = torch.ones(batch_size, seq_length, seq_length)
+    mask[-1][-1][-1] = 0
+    mask[-1][-1][-2] = 0
+    mask[-1][-1][-3] = 0
+    mask[-1][-1][-4] = 0
+    mask[-1][-1][-5] = 0
+
+    attention_layer = ScaledDotProductAttention(embed_dim, num_heads)
+    output = attention_layer(Q, K, V, mask=mask)
+
+    print("Output shape:", output.shape)
+    print("Output:", output)
