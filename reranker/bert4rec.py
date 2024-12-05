@@ -50,7 +50,11 @@ class BERT4Rec(nn.Module):
         self.max_len = max_len
 
         self.item_embeddings = nn.Embedding(num_items + 2, embed_dim, padding_idx=self.pad_token_idx)
-        self.position_embeddings = PositionalEncoding(embed_dim=embed_dim, max_len=max_len)
+        self.position_embeddings = PositionalEncoding(
+            embed_dim=embed_dim,
+            max_len=max_len,
+            dropout=dropout,
+        )
 
         encoder_layer = nn.TransformerEncoderLayer(
             d_model=embed_dim,
@@ -129,6 +133,47 @@ class Bert4RecModule(pl.LightningModule):
         self.log("train_loss", train_loss, prog_bar=True)
         return train_loss
 
+    def validation_step(self, batch: list[torch.Tensor], idx: int):
+        input_seqs, src_key_padding_mask, last_idxs, ground_truth_items = batch
+        logits = self.bert4rec(input_seqs, src_key_padding_mask=src_key_padding_mask)
+        output = logits[torch.arange(logits.size(0)), last_idxs, :]
+        scores = torch.matmul(output, self.bert4rec.item_embeddings.weight[:-2].T)
+
+        mrr = self.calc_mrr(scores, ground_truth_items)
+        self.log("val_mrr", mrr, prog_bar=True)
+
+        recall_5 = self.calc_recall_at_k(scores, ground_truth_items, 5)
+        ndcg_5 = self.calc_ndcg_at_k(scores, ground_truth_items, 5)
+        self.log(f"val_recall@5", recall_5, prog_bar=True)
+        self.log(f"val_ndcg@5", ndcg_5, prog_bar=True)
+
+        recall_20 = self.calc_recall_at_k(scores, ground_truth_items, 20)
+        ndcg_20 = self.calc_ndcg_at_k(scores, ground_truth_items, 20)
+        self.log(f"val_recall@20", recall_20, prog_bar=True)
+        self.log(f"val_ndcg@20", ndcg_20, prog_bar=True)
+
+    def calc_mrr(self, scores: torch.Tensor, ground_truth_items: torch.Tensor):
+        gt_scores = scores.gather(1, ground_truth_items.unsqueeze(1)).squeeze(1)
+        ranks = (scores > gt_scores.unsqueeze(1)).sum(dim=1) + 1
+        reciprocal_ranks = 1.0 / ranks.float()
+        mrr = torch.mean(reciprocal_ranks).item()
+        return mrr
+
+    def calc_recall_at_k(self, scores: torch.Tensor, ground_truth_items: torch.Tensor, k: int):
+        topk_scores, topk_indices = torch.topk(scores, k, dim=1)
+        hits = (topk_indices == ground_truth_items.unsqueeze(1)).any(dim=1).float()
+        recall = torch.mean(hits).item()
+        return recall
+
+    def calc_ndcg_at_k(self, scores: torch.Tensor, ground_truth_items: torch.Tensor, k: int):
+        topk_scores, topk_indices = torch.topk(scores, k, dim=1)
+        match_positions = (topk_indices == ground_truth_items.unsqueeze(1)).nonzero(as_tuple=False)
+        dcg = torch.zeros(scores.size(0), device=scores.device)
+        dcg[match_positions[:, 0]] = 1.0 / torch.log2(match_positions[:, 1].float() + 2)
+        idcg = 1.0
+        ndcg = torch.mean(dcg / idcg).item()
+        return ndcg
+
     def forward(self):
         pass
 
@@ -138,6 +183,12 @@ class Bert4RecModule(pl.LightningModule):
 
     def configure_optimizers(self) -> Optimizer:
         return optim.AdamW(self.parameters(), lr=self.lr, weight_decay=self.weight_decay)
+
+    def import_item_embeddings(self, item_embeddings: torch.Tensor):
+        mask_embeddings = torch.zeros((1, item_embeddings.size(1))).to(item_embeddings.device)
+        padding_embeddings = torch.zeros((1, item_embeddings.size(1))).to(item_embeddings.device)
+        extended_embeddings = torch.cat([item_embeddings, mask_embeddings, padding_embeddings], dim=0)
+        self.bert4rec.item_embeddings.weight.data.copy_(extended_embeddings)
 
 
 class Bert4RecTrainDataset(Dataset):
@@ -173,6 +224,33 @@ class Bert4RecTrainDataset(Dataset):
         return input_seqs, padding_mask, last_idx, positive_pidx, negative_pidx
 
 
+class Bert4RecValidDataset(Dataset):
+    def __init__(self, volume: Volume, max_len: int = 50):
+        self.histories = volume.migrate_user_histories()
+        self.num_items = volume.vocab_size()
+        self.mask_token_idx = self.num_items + 0
+        self.pad_token_idx = self.num_items + 1
+        self.max_len = max_len
+
+    def __len__(self) -> int:
+        return len(self.histories) // 500
+
+    def __getitem__(self, idx: int):
+        history_pidxs = self.histories[idx]
+        pad_len = self.max_len - len(history_pidxs)
+
+        input_seqs = history_pidxs + ([self.pad_token_idx] * pad_len)
+        input_seqs = torch.tensor(input_seqs, dtype=torch.long)
+        padding_mask = input_seqs == self.pad_token_idx
+
+        last_idx = (~padding_mask).sum(dim=0) - 1
+
+        ground_truth_item = input_seqs[last_idx].item()
+        input_seqs[last_idx] = self.mask_token_idx
+
+        return input_seqs, padding_mask, last_idx, ground_truth_item
+
+
 class Bert4RecDataModule(pl.LightningDataModule):
     def __init__(self, volume: Volume, batch_size: int = 32, num_workers: int = 2, max_len: int = 50):
         super().__init__()
@@ -181,6 +259,7 @@ class Bert4RecDataModule(pl.LightningDataModule):
         self.max_len = max_len
         self.num_workers = num_workers
         self.train_dataset = None
+        self.valid_dataset = None
 
     def setup(self, stage=None):
         if stage == "fit" or stage is None:
@@ -194,4 +273,14 @@ class Bert4RecDataModule(pl.LightningDataModule):
             persistent_workers=bool(self.num_workers > 0),
             pin_memory=True,
             shuffle=True,
+        )
+
+    def val_dataloader(self):
+        return DataLoader(
+            Bert4RecValidDataset(volume=self.volume, max_len=self.max_len),
+            batch_size=self.batch_size,
+            num_workers=self.num_workers,
+            persistent_workers=bool(self.num_workers > 0),
+            pin_memory=True,
+            shuffle=False,
         )

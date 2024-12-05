@@ -173,7 +173,7 @@ class GraphBPRItem2VecModule(pl.LightningModule):
     def configure_optimizers(self) -> Optimizer:
         return optim.AdamW(self.parameters(), lr=self.lr, weight_decay=self.weight_decay)
 
-    def get_graph_embeddings(self, num_layers: int = 2):
+    def get_graph_embeddings(self, num_layers: int = 2) -> torch.Tensor:
         initial_embeddings = self.item2vec()
         x = initial_embeddings
         layers = [initial_embeddings]  # layers = []

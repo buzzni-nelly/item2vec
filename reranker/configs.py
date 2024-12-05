@@ -5,7 +5,7 @@ class Settings(BaseSettings):
 
     embed_dim: int = 128
     num_heads: int = 2
-    num_layers: int = 2
+    num_layers: int = 4
     max_len: int = 50
     dropout: float = 0.1
 
@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     datamodule_num_workers: int = 10
     datamodule_negative_k: int = 10
 
-    trainer_max_epochs: int = 3
+    trainer_max_epochs: int = 20
     trainer_limit_val_batches: int | float = 1.0
     trainer_limit_train_batches: int | float = 1.0
     trainer_limit_test_batches: int | float = 1.0
@@ -24,8 +24,8 @@ class Settings(BaseSettings):
     trainer_precision: str = "16"
     trainer_profiler: str = "simple"
 
-    checkpoint_dirpath: str = "/tmp/checkpoints"
-    checkpoint_monitor: str = "val_graph_dot_ndcg@20"
+    checkpoint_dirpath: str = "/tmp/bert4rec/checkpoints"
+    checkpoint_monitor: str = "val_ndcg@20"
     checkpoint_filename: str = "{epoch}-{step}-{train_loss:.2f}"
     checkpoint_mode: str = "max"
     checkpoint_every_n_train_steps: int = 10_000

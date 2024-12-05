@@ -39,7 +39,7 @@ df = df.sort_values(by="click_count", ascending=False)
 top_pids = df.head(10000)
 
 # PyTorch 텐서로 변환
-indices = torch.LongTensor(top_pids["pid"].tolist())
+indices = torch.LongTensor(top_pids["pidx"].tolist())
 selected_embeddings = embeddings[indices]
 
 # 임베딩을 Numpy 배열로 변환

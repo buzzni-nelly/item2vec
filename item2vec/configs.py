@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     trainer_precision: str = "16"
     trainer_profiler: str = "simple"
 
-    checkpoint_dirpath: str = "/tmp/checkpoints"
+    checkpoint_dirpath: str = "/tmp/item2vec/checkpoints"
     checkpoint_monitor: str = "val_graph_dot_ndcg@20"
     checkpoint_filename: str = "{epoch}-{step}-{train_loss:.2f}"
     checkpoint_mode: str = "max"
