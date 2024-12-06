@@ -174,6 +174,15 @@ class Trace(Base):
         ]
 
     @staticmethod
+    def get_last_trace(session: Session) -> 'Trace | None':
+        return (
+            session.query(Trace)
+            .order_by(Trace.id.desc())
+            .limit(1)
+            .one_or_none()
+        )
+
+    @staticmethod
     def insert_traces(session: Session, traces: list[dict]):
         session.bulk_insert_mappings(Trace, traces)
 
@@ -215,9 +224,20 @@ class Trace(Base):
         )
 
     @staticmethod
-    def aggregate_user_histories(session: Session):
+    def aggregate_user_histories(
+        session: Session,
+        threshold: float = None,
+        condition: Literal['greater', 'smaller'] = 'smaller',
+        min_purchase_count:int=1,
+    ):
+        if condition not in ['greater', 'smaller']:
+            raise Exception("condition must be 'greater' or 'smaller'")
+
+        threshold = threshold or (Trace.get_last_trace(session).timestamp - 24 * 60 * 60)
+        operator = ">=" if condition == 'greater' else '<'
+
         query = text(
-            """
+            f"""
             SELECT
                 user_id,
                 GROUP_CONCAT(pidx, ',') AS pidxs,
@@ -239,7 +259,8 @@ class Trace(Base):
                     trace AS t
                 INNER JOIN item AS i ON t.pdid = i.pdid
                 INNER JOIN user AS u ON t.user_id = u.user_id
-                WHERE u.purchase_count >= 1
+                WHERE u.purchase_count >= {min_purchase_count}
+                  AND t.timestamp {operator} {threshold}
             )
             GROUP BY
                 user_id
@@ -385,8 +406,18 @@ class Volume:
         self.session.bulk_save_objects(users)
         self.session.commit()
 
-    def migrate_user_histories(self):
-        histories = Trace.aggregate_user_histories(self.session)
+    def migrate_user_histories(
+        self,
+        threshold: float = None,
+        condition: Literal['greater', 'smaller'] = 'smaller',
+        min_purchase_count: int = 1,
+    ):
+        histories = Trace.aggregate_user_histories(
+            self.session,
+            threshold=threshold,
+            condition=condition,
+            min_purchase_count=min_purchase_count,
+        )
         histories = [x["pidxs"].split(",") for x in histories]
         result = []
         for history in histories:

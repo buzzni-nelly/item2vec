@@ -108,26 +108,46 @@ class Bert4RecModule(pl.LightningModule):
             dropout=dropout,
         )
 
-    def training_step(self, batch: list[torch.Tensor], idx: int):
-        # input_seqs shape: (4, 20)
-        # src_key_padding_mask shape: (4, 20)
-        # last_idxs shape: (4)
-        # positive_idxs shape: (4)
-        # negative_idxs shape: (4)
-        input_seqs, src_key_padding_mask, masked_idx, positive_idxs, negative_idxs = batch
-        # logits shape: (4, 20, 16)
+    def forward(
+        self,
+        input_seqs: torch.Tensor,
+        src_key_padding_mask: torch.Tensor,
+        last_idxs: torch.Tensor,
+        candidate_idxs: torch.Tensor = None,
+    ):
         logits = self.bert4rec(input_seqs, src_key_padding_mask=src_key_padding_mask)
-        # output shape: (4, 16)
-        batch_indices = torch.arange(logits.size(0)).unsqueeze(1).to(self.device)
-        output = logits[batch_indices, masked_idx]
+        output = logits[torch.arange(logits.size(0)), last_idxs]
 
-        # positive_embeddings shape: (4, 16)
-        # negative_embeddings shape: (4, 16)
+        if candidate_idxs is not None:
+            candidate_embeddings = self.bert4rec.item_embeddings.weight[candidate_idxs]
+            scores = torch.matmul(output, candidate_embeddings.T)
+        else:
+            candidate_embeddings = self.bert4rec.item_embeddings.weight[:-2]
+            scores = torch.matmul(output, candidate_embeddings.T)
+
+        return scores
+
+    def training_step(self, batch: list[torch.Tensor], idx: int):
+        # input_seqs shape: (256, 50)
+        # src_key_padding_mask shape: (256, 50)
+        # masked_idxs shape: (256, 2)
+        # positive_idxs shape: (256, 2)
+        # negative_idxs shape: (256, 2)
+        input_seqs, src_key_padding_mask, masked_idxs, positive_idxs, negative_idxs = batch
+        # logits shape: (256, 50, 128)
+        logits = self.bert4rec(input_seqs, src_key_padding_mask=src_key_padding_mask)
+        # batch_indices shape: (256, 1)
+        batch_indices = torch.arange(logits.size(0)).unsqueeze(1).to(self.device)
+        # output shape: (256, 2, 128)
+        output = logits[batch_indices, masked_idxs]
+
+        # positive_embeddings shape: (256, 2, 128)
+        # negative_embeddings shape: (256, 2, 128)
         positive_embeddings = self.bert4rec.item_embeddings.weight[positive_idxs]
         negative_embeddings = self.bert4rec.item_embeddings.weight[negative_idxs]
 
-        # positive_scores shape: (4, 20)
-        # negative_scores shape: (4, 20)
+        # positive_scores shape: (256, 2)
+        # negative_scores shape: (256, 2)
         positive_scores = torch.sum(output * positive_embeddings, dim=-1)
         negative_scores = torch.sum(output * negative_embeddings, dim=-1)
 
@@ -155,6 +175,9 @@ class Bert4RecModule(pl.LightningModule):
         self.log(f"val_recall@20", recall_20, prog_bar=True)
         self.log(f"val_ndcg@20", ndcg_20, prog_bar=True)
 
+    def test_step(self, batch: list[torch.Tensor], idx: int):
+        self.validation_step(batch, idx)
+
     def calc_mrr(self, scores: torch.Tensor, ground_truth_items: torch.Tensor):
         gt_scores = scores.gather(1, ground_truth_items.unsqueeze(1)).squeeze(1)
         ranks = (scores > gt_scores.unsqueeze(1)).sum(dim=1) + 1
@@ -176,9 +199,6 @@ class Bert4RecModule(pl.LightningModule):
         idcg = 1.0
         ndcg = torch.mean(dcg / idcg).item()
         return ndcg
-
-    def forward(self):
-        pass
 
     def bpr_loss(self, positive_scores: torch.Tensor, negative_scores: torch.Tensor):
         loss = -torch.mean(torch.log(torch.sigmoid(positive_scores - negative_scores)))
@@ -232,14 +252,14 @@ class Bert4RecTrainDataset(Dataset):
 
 class Bert4RecValidDataset(Dataset):
     def __init__(self, volume: Volume, max_len: int = 50):
-        self.histories = volume.migrate_user_histories()
+        self.histories = volume.migrate_user_histories(condition='greater')
         self.num_items = volume.vocab_size()
         self.mask_token_idx = self.num_items + 0
         self.pad_token_idx = self.num_items + 1
         self.max_len = max_len
 
     def __len__(self) -> int:
-        return len(self.histories) // 500
+        return len(self.histories)
 
     def __getitem__(self, idx: int):
         history_pidxs = self.histories[idx]
@@ -265,7 +285,6 @@ class Bert4RecDataModule(pl.LightningDataModule):
         self.max_len = max_len
         self.num_workers = num_workers
         self.train_dataset = None
-        self.valid_dataset = None
 
     def setup(self, stage=None):
         if stage == "fit" or stage is None:
@@ -283,6 +302,16 @@ class Bert4RecDataModule(pl.LightningDataModule):
         )
 
     def val_dataloader(self):
+        return DataLoader(
+            Bert4RecValidDataset(volume=self.volume, max_len=self.max_len),
+            batch_size=self.batch_size,
+            num_workers=self.num_workers,
+            persistent_workers=bool(self.num_workers > 0),
+            pin_memory=True,
+            shuffle=False,
+        )
+
+    def test_dataloader(self):
         return DataLoader(
             Bert4RecValidDataset(volume=self.volume, max_len=self.max_len),
             batch_size=self.batch_size,

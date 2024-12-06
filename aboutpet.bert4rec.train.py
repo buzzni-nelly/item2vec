@@ -80,7 +80,7 @@ def main():
     item_embeddings = item2vec_module.get_graph_embeddings()
     bert4rec_module.import_item_embeddings(item_embeddings)
 
-    data_module = Bert4RecDataModule(
+    datamodule = Bert4RecDataModule(
         volume=volume,
         batch_size=DATAMODULE_BATCH_SIZE,
         num_workers=DATAMODULE_NUM_WORKERS,
@@ -109,7 +109,8 @@ def main():
             ),
         ],
     )
-    trainer.fit(model=bert4rec_module, datamodule=data_module, ckpt_path=CKPT_PATH)
+    trainer.fit(model=bert4rec_module, datamodule=datamodule, ckpt_path=CKPT_PATH)
+    trainer.test(model=bert4rec_module, datamodule=datamodule, ckpt_path=CKPT_PATH)
 
 
 if __name__ == "__main__":
