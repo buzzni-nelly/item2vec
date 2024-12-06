@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     trainer_precision: str = "16"
     trainer_profiler: str = "simple"
 
-    checkpoint_dirpath: str = "/tmp/bert4rec/checkpoints"
+    checkpoint_dirpath: str = "/tmp/aboutpet/bert4rec/checkpoints"
     checkpoint_monitor: str = "val_ndcg@20"
     checkpoint_filename: str = "{epoch}-{step}-{train_loss:.2f}"
     checkpoint_mode: str = "max"
