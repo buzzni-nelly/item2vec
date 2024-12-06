@@ -6,6 +6,7 @@ from retry import retry
 from tqdm import tqdm
 
 import clients
+from item2vec.configs import settings
 from item2vec.models import GraphBPRItem2VecModule
 from item2vec.volume import Volume
 
@@ -46,7 +47,7 @@ def debug(
 
 
 def load_embeddings(volume: Volume, embed_dim: int = 256):
-    model_path = "/tmp/checkpoints/last.ckpt"
+    model_path = f"{settings.checkpoint_dirpath}/last.ckpt"
     vocab_size = volume.vocab_size()
     item2vec_module = GraphBPRItem2VecModule.load_from_checkpoint(
         model_path,
@@ -58,7 +59,7 @@ def load_embeddings(volume: Volume, embed_dim: int = 256):
     item2vec_module.eval()
     item2vec_module.freeze()
 
-    embeddings = item2vec_module.get_graph_embeddings(num_layers=1)
+    embeddings = item2vec_module.get_graph_embeddings(num_layers=3)
     return embeddings
 
 
