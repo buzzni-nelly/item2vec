@@ -7,7 +7,7 @@ while true; do
     sleep 3
     python aboutpet.item2vec.train.py
     sleep 3
-    python aboutpet.item2vec.update.py
+    python aboutpet.item2vec.upsert.py
     sleep 3
-    python aboutpet.item2item.pastbias.py
+    python aboutpet.item2vec.pastbias.py
 done
