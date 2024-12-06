@@ -1,3 +1,5 @@
+import random
+
 import pytorch_lightning as pl
 import torch
 import torch.nn as nn
@@ -112,11 +114,12 @@ class Bert4RecModule(pl.LightningModule):
         # last_idxs shape: (4)
         # positive_idxs shape: (4)
         # negative_idxs shape: (4)
-        input_seqs, src_key_padding_mask, last_idxs, positive_idxs, negative_idxs = batch
+        input_seqs, src_key_padding_mask, masked_idx, positive_idxs, negative_idxs = batch
         # logits shape: (4, 20, 16)
         logits = self.bert4rec(input_seqs, src_key_padding_mask=src_key_padding_mask)
         # output shape: (4, 16)
-        output = logits[torch.arange(logits.size(0)), last_idxs, :]
+        batch_indices = torch.arange(logits.size(0)).unsqueeze(1).to(self.device)
+        output = logits[batch_indices, masked_idx]
 
         # positive_embeddings shape: (4, 16)
         # negative_embeddings shape: (4, 16)
@@ -198,30 +201,33 @@ class Bert4RecTrainDataset(Dataset):
         self.mask_token_idx = self.num_items + 0
         self.pad_token_idx = self.num_items + 1
         self.max_len = max_len
+        self.num_masked = 2
 
     def __len__(self) -> int:
         return len(self.histories)
 
     def __getitem__(self, idx: int):
         history_pidxs = self.histories[idx]
-        pad_len = self.max_len - len(history_pidxs)
+        seq_len = len(history_pidxs)
+        pad_len = self.max_len - seq_len
 
         input_seqs = history_pidxs + ([self.pad_token_idx] * pad_len)
         input_seqs = torch.tensor(input_seqs, dtype=torch.long)
         padding_mask = input_seqs == self.pad_token_idx
 
-        last_idx = (~padding_mask).sum(dim=0) - 1
+        valid_positions = [i for i in range(seq_len)]
+        masked_positions = random.sample(valid_positions, min(self.num_masked, seq_len))
+        masked_positions = torch.tensor(masked_positions, dtype=torch.long)
 
-        # Sampling positive_idx & masking process
-        positive_pidx = input_seqs[last_idx].item()
-        input_seqs[last_idx] = self.mask_token_idx
+        positive_pidxs = input_seqs[masked_positions].clone()
+        input_seqs[masked_positions] = self.mask_token_idx
 
-        # Sampling a negative_idx
-        negative_pidx = positive_pidx
-        while negative_pidx == positive_pidx:
-            negative_pidx = torch.randint(0, self.num_items, ()).item()
+        negative_pidxs = torch.randint(0, self.num_items, (len(masked_positions),), dtype=torch.long)
+        for i in range(len(negative_pidxs)):
+            while negative_pidxs[i] == positive_pidxs[i]:
+                negative_pidxs[i] = torch.randint(0, self.num_items, ()).item()
 
-        return input_seqs, padding_mask, last_idx, positive_pidx, negative_pidx
+        return input_seqs, padding_mask, masked_positions, positive_pidxs, negative_pidxs
 
 
 class Bert4RecValidDataset(Dataset):
@@ -273,6 +279,7 @@ class Bert4RecDataModule(pl.LightningDataModule):
             persistent_workers=bool(self.num_workers > 0),
             pin_memory=True,
             shuffle=True,
+            collate_fn=self.bert4rec_collate_fn
         )
 
     def val_dataloader(self):
@@ -284,3 +291,42 @@ class Bert4RecDataModule(pl.LightningDataModule):
             pin_memory=True,
             shuffle=False,
         )
+
+    def bert4rec_collate_fn(self, batch):
+        """
+        Bert4Rec 데이터셋을 위한 collate_fn.
+
+        Args:
+            batch (list of tuples): 각 샘플은 (input_seqs, padding_mask, masked_positions, positive_pidxs, negative_pidxs) 형태.
+
+        Returns:
+            Tensor 형태의 배치 데이터:
+            - input_seqs: (batch_size, max_len)
+            - padding_masks: (batch_size, max_len)
+            - masked_positions: (batch_size, max_masked)
+            - positive_pidxs: (batch_size, max_masked)
+            - negative_pidxs: (batch_size, max_masked)
+        """
+        # 모든 샘플에서 텐서 추출
+        input_seqs = torch.stack([item[0] for item in batch])  # shape: (batch_size, max_len)
+        padding_masks = torch.stack([item[1] for item in batch])  # shape: (batch_size, max_len)
+
+        # 각 샘플의 마스크된 위치와 positive, negative 인덱스를 패딩 처리
+        max_masked = max(len(item[2]) for item in batch)  # 배치에서 최대 마스크 개수
+        batch_size = len(batch)
+
+        pad_token_idx = self.train_dataset.pad_token_idx
+
+        # 배치를 위한 텐서 초기화 (패딩은 0으로)
+        masked_positions = torch.full((batch_size, max_masked), pad_token_idx, dtype=torch.long)
+        positive_pidxs = torch.full((batch_size, max_masked), pad_token_idx, dtype=torch.long)
+        negative_pidxs = torch.full((batch_size, max_masked), pad_token_idx, dtype=torch.long)
+
+        # 각 샘플의 데이터를 텐서에 채워 넣기
+        for i, (seq, mask, masked_pos, pos_idx, neg_idx) in enumerate(batch):
+            length = len(masked_pos)  # 현재 샘플의 마스크 된 위치 개수
+            masked_positions[i, :length] = masked_pos
+            positive_pidxs[i, :length] = pos_idx
+            negative_pidxs[i, :length] = neg_idx
+
+        return input_seqs, padding_masks, masked_positions, positive_pidxs, negative_pidxs
