@@ -165,13 +165,13 @@ class Bert4RecModule(pl.LightningModule):
         mrr = self.calc_mrr(scores, ground_truth_items)
         self.log("val_mrr", mrr, prog_bar=True)
 
-        recall_5 = self.calc_recall_at_k(scores, ground_truth_items, 5)
-        ndcg_5 = self.calc_ndcg_at_k(scores, ground_truth_items, 5)
+        recall_5 = self.calc_recall_at_k(scores, ground_truth_items, k=5)
+        ndcg_5 = self.calc_ndcg_at_k(scores, ground_truth_items, k=5)
         self.log(f"val_recall@5", recall_5, prog_bar=True)
         self.log(f"val_ndcg@5", ndcg_5, prog_bar=True)
 
-        recall_20 = self.calc_recall_at_k(scores, ground_truth_items, 20)
-        ndcg_20 = self.calc_ndcg_at_k(scores, ground_truth_items, 20)
+        recall_20 = self.calc_recall_at_k(scores, ground_truth_items, k=20)
+        ndcg_20 = self.calc_ndcg_at_k(scores, ground_truth_items, k=20)
         self.log(f"val_recall@20", recall_20, prog_bar=True)
         self.log(f"val_ndcg@20", ndcg_20, prog_bar=True)
 
