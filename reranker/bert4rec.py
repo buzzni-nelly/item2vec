@@ -170,6 +170,11 @@ class Bert4RecModule(pl.LightningModule):
         self.log(f"val_recall@5", recall_5, prog_bar=True)
         self.log(f"val_ndcg@5", ndcg_5, prog_bar=True)
 
+        recall_10 = self.calc_recall_at_k(scores, ground_truth_items, k=10)
+        ndcg_10 = self.calc_ndcg_at_k(scores, ground_truth_items, k=10)
+        self.log(f"val_recall@10", recall_10, prog_bar=True)
+        self.log(f"val_ndcg@10", ndcg_10, prog_bar=True)
+
         recall_20 = self.calc_recall_at_k(scores, ground_truth_items, k=20)
         ndcg_20 = self.calc_ndcg_at_k(scores, ground_truth_items, k=20)
         self.log(f"val_recall@20", recall_20, prog_bar=True)
@@ -265,7 +270,7 @@ class Bert4RecValidDataset(Dataset):
     def __len__(self) -> int:
         return len(self.histories)
 
-    def __getitem__(self, idx: int):
+    def __getitem__(self, idx: int) -> tuple:
         history_pidxs = self.histories[idx]
         pad_len = self.max_len - len(history_pidxs)
 

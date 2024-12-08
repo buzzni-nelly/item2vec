@@ -4,8 +4,8 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
 
     embed_dim: int = 128
-    num_heads: int = 4
-    num_layers: int = 4
+    num_heads: int = 1
+    num_layers: int = 1
     max_len: int = 50
     dropout: float = 0.1
 
@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     trainer_profiler: str = "simple"
 
     checkpoint_dirpath: str = "/tmp/aboutpet/bert4rec/checkpoints"
-    checkpoint_monitor: str = "val_ndcg@20"
+    checkpoint_monitor: str = "val_ndcg@10"
     checkpoint_filename: str = "{epoch}-{step}-{train_loss:.2f}"
     checkpoint_mode: str = "max"
     checkpoint_every_n_train_steps: int = 10_000
