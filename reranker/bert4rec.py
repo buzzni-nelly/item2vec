@@ -221,7 +221,7 @@ class Bert4RecTrainDataset(Dataset):
         self.mask_token_idx = self.num_items + 0
         self.pad_token_idx = self.num_items + 1
         self.max_len = max_len
-        self.num_masked = 2
+        self.num_masked = 10
 
     def __len__(self) -> int:
         return len(self.histories)
@@ -235,8 +235,12 @@ class Bert4RecTrainDataset(Dataset):
         input_seqs = torch.tensor(input_seqs, dtype=torch.long)
         padding_mask = input_seqs == self.pad_token_idx
 
-        valid_positions = [i for i in range(seq_len)]
-        masked_positions = random.sample(valid_positions, min(self.num_masked, seq_len))
+        valid_positions = list(range(seq_len))
+        if seq_len >= self.num_masked:
+            masked_positions = random.sample(valid_positions, self.num_masked)
+        else:
+            masked_positions = random.choices(valid_positions, k=self.num_masked)
+
         masked_positions = torch.tensor(masked_positions, dtype=torch.long)
 
         positive_pidxs = input_seqs[masked_positions].clone()
