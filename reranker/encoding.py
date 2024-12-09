@@ -10,7 +10,6 @@ class PositionalEncoding(nn.Module):
         embed_dim: int = 64,
         max_len: int = 50,
         scale: int = 100,
-        dropout: float = 0.05,
     ):
         super(PositionalEncoding, self).__init__()
         self.dropout = nn.Dropout(dropout)
@@ -25,7 +24,7 @@ class PositionalEncoding(nn.Module):
 
     def forward(self, x):
         x = x + self.pe[:, : x.size(1)]
-        return self.dropout(x)
+        return x
 
 
 class RotaryEncoding(nn.Module):

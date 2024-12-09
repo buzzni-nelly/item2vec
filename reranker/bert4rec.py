@@ -10,7 +10,7 @@ from torch.optim import Optimizer
 from torch.utils.data import Dataset, DataLoader
 
 from item2vec.volume import Volume
-from reranker.attention import TransformerEncoderLayer, TransformerEncoder
+from reranker.attention import TransformerEncoderLayer, TransformerEncoder, TransformerDecoder
 from reranker.encoding import PositionalEncoding
 
 
@@ -32,11 +32,8 @@ class BERT4Rec(nn.Module):
         self.max_len = max_len
 
         self.item_embeddings = nn.Embedding(num_items + 2, embed_dim, padding_idx=self.pad_token_idx)
-        self.position_embeddings = PositionalEncoding(
-            embed_dim=embed_dim,
-            max_len=max_len,
-            dropout=dropout,
-        )
+        self.dropout = nn.Dropout(dropout)
+        self.position_embeddings = PositionalEncoding(embed_dim=embed_dim, max_len=max_len)
 
         encoder_layer = TransformerEncoderLayer(
             d_model=embed_dim,
@@ -45,16 +42,33 @@ class BERT4Rec(nn.Module):
             activation=F.gelu,
             batch_first=True,
         )
+        decoder_layer = TransformerEncoderLayer(
+            d_model=embed_dim,
+            nhead=num_heads,
+            dropout=dropout,
+            activation=F.gelu,
+            batch_first=True,
+        )
         self.transformer_encoder = TransformerEncoder(encoder_layer, num_layers=num_layers)
+        self.transformer_decoder = TransformerDecoder(decoder_layer, num_layers=num_layers)
 
     def forward(self, input_seqs: torch.Tensor, src_key_padding_mask: torch.Tensor) -> tuple[Tensor, Tensor]:
-        embeddings = self.item_embeddings(input_seqs)
-        embeddings = self.position_embeddings(embeddings)
+        x = self.item_embeddings(input_seqs)
+        x = self.dropout(x)
+        x = self.position_embeddings(x)
         encoder_output, encoder_weights = self.transformer_encoder(
-            embeddings,
+            x,
+            x,
+            x,
             src_key_padding_mask=src_key_padding_mask,
         )
-        return encoder_output, encoder_weights
+        decoder_output, decoder_weights = self.transformer_decoder(
+            x,
+            encoder_output,
+            encoder_output,
+            src_key_padding_mask=src_key_padding_mask,
+        )
+        return decoder_output, decoder_weights
 
 
 class Bert4RecModule(pl.LightningModule):

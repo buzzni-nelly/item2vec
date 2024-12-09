@@ -68,18 +68,23 @@ class TransformerEncoderLayer(nn.Module):
 
     def forward(
         self,
-        src: Tensor,
+        k: Tensor,
+        q: Tensor,
+        v: Tensor,
         src_mask: Optional[Tensor] = None,
         src_key_padding_mask: Optional[Tensor] = None,
         is_causal: bool = False,
         need_weights: bool = False,
     ) -> tuple[Tensor, Tensor]:
+
+        assert k.dtype == q.dtype == v.dtype, "k, q, v must have the same dtype"
+
         src_key_padding_mask = F._canonical_mask(
             mask=src_key_padding_mask,
             mask_name="src_key_padding_mask",
             other_type=F._none_or_dtype(src_mask),
             other_name="src_mask",
-            target_type=src.dtype,
+            target_type=k.dtype,
         )
 
         src_mask = F._canonical_mask(
@@ -87,13 +92,12 @@ class TransformerEncoderLayer(nn.Module):
             mask_name="src_mask",
             other_type=None,
             other_name="",
-            target_type=src.dtype,
+            target_type=k.dtype,
             check_other=False,
         )
 
-        x = src
-        a, w = self._sa_block(x, src_mask, src_key_padding_mask, is_causal=is_causal, need_weights=need_weights)
-        x = x + a
+        a, w = self._sa_block(k, q, v, src_mask, src_key_padding_mask, is_causal=is_causal, need_weights=need_weights)
+        x = k + a
         x = self.norm1(x)
         x = self.norm2(x + self._ff_block(x))
         return x, w
@@ -101,16 +105,18 @@ class TransformerEncoderLayer(nn.Module):
     # self-attention block
     def _sa_block(
         self,
-        x: Tensor,
+        k: Tensor,
+        q: Tensor,
+        v: Tensor,
         attn_mask: Optional[Tensor],
         key_padding_mask: Optional[Tensor],
         is_causal: bool = False,
         need_weights: bool = False
     ) -> tuple[Tensor, Tensor]:
         x, weights = self.self_attn(
-            x,
-            x,
-            x,
+            k,
+            q,
+            v,
             attn_mask=attn_mask,
             key_padding_mask=key_padding_mask,
             need_weights=need_weights,
@@ -133,24 +139,6 @@ class TransformerEncoderLayer(nn.Module):
 
 
 class TransformerEncoder(nn.Module):
-    r"""TransformerEncoder is a stack of N encoder layers.
-
-    Users can build the BERT(https://arxiv.org/abs/1810.04805) model with corresponding parameters.
-
-    Args:
-        encoder_layer: an instance of the TransformerEncoderLayer() class (required).
-        num_layers: the number of sub-encoder-layers in the encoder (required).
-        norm: the layer normalization component (optional).
-        enable_nested_tensor: if True, input will automatically convert to nested tensor
-            (and convert back on output). This will improve the overall performance of
-            TransformerEncoder when padding rate is high. Default: ``True`` (enabled).
-
-    Examples::
-        >>> encoder_layer = nn.TransformerEncoderLayer(d_model=512, nhead=8)
-        >>> transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=6)
-        >>> src = torch.rand(10, 32, 512)
-        >>> out = transformer_encoder(src)
-    """
 
     __constants__ = ["norm"]
 
@@ -170,34 +158,22 @@ class TransformerEncoder(nn.Module):
 
     def forward(
         self,
-        src: Tensor,
+        k: Tensor,  # key: item embeddings
+        q: Tensor,  # query: item embeddings
+        v: Tensor,  # value: item embeddings
         mask: Optional[Tensor] = None,
         src_key_padding_mask: Optional[Tensor] = None,
         is_causal: Optional[bool] = None,
     ) -> tuple[Tensor, list[Tensor]]:
-        r"""Pass the input through the encoder layers in turn.
 
-        Args:
-            src: the sequence to the encoder (required).
-            mask: the mask for the src sequence (optional).
-            src_key_padding_mask: the mask for the src keys per batch (optional).
-            is_causal: If specified, applies a causal mask as ``mask``.
-                Default: ``None``; try to detect a causal mask.
-                Warning:
-                ``is_causal`` provides a hint that ``mask`` is the
-                causal mask. Providing incorrect hints can result in
-                incorrect execution, including forward and backward
-                compatibility.
+        assert k.dtype == q.dtype == v.dtype, "k, q, v must have the same dtype"
 
-        Shape:
-            see the docs in :class:`~torch.nn.Transformer`.
-        """
         src_key_padding_mask = F._canonical_mask(
             mask=src_key_padding_mask,
             mask_name="src_key_padding_mask",
             other_type=F._none_or_dtype(mask),
             other_name="mask",
-            target_type=src.dtype,
+            target_type=k.dtype,
         )
 
         mask = F._canonical_mask(
@@ -205,26 +181,100 @@ class TransformerEncoder(nn.Module):
             mask_name="mask",
             other_type=None,
             other_name="",
-            target_type=src.dtype,
+            target_type=k.dtype,
             check_other=False,
         )
 
-        output = src
         first_layer = self.layers[0]
-        src_key_padding_mask_for_layers = src_key_padding_mask
         batch_first = first_layer.self_attn.batch_first
 
-        seq_len = _get_seq_len(src, batch_first)
+        seq_len = _get_seq_len(k, batch_first)
         is_causal = _detect_is_causal_mask(mask, is_causal, seq_len)
 
         weights = []
         for mod in self.layers:
             output, weight = mod(
-                output,
+                k,
+                q,
+                v,
                 src_mask=mask,
                 is_causal=is_causal,
-                src_key_padding_mask=src_key_padding_mask_for_layers,
+                src_key_padding_mask=src_key_padding_mask,
             )
+            k, q, v = output, output, output
+            weights.append(weight)
+
+        if self.norm is not None:
+            output = self.norm(output)
+
+        return output, weights
+
+
+class TransformerDecoder(nn.Module):
+
+    __constants__ = ["norm"]
+
+    def __init__(
+        self,
+        encoder_layer: "TransformerEncoderLayer",
+        num_layers: int,
+        norm: Optional[nn.Module] = None,
+        mask_check: bool = True,
+    ) -> None:
+        super().__init__()
+        torch._C._log_api_usage_once(f"torch.nn.modules.{self.__class__.__name__}")
+        self.layers = _get_clones(encoder_layer, num_layers)
+        self.num_layers = num_layers
+        self.norm = norm
+        self.mask_check = mask_check
+
+    def forward(
+        self,
+        k: Tensor,  # key: item embeddings
+        q: Tensor,  # query: TransformerEncoder logit
+        v: Tensor,  # value: TransformerEncoder logit
+        mask: Optional[Tensor] = None,
+        src_key_padding_mask: Optional[Tensor] = None,
+        is_causal: Optional[bool] = None,
+    ) -> tuple[Tensor, list[Tensor]]:
+
+        assert k.dtype == q.dtype == v.dtype, "k, q, v must have the same dtype"
+
+        src_key_padding_mask = F._canonical_mask(
+            mask=src_key_padding_mask,
+            mask_name="src_key_padding_mask",
+            other_type=F._none_or_dtype(mask),
+            other_name="mask",
+            target_type=k.dtype,
+        )
+
+        mask = F._canonical_mask(
+            mask=mask,
+            mask_name="mask",
+            other_type=None,
+            other_name="",
+            target_type=k.dtype,
+            check_other=False,
+        )
+
+        first_layer = self.layers[0]
+        batch_first = first_layer.self_attn.batch_first
+
+        seq_len = _get_seq_len(k, batch_first)
+        is_causal = _detect_is_causal_mask(mask, is_causal, seq_len)
+
+        weights = []
+        output = k
+        for mod in self.layers:
+            output, weight = mod(
+                k,
+                q,
+                v,
+                src_mask=mask,
+                is_causal=is_causal,
+                src_key_padding_mask=src_key_padding_mask,
+            )
+            k = output
             weights.append(weight)
 
         if self.norm is not None:
