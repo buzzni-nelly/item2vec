@@ -130,12 +130,17 @@ class TransformerEncoderLayer(nn.Module):
             need_weights=need_weights,
             is_causal=is_causal,
         )
-        return self.dropout1(x), weights
+        # x = self.dropout(x)
+        return x, weights
 
     # feed forward block
     def _ff_block(self, x: Tensor) -> Tensor:
-        x = self.linear2(self.dropout(self.activation(self.linear1(x))))
-        return self.dropout2(x)
+        x = self.linear1(x)
+        x = self.activation(x)
+        # x = self.dropout(x)
+        x = self.linear2(x)
+        # x = self.dropout2(x)
+        return x
 
 
 class TransformerEncoder(nn.Module):
