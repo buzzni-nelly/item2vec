@@ -1,6 +1,4 @@
-import math
 import random
-from typing import Callable, Optional, Union
 
 import pytorch_lightning as pl
 import torch
@@ -8,241 +6,12 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
 from torch import optim
-from torch.nn import Dropout
-from torch.nn import LayerNorm
-from torch.nn import Linear
-from torch.nn import MultiheadAttention
 from torch.optim import Optimizer
 from torch.utils.data import Dataset, DataLoader
 
 from item2vec.volume import Volume
-
-
-class PositionalEncoding(nn.Module):
-    def __init__(
-        self,
-        embed_dim: int = 64,
-        max_len: int = 50,
-        scale: int = 100,
-        dropout: float = 0.05,
-    ):
-        super(PositionalEncoding, self).__init__()
-        self.dropout = nn.Dropout(dropout)
-
-        pe = torch.zeros(max_len, embed_dim)
-        position = torch.arange(0, max_len).unsqueeze(1)
-        div_term = torch.exp(torch.arange(0, embed_dim, 2) * -(torch.log(torch.Tensor([scale])) / embed_dim))
-        pe[:, 0::2] = torch.sin(position * div_term)
-        pe[:, 1::2] = torch.cos(position * div_term)
-        pe = pe.unsqueeze(0)
-        self.register_buffer("pe", pe)
-
-    def forward(self, x):
-        x = x + self.pe[:, : x.size(1)]
-        return self.dropout(x)
-
-
-class RotaryEncoding(nn.Module):
-    """
-    Module for applying rotary positional encoding to input sequences.
-
-    This module incorporates positional information into input sequences using rotary positional encoding.
-    It supports two modes: concatenation and addition. In concatenation mode, the positional embeddings
-    are concatenated with the input, followed by a linear transformation. In addition mode, the positional
-    embeddings are added directly to the input.
-
-    Args:
-    - config (object): Configuration object with the following attributes:
-        - position_concatenation (bool): Whether to concatenate positional embeddings with input.
-        - maxlen (int): Maximum length of input sequences.
-        - embedding_d (int): Dimensionality of the input embeddings.
-
-    Attributes:
-    - concat (bool): Whether to concatenate positional embeddings with input.
-    - position_embeddings (nn.Embedding): Embedding layer for positional embeddings.
-    - encoding (nn.Linear): Linear layer for concatenation mode.
-
-    Methods:
-    - forward(x: Tensor) -> Tensor: Apply rotary positional encoding to input tensor.
-
-    Example:
-    >> config = Configuration(position_concatenation=True, maxlen=100, embedding_d=512)
-    >> rotary_encoder = RotaryPositionalEncoding(config)
-    >> input_tensor = torch.rand((batch_size, sequence_length, embedding_dim))
-    >> output_tensor = rotary_encoder(input_tensor)
-    """
-
-    def __init__(self, config):
-        """
-        Initialize the RotaryPositionalEncoding module.
-        Args:
-        - config (object): Configuration object with required attributes.
-
-        """
-        super().__init__()
-        self.concat = config.position_concatenation
-        L, H = config.maxlen, config.embedding_d
-        self.position_embeddings = nn.Embedding(L, H)
-        if self.concat:
-            self.encoding = nn.Linear(H * 2, H)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        Apply rotary positional encoding to the input tensor.
-
-        Args:
-        - x (Tensor): Input tensor with shape (batch_size, sequence_length, embedding_dim).
-
-        Returns:
-        Tensor: Output tensor after applying rotary positional encoding.
-
-        """
-        # position_ids => L x H, rows [ 0, 1, 2, ...,H]
-        position_ids = torch.arange(0, x.size(1), device=x.device).unsqueeze(0).expand(x.size(0), -1)
-        position_embeddings = self.position_embeddings(position_ids)
-
-        # Rotary Positional Encoding
-        angles = position_embeddings / 10000.0
-        angle_rads = angles[:, :, 0::2] * 2 * math.pi
-
-        sin_angles = torch.sin(angle_rads)
-        cos_angles = torch.cos(angle_rads)
-
-        # Add rotation
-        sin_angles = sin_angles * torch.tensor([(-1) ** i for i in range(sin_angles.size(-1))], device=x.device)
-
-        # Combine sine and cosine embeddings
-        position_embeddings[:, :, 0::2] = sin_angles
-        position_embeddings[:, :, 1::2] = cos_angles
-
-        if not self.concat:
-            x = x + position_embeddings
-        else:
-            x = torch.cat([x, position_embeddings], -1)
-            x = self.encoding(x)
-        return x
-
-
-def _get_activation_fn(activation: str) -> Callable[[Tensor], Tensor]:
-    if activation == "relu":
-        return F.relu
-    elif activation == "gelu":
-        return F.gelu
-
-    raise RuntimeError(f"activation should be relu/gelu, not {activation}")
-
-
-class TransformerEncoderLayer(nn.Module):
-
-    __constants__ = ["norm_first"]
-
-    def __init__(
-        self,
-        d_model: int,
-        nhead: int,
-        dim_feedforward: int = 2048,
-        dropout: float = 0.1,
-        activation: Union[str, Callable[[Tensor], Tensor]] = F.relu,
-        layer_norm_eps: float = 1e-5,
-        batch_first: bool = False,
-        norm_first: bool = False,
-        bias: bool = True,
-        device=None,
-        dtype=None,
-    ) -> None:
-        factory_kwargs = {"device": device, "dtype": dtype}
-        super().__init__()
-        self.self_attn = MultiheadAttention(
-            d_model,
-            nhead,
-            dropout=dropout,
-            bias=bias,
-            batch_first=batch_first,
-            **factory_kwargs,
-        )
-        # Implementation of Feedforward model
-        self.linear1 = Linear(d_model, dim_feedforward, bias=bias, **factory_kwargs)
-        self.dropout = Dropout(dropout)
-        self.linear2 = Linear(dim_feedforward, d_model, bias=bias, **factory_kwargs)
-
-        self.norm_first = norm_first
-        self.norm1 = LayerNorm(d_model, eps=layer_norm_eps, bias=bias, **factory_kwargs)
-        self.norm2 = LayerNorm(d_model, eps=layer_norm_eps, bias=bias, **factory_kwargs)
-        self.dropout1 = Dropout(dropout)
-        self.dropout2 = Dropout(dropout)
-
-        # Legacy string support for activation function.
-        if isinstance(activation, str):
-            activation = _get_activation_fn(activation)
-
-        # We can't test self.activation in forward() in TorchScript,
-        # so stash some information about it instead.
-        if activation is F.relu or isinstance(activation, torch.nn.ReLU):
-            self.activation_relu_or_gelu = 1
-        elif activation is F.gelu or isinstance(activation, torch.nn.GELU):
-            self.activation_relu_or_gelu = 2
-        else:
-            self.activation_relu_or_gelu = 0
-        self.activation = activation
-
-    def __setstate__(self, state):
-        super().__setstate__(state)
-        if not hasattr(self, "activation"):
-            self.activation = F.relu
-
-    def forward(
-        self,
-        src: Tensor,
-        src_mask: Optional[Tensor] = None,
-        src_key_padding_mask: Optional[Tensor] = None,
-        is_causal: bool = False,
-    ) -> Tensor:
-        src_key_padding_mask = F._canonical_mask(
-            mask=src_key_padding_mask,
-            mask_name="src_key_padding_mask",
-            other_type=F._none_or_dtype(src_mask),
-            other_name="src_mask",
-            target_type=src.dtype,
-        )
-
-        src_mask = F._canonical_mask(
-            mask=src_mask,
-            mask_name="src_mask",
-            other_type=None,
-            other_name="",
-            target_type=src.dtype,
-            check_other=False,
-        )
-
-        x = src
-        x = x + self._sa_block(x, src_mask, src_key_padding_mask, is_causal=is_causal)
-        x = self.norm1(x)
-        x = self.norm2(x + self._ff_block(x))
-        return x
-
-    # self-attention block
-    def _sa_block(
-        self,
-        x: Tensor,
-        attn_mask: Optional[Tensor],
-        key_padding_mask: Optional[Tensor],
-        is_causal: bool = False,
-    ) -> Tensor:
-        x = self.self_attn(
-            x,
-            x,
-            x,
-            attn_mask=attn_mask,
-            key_padding_mask=key_padding_mask,
-            need_weights=False,
-            is_causal=is_causal,
-        )[0]
-        return self.dropout1(x)
-
-    # feed forward block
-    def _ff_block(self, x: Tensor) -> Tensor:
-        x = self.linear2(self.dropout(self.activation(self.linear1(x))))
-        return self.dropout2(x)
+from reranker.attention import TransformerEncoderLayer, TransformerEncoder
+from reranker.encoding import PositionalEncoding
 
 
 class BERT4Rec(nn.Module):
@@ -273,16 +42,19 @@ class BERT4Rec(nn.Module):
             d_model=embed_dim,
             nhead=num_heads,
             dropout=dropout,
-            activation="gelu",
+            activation=F.gelu,
             batch_first=True,
         )
-        self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
+        self.transformer_encoder = TransformerEncoder(encoder_layer, num_layers=num_layers)
 
-    def forward(self, input_seqs: torch.Tensor, src_key_padding_mask: torch.Tensor):
+    def forward(self, input_seqs: torch.Tensor, src_key_padding_mask: torch.Tensor) -> tuple[Tensor, Tensor]:
         embeddings = self.item_embeddings(input_seqs)
         embeddings = self.position_embeddings(embeddings)
-        encoder_output = self.transformer_encoder(embeddings, src_key_padding_mask=src_key_padding_mask)
-        return encoder_output
+        encoder_output, encoder_weights = self.transformer_encoder(
+            embeddings,
+            src_key_padding_mask=src_key_padding_mask,
+        )
+        return encoder_output, encoder_weights
 
 
 class Bert4RecModule(pl.LightningModule):
@@ -326,7 +98,7 @@ class Bert4RecModule(pl.LightningModule):
         last_idxs: torch.Tensor,
         candidate_idxs: torch.Tensor = None,
     ):
-        logits = self.bert4rec(input_seqs, src_key_padding_mask=src_key_padding_mask)
+        logits, _ = self.bert4rec(input_seqs, src_key_padding_mask=src_key_padding_mask)
         output = logits[torch.arange(logits.size(0)), last_idxs]
 
         if candidate_idxs is not None:
@@ -346,7 +118,7 @@ class Bert4RecModule(pl.LightningModule):
         # negative_idxs shape: (256, 2)
         input_seqs, src_key_padding_mask, masked_idxs, positive_idxs, negative_idxs = batch
         # logits shape: (256, 50, 128)
-        logits = self.bert4rec(input_seqs, src_key_padding_mask=src_key_padding_mask)
+        logits, _ = self.bert4rec(input_seqs, src_key_padding_mask=src_key_padding_mask)
         # batch_indices shape: (256, 1)
         batch_indices = torch.arange(logits.size(0)).unsqueeze(1).to(self.device)
         # output shape: (256, 2, 128)
@@ -369,7 +141,7 @@ class Bert4RecModule(pl.LightningModule):
 
     def validation_step(self, batch: list[torch.Tensor], idx: int):
         input_seqs, src_key_padding_mask, last_idxs, ground_truth_items = batch
-        logits = self.bert4rec(input_seqs, src_key_padding_mask=src_key_padding_mask)
+        logits, _ = self.bert4rec(input_seqs, src_key_padding_mask=src_key_padding_mask)
         output = logits[torch.arange(logits.size(0)), last_idxs, :]
         scores = torch.matmul(output, self.bert4rec.item_embeddings.weight[:-2].T)
 
