@@ -1,5 +1,5 @@
 import copy
-from typing import Callable, Optional
+from typing import Callable, Optional, Literal
 
 import torch
 import torch.nn as nn
@@ -65,6 +65,8 @@ class TransformerEncoderLayer(nn.Module):
         src_key_padding_mask: Optional[Tensor] = None,
         is_causal: bool = False,
         need_weights: bool = False,
+        residual_strategy_1: Literal['sum', 'multiply', 'none'] = "sum",
+        residual_strategy_2: Literal['sum', 'multiply', 'none'] = "sum"
     ) -> tuple[Tensor, Tensor]:
 
         assert q.dtype == k.dtype == v.dtype, "k, q, v must have the same dtype"
@@ -86,17 +88,26 @@ class TransformerEncoderLayer(nn.Module):
             check_other=False,
         )
 
-        sa, w = self._sa_block(
-            q,
-            k,
-            v,
-            src_mask,
-            src_key_padding_mask,
-            is_causal=is_causal,
-            need_weights=need_weights,
-        )
-        x = self.norm1(q + sa)
-        x = self.norm2(x + self._ff_block(x))
+        sa, w = self._sa_block(q, k, v, src_mask, src_key_padding_mask, is_causal=is_causal, need_weights=need_weights)
+
+        if residual_strategy_1 == "sum":
+            x = self.norm1(q + sa)
+        elif residual_strategy_1 == "multiply":
+            x = self.norm1(q * sa)
+        elif residual_strategy_1 == "none":
+            x = sa
+        else:
+            raise ValueError(f"Invalid residual operator: {residual_strategy_1}")
+
+        if residual_strategy_2 == "sum":
+            x = self.norm2(x + self._ff_block(x))
+        elif residual_strategy_2 == "multiply":
+            x = self.norm2(x * self._ff_block(x))
+        elif residual_strategy_2 == "none":
+            x = sa
+        else:
+            raise ValueError(f"Invalid residual operator: {residual_strategy_2}")
+
         return x, w
 
     # self-attention block
@@ -190,6 +201,8 @@ class TransformerEncoder(nn.Module):
                 src_mask=mask,
                 is_causal=is_causal,
                 src_key_padding_mask=src_key_padding_mask,
+                residual_strategy_1="multiply",
+                residual_strategy_2="multiply"
             )
             q, k, v = output, output, output
             weights.append(weight)
@@ -263,6 +276,8 @@ class TransformerDecoder(nn.Module):
                 src_mask=mask,
                 is_causal=is_causal,
                 src_key_padding_mask=src_key_padding_mask,
+                residual_strategy_1="multiply",
+                residual_strategy_2="none"
             )
             q = output
             weights.append(weight)
