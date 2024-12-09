@@ -193,8 +193,8 @@ class Bert4RecModule(pl.LightningModule):
     def calc_hr_at_k(self, scores: torch.Tensor, ground_truth_items: torch.Tensor, k: int):
         topk_scores, topk_indices = torch.topk(scores, k, dim=1)
         hits = (topk_indices == ground_truth_items.unsqueeze(1)).any(dim=1).float()
-        recall = torch.mean(hits).item()
-        return recall
+        hit_rate = torch.mean(hits).item()
+        return hit_rate
 
     def calc_ndcg_at_k(self, scores: torch.Tensor, ground_truth_items: torch.Tensor, k: int):
         topk_scores, topk_indices = torch.topk(scores, k, dim=1)
