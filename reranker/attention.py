@@ -86,7 +86,15 @@ class TransformerEncoderLayer(nn.Module):
             check_other=False,
         )
 
-        sa, w = self._sa_block(q, k, v, src_mask, src_key_padding_mask, is_causal=is_causal, need_weights=need_weights)
+        sa, w = self._sa_block(
+            q,
+            k,
+            v,
+            src_mask,
+            src_key_padding_mask,
+            is_causal=is_causal,
+            need_weights=need_weights,
+        )
         x = self.norm1(q + sa)
         x = self.norm2(x + self._ff_block(x))
         return x, w
