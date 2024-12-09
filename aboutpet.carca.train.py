@@ -10,52 +10,52 @@ from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from pytorch_lightning.loggers import WandbLogger
 
 from item2vec.configs import settings as item2vec_settings
-from reranker.configs import settings as bert4rec_settings
+from reranker.configs import settings as carca_settings
 from item2vec.volume import Volume
 from item2vec.models import GraphBPRItem2VecModule
-from reranker.bert4rec import Bert4RecDataModule, Bert4RecModule
+from reranker.carca import CarcaDataModule, CARCA
 
-os.environ["WANDB_API_KEY"] = bert4rec_settings.wandb_api_key
+os.environ["WANDB_API_KEY"] = carca_settings.wandb_api_key
 
 # Models
-EMBED_DIM = bert4rec_settings.embed_dim
-NUM_HEADS = bert4rec_settings.num_heads
-NUM_LAYERS = bert4rec_settings.num_layers
-MAX_LEN = bert4rec_settings.max_len
-DROPOUT = bert4rec_settings.dropout
+EMBED_DIM = carca_settings.embed_dim
+NUM_HEADS = carca_settings.num_heads
+NUM_LAYERS = carca_settings.num_layers
+MAX_LEN = carca_settings.max_len
+DROPOUT = carca_settings.dropout
 
 # Optimizers and training envs
-LR = bert4rec_settings.lr
-WEIGHT_DECAY = bert4rec_settings.weight_decay
+LR = carca_settings.lr
+WEIGHT_DECAY = carca_settings.weight_decay
 
 # Trainers
-TRAINER_STRATEGY = bert4rec_settings.trainer_strategy
-TRAINER_PRECISION = bert4rec_settings.trainer_precision
-TRAINER_LIMIT_TRAIN_BATCHES = bert4rec_settings.trainer_limit_train_batches
-TRAINER_LIMIT_VAL_BATCHES = bert4rec_settings.trainer_limit_val_batches
-TRAINER_LIMIT_TEST_BATCHES = bert4rec_settings.trainer_limit_test_batches
-TRAINER_MAX_EPOCHS = bert4rec_settings.trainer_max_epochs
-TRAINER_PROFILER = bert4rec_settings.trainer_profiler
+TRAINER_STRATEGY = carca_settings.trainer_strategy
+TRAINER_PRECISION = carca_settings.trainer_precision
+TRAINER_LIMIT_TRAIN_BATCHES = carca_settings.trainer_limit_train_batches
+TRAINER_LIMIT_VAL_BATCHES = carca_settings.trainer_limit_val_batches
+TRAINER_LIMIT_TEST_BATCHES = carca_settings.trainer_limit_test_batches
+TRAINER_MAX_EPOCHS = carca_settings.trainer_max_epochs
+TRAINER_PROFILER = carca_settings.trainer_profiler
 
 # DataModules
-DATAMODULE_BATCH_SIZE = bert4rec_settings.datamodule_batch_size
-DATAMODULE_NUM_WORKERS = bert4rec_settings.datamodule_num_workers
-DATAMODULE_NEGATIVE_K = bert4rec_settings.datamodule_negative_k
+DATAMODULE_BATCH_SIZE = carca_settings.datamodule_batch_size
+DATAMODULE_NUM_WORKERS = carca_settings.datamodule_num_workers
+DATAMODULE_NEGATIVE_K = carca_settings.datamodule_negative_k
 
 # Checkpoints
-CHECKPOINT_MONITOR = bert4rec_settings.checkpoint_monitor
-CHECKPOINT_MODE = bert4rec_settings.checkpoint_mode
-CHECKPOINT_EVERY_N_TRAIN_STEPS = bert4rec_settings.checkpoint_every_n_train_steps
-CHECKPOINT_FILENAME = bert4rec_settings.checkpoint_filename
-CHECKPOINT_DIRPATH = bert4rec_settings.checkpoint_dirpath
-CKPT_PATH = bert4rec_settings.checkpoint_path
+CHECKPOINT_MONITOR = carca_settings.checkpoint_monitor
+CHECKPOINT_MODE = carca_settings.checkpoint_mode
+CHECKPOINT_EVERY_N_TRAIN_STEPS = carca_settings.checkpoint_every_n_train_steps
+CHECKPOINT_FILENAME = carca_settings.checkpoint_filename
+CHECKPOINT_DIRPATH = carca_settings.checkpoint_dirpath
+CKPT_PATH = carca_settings.checkpoint_path
 
 # Wandb
-WANDB_CONFIG = bert4rec_settings.dict()
+WANDB_CONFIG = carca_settings.dict()
 
 
 def main():
-    bert4rec_settings.print()
+    carca_settings.print()
 
     volume = Volume(site="aboutpet", model="item2vec", version="v1")
 
@@ -66,7 +66,7 @@ def main():
         embed_dim=128,
     )
 
-    bert4rec_module = Bert4RecModule(
+    carca = CARCA(
         num_items=volume.vocab_size(),
         embed_dim=EMBED_DIM,
         num_heads=NUM_HEADS,
@@ -78,9 +78,9 @@ def main():
     )
 
     item_embeddings = item2vec_module.get_graph_embeddings()
-    bert4rec_module.import_item_embeddings(item_embeddings)
+    carca.import_item_embeddings(item_embeddings)
 
-    datamodule = Bert4RecDataModule(
+    datamodule = CarcaDataModule(
         volume=volume,
         batch_size=DATAMODULE_BATCH_SIZE,
         num_workers=DATAMODULE_NUM_WORKERS,
@@ -109,8 +109,8 @@ def main():
             ),
         ],
     )
-    trainer.fit(model=bert4rec_module, datamodule=datamodule, ckpt_path=CKPT_PATH)
-    trainer.test(model=bert4rec_module, datamodule=datamodule, ckpt_path=CKPT_PATH)
+    trainer.fit(model=carca, datamodule=datamodule, ckpt_path=CKPT_PATH)
+    trainer.test(model=carca, datamodule=datamodule, ckpt_path=CKPT_PATH)
 
 
 if __name__ == "__main__":

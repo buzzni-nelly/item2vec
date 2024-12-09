@@ -14,7 +14,7 @@ from reranker.attention import TransformerEncoderLayer, TransformerEncoder, Tran
 from reranker.encoding import PositionalEncoding
 
 
-class BERT4Rec(nn.Module):
+class CrossAttention(nn.Module):
     def __init__(
         self,
         num_items: int,
@@ -24,7 +24,7 @@ class BERT4Rec(nn.Module):
         max_len: int,
         dropout=0.1,
     ):
-        super(BERT4Rec, self).__init__()
+        super(CrossAttention, self).__init__()
         self.num_items = num_items
         self.mask_token_idx = self.num_items + 0
         self.pad_token_idx = self.num_items + 1
@@ -71,7 +71,7 @@ class BERT4Rec(nn.Module):
         return decoder_output, decoder_weights
 
 
-class Bert4RecModule(pl.LightningModule):
+class CARCA(pl.LightningModule):
 
     def __init__(
         self,
@@ -84,7 +84,7 @@ class Bert4RecModule(pl.LightningModule):
         lr: float = 0.001,
         weight_decay: float = 0.001,
     ):
-        super(Bert4RecModule, self).__init__()
+        super(CARCA, self).__init__()
         self.num_items = num_items
         self.mask_token_idx = num_items + 0
         self.pad_token_idx = num_items + 1
@@ -96,7 +96,7 @@ class Bert4RecModule(pl.LightningModule):
         self.lr = lr
         self.weight_decay = weight_decay
 
-        self.bert4rec = BERT4Rec(
+        self.cross_attention = CrossAttention(
             num_items=num_items,
             embed_dim=embed_dim,
             num_heads=num_heads,
@@ -112,14 +112,14 @@ class Bert4RecModule(pl.LightningModule):
         last_idxs: torch.Tensor,
         candidate_idxs: torch.Tensor = None,
     ):
-        logits, _ = self.bert4rec(input_seqs, src_key_padding_mask=src_key_padding_mask)
+        logits, _ = self.cross_attention(input_seqs, src_key_padding_mask=src_key_padding_mask)
         output = logits[torch.arange(logits.size(0)), last_idxs]
 
         if candidate_idxs is not None:
-            candidate_embeddings = self.bert4rec.item_embeddings.weight[candidate_idxs]
+            candidate_embeddings = self.cross_attention.item_embeddings.weight[candidate_idxs]
             scores = torch.matmul(output, candidate_embeddings.T)
         else:
-            candidate_embeddings = self.bert4rec.item_embeddings.weight[:-2]
+            candidate_embeddings = self.cross_attention.item_embeddings.weight[:-2]
             scores = torch.matmul(output, candidate_embeddings.T)
 
         return scores
@@ -132,7 +132,7 @@ class Bert4RecModule(pl.LightningModule):
         # negative_idxs shape: (256, 2)
         input_seqs, src_key_padding_mask, masked_idxs, positive_idxs, negative_idxs = batch
         # logits shape: (256, 50, 128)
-        logits, _ = self.bert4rec(input_seqs, src_key_padding_mask=src_key_padding_mask)
+        logits, _ = self.cross_attention(input_seqs, src_key_padding_mask=src_key_padding_mask)
         # batch_indices shape: (256, 1)
         batch_indices = torch.arange(logits.size(0)).unsqueeze(1).to(self.device)
         # output shape: (256, 2, 128)
@@ -140,8 +140,8 @@ class Bert4RecModule(pl.LightningModule):
 
         # positive_embeddings shape: (256, 2, 128)
         # negative_embeddings shape: (256, 2, 128)
-        positive_embeddings = self.bert4rec.item_embeddings.weight[positive_idxs]
-        negative_embeddings = self.bert4rec.item_embeddings.weight[negative_idxs]
+        positive_embeddings = self.cross_attention.item_embeddings.weight[positive_idxs]
+        negative_embeddings = self.cross_attention.item_embeddings.weight[negative_idxs]
 
         # positive_scores shape: (256, 2)
         # negative_scores shape: (256, 2)
@@ -155,9 +155,9 @@ class Bert4RecModule(pl.LightningModule):
 
     def validation_step(self, batch: list[torch.Tensor], idx: int):
         input_seqs, src_key_padding_mask, last_idxs, ground_truth_items = batch
-        logits, _ = self.bert4rec(input_seqs, src_key_padding_mask=src_key_padding_mask)
+        logits, _ = self.cross_attention(input_seqs, src_key_padding_mask=src_key_padding_mask)
         output = logits[torch.arange(logits.size(0)), last_idxs, :]
-        scores = torch.matmul(output, self.bert4rec.item_embeddings.weight[:-2].T)
+        scores = torch.matmul(output, self.cross_attention.item_embeddings.weight[:-2].T)
 
         mrr = self.calc_mrr(scores, ground_truth_items)
         self.log("val_mrr", mrr, prog_bar=True)
@@ -213,10 +213,10 @@ class Bert4RecModule(pl.LightningModule):
         mask_embeddings = torch.zeros((1, item_embeddings.size(1))).to(item_embeddings.device)
         padding_embeddings = torch.zeros((1, item_embeddings.size(1))).to(item_embeddings.device)
         extended_embeddings = torch.cat([item_embeddings, mask_embeddings, padding_embeddings], dim=0)
-        self.bert4rec.item_embeddings.weight.data.copy_(extended_embeddings)
+        self.cross_attention.item_embeddings.weight.data.copy_(extended_embeddings)
 
 
-class Bert4RecTrainDataset(Dataset):
+class CarcaTrainDataset(Dataset):
     def __init__(self, volume: Volume, max_len: int = 50):
         self.histories = volume.migrate_user_histories()
         self.num_items = volume.vocab_size()
@@ -256,7 +256,7 @@ class Bert4RecTrainDataset(Dataset):
         return input_seqs, padding_mask, masked_positions, positive_pidxs, negative_pidxs
 
 
-class Bert4RecValidDataset(Dataset):
+class CarcaValidDataset(Dataset):
     def __init__(self, volume: Volume, max_len: int = 50):
         self.histories = volume.migrate_user_histories(condition='greater')
         self.num_items = volume.vocab_size()
@@ -283,7 +283,7 @@ class Bert4RecValidDataset(Dataset):
         return input_seqs, padding_mask, last_idx, ground_truth_item
 
 
-class Bert4RecDataModule(pl.LightningDataModule):
+class CarcaDataModule(pl.LightningDataModule):
     def __init__(self, volume: Volume, batch_size: int = 32, num_workers: int = 2, max_len: int = 50):
         super().__init__()
         self.volume = volume
@@ -294,7 +294,7 @@ class Bert4RecDataModule(pl.LightningDataModule):
 
     def setup(self, stage=None):
         if stage == "fit" or stage is None:
-            self.train_dataset = Bert4RecTrainDataset(volume=self.volume, max_len=self.max_len)
+            self.train_dataset = CarcaTrainDataset(volume=self.volume, max_len=self.max_len)
 
     def train_dataloader(self):
         return DataLoader(
@@ -304,12 +304,12 @@ class Bert4RecDataModule(pl.LightningDataModule):
             persistent_workers=bool(self.num_workers > 0),
             pin_memory=True,
             shuffle=True,
-            collate_fn=self.bert4rec_collate_fn
+            collate_fn=self.carca_collate_fn
         )
 
     def val_dataloader(self):
         return DataLoader(
-            Bert4RecValidDataset(volume=self.volume, max_len=self.max_len),
+            CarcaValidDataset(volume=self.volume, max_len=self.max_len),
             batch_size=self.batch_size,
             num_workers=self.num_workers,
             persistent_workers=bool(self.num_workers > 0),
@@ -319,7 +319,7 @@ class Bert4RecDataModule(pl.LightningDataModule):
 
     def test_dataloader(self):
         return DataLoader(
-            Bert4RecValidDataset(volume=self.volume, max_len=self.max_len),
+            CarcaValidDataset(volume=self.volume, max_len=self.max_len),
             batch_size=self.batch_size,
             num_workers=self.num_workers,
             persistent_workers=bool(self.num_workers > 0),
@@ -327,9 +327,9 @@ class Bert4RecDataModule(pl.LightningDataModule):
             shuffle=False,
         )
 
-    def bert4rec_collate_fn(self, batch):
+    def carca_collate_fn(self, batch):
         """
-        Bert4Rec 데이터셋을 위한 collate_fn.
+        CARCA 데이터셋을 위한 collate_fn.
 
         Args:
             batch (list of tuples): 각 샘플은 (input_seqs, padding_mask, masked_positions, positive_pidxs, negative_pidxs) 형태.
