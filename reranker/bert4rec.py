@@ -1,3 +1,4 @@
+import math
 import random
 
 import pytorch_lightning as pl
@@ -32,6 +33,87 @@ class PositionalEncoding(nn.Module):
     def forward(self, x):
         x = x + self.pe[:, : x.size(1)]
         return self.dropout(x)
+
+
+class RotaryEncoding(nn.Module):
+    """
+    Module for applying rotary positional encoding to input sequences.
+
+    This module incorporates positional information into input sequences using rotary positional encoding.
+    It supports two modes: concatenation and addition. In concatenation mode, the positional embeddings
+    are concatenated with the input, followed by a linear transformation. In addition mode, the positional
+    embeddings are added directly to the input.
+
+    Args:
+    - config (object): Configuration object with the following attributes:
+        - position_concatenation (bool): Whether to concatenate positional embeddings with input.
+        - maxlen (int): Maximum length of input sequences.
+        - embedding_d (int): Dimensionality of the input embeddings.
+
+    Attributes:
+    - concat (bool): Whether to concatenate positional embeddings with input.
+    - position_embeddings (nn.Embedding): Embedding layer for positional embeddings.
+    - encoding (nn.Linear): Linear layer for concatenation mode.
+
+    Methods:
+    - forward(x: Tensor) -> Tensor: Apply rotary positional encoding to input tensor.
+
+    Example:
+    >> config = Configuration(position_concatenation=True, maxlen=100, embedding_d=512)
+    >> rotary_encoder = RotaryPositionalEncoding(config)
+    >> input_tensor = torch.rand((batch_size, sequence_length, embedding_dim))
+    >> output_tensor = rotary_encoder(input_tensor)
+    """
+
+    def __init__(self, config):
+        """
+        Initialize the RotaryPositionalEncoding module.
+        Args:
+        - config (object): Configuration object with required attributes.
+
+        """
+        super().__init__()
+        self.concat = config.position_concatenation
+        L, H = config.maxlen, config.embedding_d
+        self.position_embeddings = nn.Embedding(L, H)
+        if self.concat:
+            self.encoding = nn.Linear(H * 2, H)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Apply rotary positional encoding to the input tensor.
+
+        Args:
+        - x (Tensor): Input tensor with shape (batch_size, sequence_length, embedding_dim).
+
+        Returns:
+        Tensor: Output tensor after applying rotary positional encoding.
+
+        """
+        # position_ids => L x H, rows [ 0, 1, 2, ...,H]
+        position_ids = torch.arange(0, x.size(1), device=x.device).unsqueeze(0).expand(x.size(0), -1)
+        position_embeddings = self.position_embeddings(position_ids)
+
+        # Rotary Positional Encoding
+        angles = position_embeddings / 10000.0
+        angle_rads = angles[:, :, 0::2] * 2 * math.pi
+
+        sin_angles = torch.sin(angle_rads)
+        cos_angles = torch.cos(angle_rads)
+
+        # Add rotation
+        sin_angles = sin_angles * torch.tensor([(-1) ** i for i in range(sin_angles.size(-1))], device=x.device)
+
+        # Combine sine and cosine embeddings
+        position_embeddings[:, :, 0::2] = sin_angles
+        position_embeddings[:, :, 1::2] = cos_angles
+
+        if not self.concat:
+            x = x + position_embeddings
+        else:
+            x = torch.cat([x, position_embeddings], -1)
+            x = self.encoding(x)
+        return x
 
 
 class BERT4Rec(nn.Module):
@@ -183,6 +265,9 @@ class Bert4RecModule(pl.LightningModule):
     def test_step(self, batch: list[torch.Tensor], idx: int):
         self.validation_step(batch, idx)
 
+    def configure_optimizers(self) -> Optimizer:
+        return optim.AdamW(self.parameters(), lr=self.lr, weight_decay=self.weight_decay)
+
     def calc_mrr(self, scores: torch.Tensor, ground_truth_items: torch.Tensor):
         gt_scores = scores.gather(1, ground_truth_items.unsqueeze(1)).squeeze(1)
         ranks = (scores > gt_scores.unsqueeze(1)).sum(dim=1) + 1
@@ -208,9 +293,6 @@ class Bert4RecModule(pl.LightningModule):
     def bpr_loss(self, positive_scores: torch.Tensor, negative_scores: torch.Tensor):
         loss = -torch.mean(torch.log(torch.sigmoid(positive_scores - negative_scores)))
         return loss
-
-    def configure_optimizers(self) -> Optimizer:
-        return optim.AdamW(self.parameters(), lr=self.lr, weight_decay=self.weight_decay)
 
     def import_item_embeddings(self, item_embeddings: torch.Tensor):
         mask_embeddings = torch.zeros((1, item_embeddings.size(1))).to(item_embeddings.device)
