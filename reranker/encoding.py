@@ -12,8 +12,6 @@ class PositionalEncoding(nn.Module):
         scale: int = 100,
     ):
         super(PositionalEncoding, self).__init__()
-        self.dropout = nn.Dropout(dropout)
-
         pe = torch.zeros(max_len, embed_dim)
         position = torch.arange(0, max_len).unsqueeze(1)
         div_term = torch.exp(torch.arange(0, embed_dim, 2) * -(torch.log(torch.Tensor([scale])) / embed_dim))

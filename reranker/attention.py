@@ -1,5 +1,4 @@
 import copy
-import math
 from typing import Callable, Optional
 
 import torch
@@ -50,15 +49,6 @@ class TransformerEncoderLayer(nn.Module):
         self.norm2 = LayerNorm(d_model, eps=layer_norm_eps, bias=bias, **factory_kwargs)
         self.dropout1 = Dropout(dropout)
         self.dropout2 = Dropout(dropout)
-
-        # We can't test self.activation in forward() in TorchScript,
-        # so stash some information about it instead.
-        if activation is F.relu or isinstance(activation, torch.nn.ReLU):
-            self.activation_relu_or_gelu = 1
-        elif activation is F.gelu or isinstance(activation, torch.nn.GELU):
-            self.activation_relu_or_gelu = 2
-        else:
-            self.activation_relu_or_gelu = 0
         self.activation = activation
 
     def __setstate__(self, state):
@@ -68,8 +58,8 @@ class TransformerEncoderLayer(nn.Module):
 
     def forward(
         self,
-        k: Tensor,
         q: Tensor,
+        k: Tensor,
         v: Tensor,
         src_mask: Optional[Tensor] = None,
         src_key_padding_mask: Optional[Tensor] = None,
@@ -77,14 +67,14 @@ class TransformerEncoderLayer(nn.Module):
         need_weights: bool = False,
     ) -> tuple[Tensor, Tensor]:
 
-        assert k.dtype == q.dtype == v.dtype, "k, q, v must have the same dtype"
+        assert q.dtype == k.dtype == v.dtype, "k, q, v must have the same dtype"
 
         src_key_padding_mask = F._canonical_mask(
             mask=src_key_padding_mask,
             mask_name="src_key_padding_mask",
             other_type=F._none_or_dtype(src_mask),
             other_name="src_mask",
-            target_type=k.dtype,
+            target_type=q.dtype,
         )
 
         src_mask = F._canonical_mask(
@@ -92,13 +82,12 @@ class TransformerEncoderLayer(nn.Module):
             mask_name="src_mask",
             other_type=None,
             other_name="",
-            target_type=k.dtype,
+            target_type=q.dtype,
             check_other=False,
         )
 
-        a, w = self._sa_block(k, q, v, src_mask, src_key_padding_mask, is_causal=is_causal, need_weights=need_weights)
-        x = k + a
-        x = self.norm1(x)
+        sa, w = self._sa_block(q, k, v, src_mask, src_key_padding_mask, is_causal=is_causal, need_weights=need_weights)
+        x = self.norm1(q + sa)
         x = self.norm2(x + self._ff_block(x))
         return x, w
 
@@ -129,14 +118,6 @@ class TransformerEncoderLayer(nn.Module):
         x = self.linear2(self.dropout(self.activation(self.linear1(x))))
         return self.dropout2(x)
 
-    def _get_activation_fn(self, activation: str) -> Callable[[Tensor], Tensor]:
-        if activation == "relu":
-            return F.relu
-        elif activation == "gelu":
-            return F.gelu
-
-        raise RuntimeError(f"activation should be relu/gelu, not {activation}")
-
 
 class TransformerEncoder(nn.Module):
 
@@ -158,22 +139,22 @@ class TransformerEncoder(nn.Module):
 
     def forward(
         self,
-        k: Tensor,  # key: item embeddings
         q: Tensor,  # query: item embeddings
+        k: Tensor,  # key: item embeddings
         v: Tensor,  # value: item embeddings
         mask: Optional[Tensor] = None,
         src_key_padding_mask: Optional[Tensor] = None,
         is_causal: Optional[bool] = None,
     ) -> tuple[Tensor, list[Tensor]]:
 
-        assert k.dtype == q.dtype == v.dtype, "k, q, v must have the same dtype"
+        assert q.dtype == k.dtype == v.dtype, "k, q, v must have the same dtype"
 
         src_key_padding_mask = F._canonical_mask(
             mask=src_key_padding_mask,
             mask_name="src_key_padding_mask",
             other_type=F._none_or_dtype(mask),
             other_name="mask",
-            target_type=k.dtype,
+            target_type=q.dtype,
         )
 
         mask = F._canonical_mask(
@@ -181,27 +162,28 @@ class TransformerEncoder(nn.Module):
             mask_name="mask",
             other_type=None,
             other_name="",
-            target_type=k.dtype,
+            target_type=q.dtype,
             check_other=False,
         )
 
         first_layer = self.layers[0]
         batch_first = first_layer.self_attn.batch_first
 
-        seq_len = _get_seq_len(k, batch_first)
+        seq_len = _get_seq_len(q, batch_first)
         is_causal = _detect_is_causal_mask(mask, is_causal, seq_len)
 
+        output = q
         weights = []
         for mod in self.layers:
             output, weight = mod(
-                k,
                 q,
+                k,
                 v,
                 src_mask=mask,
                 is_causal=is_causal,
                 src_key_padding_mask=src_key_padding_mask,
             )
-            k, q, v = output, output, output
+            q, k, v = output, output, output
             weights.append(weight)
 
         if self.norm is not None:
@@ -230,22 +212,22 @@ class TransformerDecoder(nn.Module):
 
     def forward(
         self,
-        k: Tensor,  # key: item embeddings
-        q: Tensor,  # query: TransformerEncoder logit
+        q: Tensor,  # query: item embeddings
+        k: Tensor,  # key: TransformerEncoder logit
         v: Tensor,  # value: TransformerEncoder logit
         mask: Optional[Tensor] = None,
         src_key_padding_mask: Optional[Tensor] = None,
         is_causal: Optional[bool] = None,
     ) -> tuple[Tensor, list[Tensor]]:
 
-        assert k.dtype == q.dtype == v.dtype, "k, q, v must have the same dtype"
+        assert q.dtype == k.dtype == v.dtype, "k, q, v must have the same dtype"
 
         src_key_padding_mask = F._canonical_mask(
             mask=src_key_padding_mask,
             mask_name="src_key_padding_mask",
             other_type=F._none_or_dtype(mask),
             other_name="mask",
-            target_type=k.dtype,
+            target_type=q.dtype,
         )
 
         mask = F._canonical_mask(
@@ -253,7 +235,7 @@ class TransformerDecoder(nn.Module):
             mask_name="mask",
             other_type=None,
             other_name="",
-            target_type=k.dtype,
+            target_type=q.dtype,
             check_other=False,
         )
 
@@ -264,17 +246,17 @@ class TransformerDecoder(nn.Module):
         is_causal = _detect_is_causal_mask(mask, is_causal, seq_len)
 
         weights = []
-        output = k
+        output = q
         for mod in self.layers:
             output, weight = mod(
-                k,
                 q,
+                k,
                 v,
                 src_mask=mask,
                 is_causal=is_causal,
                 src_key_padding_mask=src_key_padding_mask,
             )
-            k = output
+            q = output
             weights.append(weight)
 
         if self.norm is not None:
