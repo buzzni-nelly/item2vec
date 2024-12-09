@@ -164,17 +164,17 @@ class Bert4RecModule(pl.LightningModule):
 
         hr_5 = self.calc_hr_at_k(scores, ground_truth_items, k=5)
         ndcg_5 = self.calc_ndcg_at_k(scores, ground_truth_items, k=5)
-        self.log(f"val_recall@5", hr_5, prog_bar=True)
+        self.log(f"val_hr@5", hr_5, prog_bar=True)
         self.log(f"val_ndcg@5", ndcg_5, prog_bar=True)
 
         hr_10 = self.calc_hr_at_k(scores, ground_truth_items, k=10)
         ndcg_10 = self.calc_ndcg_at_k(scores, ground_truth_items, k=10)
-        self.log(f"val_recall@10", hr_10, prog_bar=True)
+        self.log(f"val_hr@10", hr_10, prog_bar=True)
         self.log(f"val_ndcg@10", ndcg_10, prog_bar=True)
 
         hr_20 = self.calc_hr_at_k(scores, ground_truth_items, k=20)
         ndcg_20 = self.calc_ndcg_at_k(scores, ground_truth_items, k=20)
-        self.log(f"val_recall@20", hr_20, prog_bar=True)
+        self.log(f"val_hr@20", hr_20, prog_bar=True)
         self.log(f"val_ndcg@20", ndcg_20, prog_bar=True)
 
     def test_step(self, batch: list[torch.Tensor], idx: int):
