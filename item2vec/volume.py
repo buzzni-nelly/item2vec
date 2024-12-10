@@ -337,7 +337,7 @@ class Volume:
 
             print(f"Downloading {current_date.strftime('%Y-%m-%d')}")
             date_str = current_date.strftime("%Y-%m-%d")
-            query = queries.QUERY_USER_ITEMS.format(date=date_str)
+            query = queries.QUERY_USER_ITEMS.format(company_id=self.site, date=date_str)
             df = fetch_trino_query(query)
 
             delete_criteria = float(df["timestamp"].min())
@@ -350,21 +350,25 @@ class Volume:
 
             current_date += timedelta(days=1)
 
-    def migrate_items(self):
+    def migrate_items(self, chunk_size=1000):
         Item.reset_table(self.session)
 
         aggregates = Trace.aggregate_items(self.session)
         pdids, purchase_counts, click_counts = zip(*aggregates)
-        products = clients.mongo.p32712.list_products(pdids)
-        products_dict = {
-            x["_id"]: {
-                "name": x.get("name"),
-                "category1": x.get("category1", "UNKNOWN").replace("*", "").replace("_", ""),
-                "category2": x.get("category2", "UNKNOWN").replace("*", "").replace("_", ""),
-                "category3": x.get("category3", "UNKNOWN").replace("*", "").replace("_", ""),
-            }
-            for x in products
-        }
+
+        products_dict = {}
+        for i in tqdm(range(0, len(pdids), chunk_size), desc="MongoDB 에서 product 정보를 가져옵니다."):
+            chunk_pdids = pdids[i:i + chunk_size]
+            products = clients.mongo.p32712.list_products(chunk_pdids, company_id=self.site)
+            products_dict.update({
+                x["_id"]: {
+                    "name": x.get("name") or "UNKNOWN",
+                    "category1": (x.get("category1") or "UNKNOWN").replace("*", "").replace("_", ""),
+                    "category2": (x.get("category2") or "UNKNOWN").replace("*", "").replace("_", ""),
+                    "category3": (x.get("category3") or "UNKNOWN").replace("*", "").replace("_", ""),
+                }
+                for x in products
+            })
 
         items, pidx = [], 0
         for pdid, purchase_count, click_count in aggregates:
@@ -472,8 +476,8 @@ class Volume:
         df = df.dropna(subset=["pid", "target_pid"])
         df = df[df["purchase_time"].notna()]
 
-        df["source_pdid"] = df["pid"].apply(lambda x: f"aboutpet_{x}")
-        df["target_pdid"] = df["target_pid"].apply(lambda x: f"aboutpet_{x}")
+        df["source_pdid"] = df["pid"].apply(lambda x: f"{self.site}_{x}")
+        df["target_pdid"] = df["target_pid"].apply(lambda x: f"{self.site}_{x}")
         df = df[["source_pdid", "target_pdid"]]
         df = df[df["source_pdid"] != df["target_pdid"]]
         return df.values.tolist()
@@ -492,8 +496,8 @@ class Volume:
         df = pd.DataFrame(rows, columns=columns)
         df = df.dropna(subset=["pid", "target_pid"])
 
-        df["source_pdid"] = df["pid"].apply(lambda x: f"aboutpet_{x}")
-        df["target_pdid"] = df["target_pid"].apply(lambda x: f"aboutpet_{x}")
+        df["source_pdid"] = df["pid"].apply(lambda x: f"{self.site}_{x}")
+        df["target_pdid"] = df["target_pid"].apply(lambda x: f"{self.site}_{x}")
         df = df[["source_pdid", "target_pdid"]]
         df = df[df["source_pdid"] != df["target_pdid"]]
         return df.values.tolist()

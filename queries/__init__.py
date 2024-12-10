@@ -223,13 +223,13 @@ WITH raw_user_products AS (
         event_type AS event
     FROM retarget.retarget_access_log
     WHERE DATE(time) = DATE '{date}'
-      AND company_id = 'aboutpet'
+      AND company_id = '{company_id}'
       AND event_type != 'list'
       AND event_type != 'basketview'
 )
 SELECT
     u.user_id AS user_id,
-    ('aboutpet' || '_' || u.product_id) AS pdid,
+    ('{company_id}' || '_' || u.product_id) AS pdid,
     u.timestamp AS timestamp,
     u.event AS event
 FROM raw_user_products u
