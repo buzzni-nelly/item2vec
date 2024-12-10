@@ -1,6 +1,9 @@
 import pathlib
 
-from item2vec.configs import settings
+import directories
+from item2vec.configs import Settings
+
+settings = Settings.load(directories.config("aboutpet", "item2vec", "v1"))
 
 
 def delete_checkpoints():

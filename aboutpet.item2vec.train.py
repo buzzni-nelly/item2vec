@@ -1,6 +1,7 @@
 import os
 
-from item2vec.configs import settings
+import directories
+from item2vec.configs import Settings
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
@@ -12,6 +13,8 @@ from pytorch_lightning.loggers import WandbLogger
 from item2vec.datasets import SkipGramBPRDataModule
 from item2vec.models import GraphBPRItem2VecModule
 from item2vec.volume import Volume
+
+settings = Settings.load(directories.config("aboutpet", "item2vec", "v1"))
 
 os.environ["WANDB_API_KEY"] = settings.wandb_api_key
 
