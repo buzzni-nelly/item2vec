@@ -75,7 +75,7 @@ def upload(aggregated_scores: dict):
 
 @retry(tries=3)
 def main(embed_dim=128, k: int = 100, batch_size: int = 1000):
-    volume = Volume(site="aboutpet", model="item2vec", version="v1")
+    volume = Volume(company_id="aboutpet", model="item2vec", version="v1")
 
     embeddings = load_embeddings(volume, embed_dim=embed_dim)
     items = volume.items(by="pidx")

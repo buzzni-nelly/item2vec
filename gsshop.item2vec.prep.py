@@ -4,7 +4,7 @@ from item2vec.volume import Volume
 
 
 if __name__ == "__main__":
-    volume = Volume(site="gsshop", model="item2vec", version="v1")
+    volume = Volume(company_id="gsshop", model="item2vec", version="v1")
     volume.migrate_traces(begin_date=datetime(2024, 12, 5))
     volume.migrate_items()
     volume.migrate_users()

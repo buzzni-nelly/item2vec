@@ -50,7 +50,7 @@ WANDB_CONFIG = settings.dict()
 def main():
     settings.print()
 
-    volume = Volume(site="gsshop", model="item2vec", version="v1")
+    volume = Volume(company_id="gsshop", model="item2vec", version="v1")
 
     data_module = SkipGramBPRDataModule(
         volume=volume,

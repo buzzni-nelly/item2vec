@@ -1,5 +1,7 @@
 import os
 
+from item2vec.configs import settings
+
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
@@ -7,7 +9,6 @@ from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from pytorch_lightning.loggers import WandbLogger
 
-from item2vec.configs import settings
 from item2vec.datasets import SkipGramBPRDataModule
 from item2vec.models import GraphBPRItem2VecModule
 from item2vec.volume import Volume
@@ -50,7 +51,7 @@ WANDB_CONFIG = settings.dict()
 def main():
     settings.print()
 
-    volume = Volume(site="aboutpet", model="item2vec", version="v1")
+    volume = Volume(company_id="aboutpet", model="item2vec", version="v1")
 
     data_module = SkipGramBPRDataModule(
         volume=volume,

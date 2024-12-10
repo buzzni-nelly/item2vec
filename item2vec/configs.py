@@ -1,3 +1,6 @@
+from pathlib import Path
+
+import yaml
 from pydantic_settings import BaseSettings
 
 
@@ -33,5 +36,10 @@ class Settings(BaseSettings):
         for k, v in self.model_dump().items():
             print(k, v)
 
+    @staticmethod
+    def load(filepath: Path) -> 'Settings':
+        with filepath.open("r") as file:
+            config = yaml.safe_load(file)
+            return Settings(**config)
 
 settings = Settings()

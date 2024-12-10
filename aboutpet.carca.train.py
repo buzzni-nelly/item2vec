@@ -57,7 +57,7 @@ WANDB_CONFIG = carca_settings.dict()
 def main():
     carca_settings.print()
 
-    volume = Volume(site="aboutpet", model="item2vec", version="v1")
+    volume = Volume(company_id="aboutpet", model="item2vec", version="v1")
 
     item2vec_module = GraphBPRItem2VecModule.load_from_checkpoint(
         f"{item2vec_settings.checkpoint_dirpath}/last.ckpt",

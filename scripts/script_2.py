@@ -4,7 +4,7 @@ import json
 import clients
 from item2vec.volume import Volume
 
-volume = Volume(site="aboutpet", model="item2vec", version="v1")
+volume = Volume(company_id="aboutpet", model="item2vec", version="v1")
 
 items = volume.list_popular_items(days=30)
 

@@ -303,12 +303,12 @@ class Trace(Base):
 
 class Volume:
 
-    def __init__(self, site: str, model: str, version: str):
-        self.site = site
+    def __init__(self, company_id: str, model: str, version: str):
+        self.company_id = company_id
         self.model = model
         self.version = version
-        self.workspace_path = directories.workspaces.joinpath(site, model, version)
-        self.sqlite3_path = self.workspace_path.joinpath(f"{site}-{model}-{version}.db")
+        self.workspace_path = directories.workspaces.joinpath(company_id, model, version)
+        self.sqlite3_path = self.workspace_path.joinpath(f"{company_id}-{model}-{version}.db")
 
         if not self.workspace_path.exists():
             self.workspace_path.mkdir(parents=True)
@@ -337,7 +337,7 @@ class Volume:
 
             print(f"Downloading {current_date.strftime('%Y-%m-%d')}")
             date_str = current_date.strftime("%Y-%m-%d")
-            query = queries.QUERY_USER_ITEMS.format(company_id=self.site, date=date_str)
+            query = queries.QUERY_USER_ITEMS.format(company_id=self.company_id, date=date_str)
             df = fetch_trino_query(query)
 
             delete_criteria = float(df["timestamp"].min())
@@ -359,7 +359,7 @@ class Volume:
         products_dict = {}
         for i in tqdm(range(0, len(pdids), chunk_size), desc="MongoDB 에서 product 정보를 가져옵니다."):
             chunk_pdids = pdids[i:i + chunk_size]
-            products = clients.mongo.p32712.list_products(chunk_pdids, company_id=self.site)
+            products = clients.mongo.p32712.list_products(chunk_pdids, company_id=self.company_id)
             products_dict.update({
                 x["_id"]: {
                     "name": x.get("name") or "UNKNOWN",
@@ -476,8 +476,8 @@ class Volume:
         df = df.dropna(subset=["pid", "target_pid"])
         df = df[df["purchase_time"].notna()]
 
-        df["source_pdid"] = df["pid"].apply(lambda x: f"{self.site}_{x}")
-        df["target_pdid"] = df["target_pid"].apply(lambda x: f"{self.site}_{x}")
+        df["source_pdid"] = df["pid"].apply(lambda x: f"{self.company_id}_{x}")
+        df["target_pdid"] = df["target_pid"].apply(lambda x: f"{self.company_id}_{x}")
         df = df[["source_pdid", "target_pdid"]]
         df = df[df["source_pdid"] != df["target_pdid"]]
         return df.values.tolist()
@@ -496,8 +496,8 @@ class Volume:
         df = pd.DataFrame(rows, columns=columns)
         df = df.dropna(subset=["pid", "target_pid"])
 
-        df["source_pdid"] = df["pid"].apply(lambda x: f"{self.site}_{x}")
-        df["target_pdid"] = df["target_pid"].apply(lambda x: f"{self.site}_{x}")
+        df["source_pdid"] = df["pid"].apply(lambda x: f"{self.company_id}_{x}")
+        df["target_pdid"] = df["target_pid"].apply(lambda x: f"{self.company_id}_{x}")
         df = df[["source_pdid", "target_pdid"]]
         df = df[df["source_pdid"] != df["target_pdid"]]
         return df.values.tolist()
@@ -597,7 +597,7 @@ class Volume:
 
 
 if __name__ == "__main__":
-    volume = Volume(site="aboutpet", model="item2vec", version="v1")
+    volume = Volume(company_id="aboutpet", model="item2vec", version="v1")
     # volume.migrate_traces(begin_date=datetime(2024, 8, 1))
     # volume.migrate_items()
     # volume.migrate_users()
