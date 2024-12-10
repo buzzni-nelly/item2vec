@@ -10,8 +10,8 @@ configs = project.joinpath("configs")
 workspaces = project.joinpath("workspaces")
 
 
-def workspace(site: str, model: str, version: str) -> pathlib.Path:
-    return workspaces.joinpath(site, model, version)
+def workspace(company_id: str, model: str, version: str) -> pathlib.Path:
+    return workspaces.joinpath(company_id, model, version)
 
-def config(site: str, model: str, version: str) -> pathlib.Path:
-    return configs.joinpath(f"{site}.{model}.{version}.yaml")
+def config(company_id: str, model: str, version: str) -> pathlib.Path:
+    return configs.joinpath(f"{company_id}.{model}.{version}.yaml")
