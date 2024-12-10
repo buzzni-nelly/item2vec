@@ -1,13 +1,13 @@
 while true; do
-    python aboutpet.item2vec.prep.py
+    python aboutpet.item2vec.v1.prep.py
     sleep 3
     python aboutpet.popular.py
     sleep 3
-    python aboutpet.item2vec.delete.py
+    python aboutpet.item2vec.v1.delete.py
     sleep 3
-    python aboutpet.item2vec.train.py
+    python aboutpet.item2vec.v1.train.py
     sleep 3
-    python aboutpet.item2vec.upsert.py
+    python aboutpet.item2vec.v1.upsert.py
     sleep 3
-    python aboutpet.item2vec.pastbias.py
+    python aboutpet.item2vec.v1.pastbias.py
 done
