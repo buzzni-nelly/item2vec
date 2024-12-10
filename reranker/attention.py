@@ -88,7 +88,15 @@ class TransformerEncoderLayer(nn.Module):
             check_other=False,
         )
 
-        sa, w = self._sa_block(q, k, v, src_mask, src_key_padding_mask, is_causal=is_causal, need_weights=need_weights)
+        sa, w = self._sa_block(
+            q,
+            k,
+            v,
+            src_mask,
+            src_key_padding_mask,
+            is_causal=is_causal,
+            need_weights=need_weights,
+        )
 
         if residual_strategy_1 == "sum":
             x = self.norm1(q + sa)
@@ -130,16 +138,16 @@ class TransformerEncoderLayer(nn.Module):
             need_weights=need_weights,
             is_causal=is_causal,
         )
-        # x = self.dropout(x)
+        x = self.dropout(x)
         return x, weights
 
     # feed forward block
     def _ff_block(self, x: Tensor) -> Tensor:
         x = self.linear1(x)
         x = self.activation(x)
-        # x = self.dropout(x)
+        x = self.dropout1(x)
         x = self.linear2(x)
-        # x = self.dropout2(x)
+        x = self.dropout2(x)
         return x
 
 
@@ -158,6 +166,7 @@ class TransformerEncoder(nn.Module):
         torch._C._log_api_usage_once(f"torch.nn.modules.{self.__class__.__name__}")
         self.layers = _get_clones(encoder_layer, num_layers)
         self.num_layers = num_layers
+        self.layer_norm = LayerNorm(128)
         self.norm = norm
         self.mask_check = mask_check
 
@@ -197,8 +206,10 @@ class TransformerEncoder(nn.Module):
         is_causal = _detect_is_causal_mask(mask, is_causal, seq_len)
 
         output = q
+
         weights = []
         for mod in self.layers:
+            q = self.layer_norm(q)
             output, weight = mod(
                 q,
                 k,
@@ -281,7 +292,7 @@ class TransformerDecoder(nn.Module):
                 src_mask=mask,
                 is_causal=is_causal,
                 src_key_padding_mask=src_key_padding_mask,
-                residual_strategy_1="multiply",
+                residual_strategy_1="none",
                 residual_strategy_2="none"
             )
             q = output

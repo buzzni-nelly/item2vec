@@ -112,7 +112,7 @@ def main():
             EarlyStopping(
                 monitor=CHECKPOINT_MONITOR,
                 mode=CHECKPOINT_MODE,
-                patience=5,
+                patience=10,
                 verbose=True,
             ),
         ],
