@@ -2,6 +2,7 @@ import collections
 import enum
 import time
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Literal
 
 import pandas as pd
@@ -303,11 +304,13 @@ class Trace(Base):
 
 class Volume:
 
-    def __init__(self, company_id: str, model: str, version: str):
+    def __init__(self, company_id: str, model: str, version: str, workspaces_path: Path = None):
         self.company_id = company_id
         self.model = model
         self.version = version
-        self.workspace_path = directories.workspaces.joinpath(company_id, model, version)
+
+        workspaces_path = workspaces_path or directories.workspaces
+        self.workspace_path = workspaces_path.joinpath(company_id, model, version)
         self.sqlite3_path = self.workspace_path.joinpath(f"{company_id}-{model}-{version}.db")
 
         if not self.workspace_path.exists():

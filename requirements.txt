@@ -12,3 +12,4 @@ s3fs
 trino
 pymongo
 redis
+retry
