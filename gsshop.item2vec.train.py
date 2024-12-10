@@ -1,16 +1,17 @@
 import os
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
-os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+import directories
 
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from pytorch_lightning.loggers import WandbLogger
 
-from item2vec.configs import settings
+from item2vec.configs import Settings
 from item2vec.datasets import SkipGramBPRDataModule
 from item2vec.models import GraphBPRItem2VecModule
 from item2vec.volume import Volume
+
+settings = Settings.load(directories.config("gsshop", "item2vec", "v1"))
 
 os.environ["WANDB_API_KEY"] = settings.wandb_api_key
 
