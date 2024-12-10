@@ -5,7 +5,7 @@ import plotly.express as px
 import torch
 from sklearn.manifold import TSNE
 
-from item2vec.models import GraphBPRItem2VecModule
+from item2vec.models import GraphBPRItem2Vec
 from item2vec.volume import Volume
 
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
@@ -14,7 +14,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 model_path = "/tmp/checkpoints/last.ckpt"
 volume = Volume("aboutpet", "item2vec", "v1")
 
-item2vec_module = GraphBPRItem2VecModule.load_from_checkpoint(
+item2vec_module = GraphBPRItem2Vec.load_from_checkpoint(
     model_path,
     vocab_size=volume.vocab_size(),
     purchase_edge_index_path=volume.workspace_path.joinpath("edge.purchase.indices.csv"),

@@ -55,7 +55,7 @@ class LightGCNConv(MessagePassing):
         return msg
 
 
-class GraphBPRItem2VecModule(pl.LightningModule):
+class GraphBPRItem2Vec(pl.LightningModule):
     def __init__(
         self,
         vocab_size: int,
@@ -65,7 +65,7 @@ class GraphBPRItem2VecModule(pl.LightningModule):
         weight_decay: float = 1e-2,
         dropout: float = 0.0,
     ):
-        super(GraphBPRItem2VecModule, self).__init__()
+        super(GraphBPRItem2Vec, self).__init__()
         self.lr = lr
         self.weight_decay = weight_decay
         self.vocab_size = vocab_size
