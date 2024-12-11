@@ -17,24 +17,12 @@ from reranker.encoding import PositionalEncoding
 class CrossAttention(nn.Module):
     def __init__(
         self,
-        num_items: int,
         embed_dim: int,
         num_heads: int,
         num_layers: int,
-        max_len: int,
         dropout=0.1,
     ):
         super(CrossAttention, self).__init__()
-        self.num_items = num_items
-        self.mask_token_idx = self.num_items + 0
-        self.pad_token_idx = self.num_items + 1
-        self.embed_dim = embed_dim
-        self.max_len = max_len
-
-        self.item_embeddings = nn.Embedding(num_items + 2, embed_dim, padding_idx=self.pad_token_idx)
-        self.dropout = nn.Dropout(dropout)
-        self.position_embeddings = PositionalEncoding(embed_dim=embed_dim, max_len=max_len)
-
         encoder_layer = TransformerEncoderLayer(
             d_model=embed_dim,
             nhead=num_heads,
@@ -52,10 +40,7 @@ class CrossAttention(nn.Module):
         self.transformer_encoder = TransformerEncoder(encoder_layer, num_layers=num_layers)
         self.transformer_decoder = TransformerDecoder(decoder_layer, num_layers=num_layers)
 
-    def forward(self, input_seqs: torch.Tensor, src_key_padding_mask: torch.Tensor) -> tuple[Tensor, Tensor]:
-        x = self.item_embeddings(input_seqs)
-        x = self.dropout(x)
-        x = self.position_embeddings(x)
+    def forward(self, x: torch.Tensor, src_key_padding_mask: torch.Tensor) -> tuple[Tensor, Tensor]:
         encoder_output, encoder_weights = self.transformer_encoder(
             x,
             x,
@@ -96,12 +81,14 @@ class CARCA(pl.LightningModule):
         self.lr = lr
         self.weight_decay = weight_decay
 
+        self.item_embeddings = nn.Embedding(num_items + 2, embed_dim, padding_idx=self.pad_token_idx)
+        self.dropout = nn.Dropout(dropout)
+        self.position_embeddings = PositionalEncoding(embed_dim=embed_dim, max_len=max_len)
+
         self.cross_attention = CrossAttention(
-            num_items=num_items,
             embed_dim=embed_dim,
             num_heads=num_heads,
             num_layers=num_layers,
-            max_len=max_len,
             dropout=dropout,
         )
 
@@ -112,7 +99,11 @@ class CARCA(pl.LightningModule):
         last_idxs: torch.Tensor,
         candidate_idxs: torch.Tensor = None,
     ):
-        logits, _ = self.cross_attention(input_seqs, src_key_padding_mask=src_key_padding_mask)
+        embeddings = self.item_embeddings(input_seqs)
+        embeddings = self.dropout(embeddings)
+        embeddings = self.position_embeddings(embeddings)
+
+        logits, _ = self.cross_attention(embeddings, src_key_padding_mask=src_key_padding_mask)
         output = logits[torch.arange(logits.size(0)), last_idxs]
 
         if candidate_idxs is not None:
