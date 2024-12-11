@@ -5,7 +5,7 @@ import plotly.express as px
 import torch
 from sklearn.manifold import TSNE
 
-from item2vec.models import GraphBPRItem2Vec
+from item2vec.modules import GraphBPRItem2Vec
 from item2vec.volume import Volume
 
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"

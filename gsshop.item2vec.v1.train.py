@@ -8,7 +8,7 @@ from pytorch_lightning.loggers import WandbLogger
 
 from item2vec.configs import Settings
 from item2vec.datasets import SkipGramBPRDataModule
-from item2vec.models import GraphBPRItem2Vec
+from item2vec.modules import GraphBPRItem2Vec
 from item2vec.volume import Volume
 
 settings = Settings.load(directories.config("gsshop", "item2vec", "v1"))

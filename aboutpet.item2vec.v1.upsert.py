@@ -8,14 +8,14 @@ from tqdm import tqdm
 import clients
 import directories
 from item2vec.configs import Settings
-from item2vec.models import GraphBPRItem2Vec
+from item2vec.modules import GraphBPRItem2Vec
 from item2vec.volume import Volume
 
 RELEASE = "i2i"
 
 COMPANY_ID = "aboutpet"
 
-MODEL_NAME = "i2v"
+MODEL_NAME = "item2vec"
 
 VERSION = "v1"
 
@@ -72,7 +72,7 @@ def load_embeddings(volume: Volume, embed_dim: int = 256):
 def upload(aggregated_scores: dict):
     pipeline = clients.redis.aiaas_6.pipeline()
     for pdid, scores in aggregated_scores.items():
-        key = f"{RELEASE}:{COMPANY_ID}:{MODEL_NAME}:{VERSION}:{pdid}"
+        key = f"{RELEASE}:{COMPANY_ID}:i2v:{VERSION}:{pdid}"
         pipeline.set(key, json.dumps(scores))
         pipeline.expire(key, 30 * 24 * 60 * 60)
     pipeline.execute()

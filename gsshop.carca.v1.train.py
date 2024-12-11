@@ -15,8 +15,8 @@ from pytorch_lightning.loggers import WandbLogger
 
 from item2vec.configs import Settings
 from item2vec.volume import Volume
-from item2vec.models import GraphBPRItem2Vec
-from reranker.carca import CarcaDataModule, CARCA
+from item2vec.modules import GraphBPRItem2Vec
+from reranker.modules import CarcaDataModule, CARCA
 
 item2vec_config_path = directories.config("gsshop", "item2vec", "v1")
 item2vec_settings = item2vec.configs.Settings.load(item2vec_config_path)
