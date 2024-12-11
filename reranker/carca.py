@@ -3,57 +3,13 @@ import random
 import pytorch_lightning as pl
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from torch import Tensor
 from torch import optim
 from torch.optim import Optimizer
 from torch.utils.data import Dataset, DataLoader
 
 from item2vec.volume import Volume
-from reranker.attention import TransformerEncoderLayer, TransformerEncoder, TransformerDecoder
+from reranker.attention import CrossAttention
 from reranker.encoding import PositionalEncoding
-
-
-class CrossAttention(nn.Module):
-    def __init__(
-        self,
-        embed_dim: int,
-        num_heads: int,
-        num_layers: int,
-        dropout=0.1,
-    ):
-        super(CrossAttention, self).__init__()
-        encoder_layer = TransformerEncoderLayer(
-            d_model=embed_dim,
-            nhead=num_heads,
-            dropout=dropout,
-            activation=F.gelu,
-            batch_first=True,
-        )
-        decoder_layer = TransformerEncoderLayer(
-            d_model=embed_dim,
-            nhead=num_heads,
-            dropout=dropout,
-            activation=F.gelu,
-            batch_first=True,
-        )
-        self.transformer_encoder = TransformerEncoder(encoder_layer, num_layers=num_layers)
-        self.transformer_decoder = TransformerDecoder(decoder_layer, num_layers=num_layers)
-
-    def forward(self, x: torch.Tensor, src_key_padding_mask: torch.Tensor) -> tuple[Tensor, Tensor]:
-        encoder_output, encoder_weights = self.transformer_encoder(
-            x,
-            x,
-            x,
-            src_key_padding_mask=src_key_padding_mask,
-        )
-        decoder_output, decoder_weights = self.transformer_decoder(
-            x,
-            encoder_output,
-            encoder_output,
-            src_key_padding_mask=src_key_padding_mask,
-        )
-        return decoder_output, decoder_weights
 
 
 class CARCA(pl.LightningModule):

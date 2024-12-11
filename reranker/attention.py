@@ -273,6 +273,48 @@ class TransformerDecoder(nn.Module):
         return output, weights
 
 
+class CrossAttention(nn.Module):
+    def __init__(
+        self,
+        embed_dim: int,
+        num_heads: int,
+        num_layers: int,
+        dropout=0.1,
+    ):
+        super(CrossAttention, self).__init__()
+        encoder_layer = TransformerEncoderLayer(
+            d_model=embed_dim,
+            nhead=num_heads,
+            dropout=dropout,
+            activation=F.gelu,
+            batch_first=True,
+        )
+        decoder_layer = TransformerEncoderLayer(
+            d_model=embed_dim,
+            nhead=num_heads,
+            dropout=dropout,
+            activation=F.gelu,
+            batch_first=True,
+        )
+        self.transformer_encoder = TransformerEncoder(encoder_layer, num_layers=num_layers)
+        self.transformer_decoder = TransformerDecoder(decoder_layer, num_layers=num_layers)
+
+    def forward(self, x: torch.Tensor, src_key_padding_mask: torch.Tensor) -> tuple[Tensor, Tensor]:
+        encoder_output, encoder_weights = self.transformer_encoder(
+            x,
+            x,
+            x,
+            src_key_padding_mask=src_key_padding_mask,
+        )
+        decoder_output, decoder_weights = self.transformer_decoder(
+            x,
+            encoder_output,
+            encoder_output,
+            src_key_padding_mask=src_key_padding_mask,
+        )
+        return decoder_output, decoder_weights
+
+
 def _generate_square_subsequent_mask(
     sz: int,
     device: Optional[torch.device] = None,
