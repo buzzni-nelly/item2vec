@@ -11,15 +11,14 @@ from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from pytorch_lightning.loggers import WandbLogger
 
 from item2vec.datasets import SkipGramBPRDataModule
-from item2vec.models import GraphBPRItem2Vec
+from item2vec.modules import GraphBPRItem2Vec
 from item2vec.volume import Volume
 
 settings = Settings.load(directories.config("aboutpet", "item2vec", "v1"))
 
-os.environ["WANDB_API_KEY"] = settings.wandb_api_key
-
 # Models
 EMBED_DIM = settings.embed_dim
+NUM_LAYERS = settings.num_layers
 
 # Optimizers and training envs
 LR = settings.lr
@@ -69,6 +68,7 @@ def main():
         embed_dim=EMBED_DIM,
         lr=LR,
         weight_decay=WEIGHT_DECAY,
+        num_layers=NUM_LAYERS,
     )
 
     trainer = Trainer(

@@ -2,7 +2,7 @@ import pandas as pd
 import torch
 
 from item2vec import vocab
-from item2vec.models import Item2VecModule
+from item2vec.modules import Item2VecModule
 import plotly.express as px
 
 df = pd.read_csv("/Users/nelly/PycharmProjects/item2vec/assets/items.csv")

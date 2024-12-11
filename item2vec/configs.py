@@ -7,6 +7,7 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
 
     embed_dim: int = 128  # 32
+    num_layers: int = 2
 
     lr: float = 1e-3
     weight_decay: float = 1e-2
@@ -29,8 +30,6 @@ class Settings(BaseSettings):
     checkpoint_mode: str = "max"
     checkpoint_every_n_train_steps: int = 10_000
     checkpoint_path: str | None = "last"
-
-    wandb_api_key: str = "7290cd5cb94c29300893438a08b4b6aa844149f3"
 
     def print(self):
         for k, v in self.model_dump().items():

@@ -8,14 +8,14 @@ from tqdm import tqdm
 import clients
 import directories
 from item2vec.configs import Settings
-from item2vec.models import GraphBPRItem2Vec
+from item2vec.modules import GraphBPRItem2Vec
 from item2vec.volume import Volume
 
 RELEASE = "i2i"
 
 COMPANY_ID = "aboutpet"
 
-MODEL_NAME = "i2v"
+MODEL_NAME = "item2vec"
 
 VERSION = "v1"
 
@@ -52,7 +52,7 @@ def debug(
     print("=" * 20)
 
 
-def load_embeddings(volume: Volume, embed_dim: int = 256):
+def load_embeddings(volume: Volume, embed_dim: int = 256, num_layers: int = 2):
     model_path = f"{settings.checkpoint_dirpath}/last.ckpt"
     vocab_size = volume.vocab_size()
     item2vec_module = GraphBPRItem2Vec.load_from_checkpoint(
@@ -65,14 +65,14 @@ def load_embeddings(volume: Volume, embed_dim: int = 256):
     item2vec_module.eval()
     item2vec_module.freeze()
 
-    embeddings = item2vec_module.get_graph_embeddings(num_layers=3)
+    embeddings = item2vec_module.get_graph_embeddings(num_layers=num_layers)
     return embeddings
 
 
 def upload(aggregated_scores: dict):
     pipeline = clients.redis.aiaas_6.pipeline()
     for pdid, scores in aggregated_scores.items():
-        key = f"{RELEASE}:{COMPANY_ID}:{MODEL_NAME}:{VERSION}:{pdid}"
+        key = f"{RELEASE}:{COMPANY_ID}:i2v:{VERSION}:{pdid}"
         pipeline.set(key, json.dumps(scores))
         pipeline.expire(key, 30 * 24 * 60 * 60)
     pipeline.execute()
@@ -83,7 +83,7 @@ def upload(aggregated_scores: dict):
 def main(embed_dim=128, k: int = 100, batch_size: int = 1000):
     volume = Volume(company_id="aboutpet", model="item2vec", version="v1")
 
-    embeddings = load_embeddings(volume, embed_dim=embed_dim)
+    embeddings = load_embeddings(volume, embed_dim=embed_dim, num_layers=settings.num_layers)
     items = volume.items(by="pidx")
 
     unknown_pidxs = [x["pidx"] for x in items.values() if x["name"] == "UNKNOWN"]

@@ -25,5 +25,3 @@ checkpoint_filename: "{epoch}-{step}-{train_loss:.2f}"
 checkpoint_mode: "max"
 checkpoint_every_n_train_steps: 10000
 checkpoint_path: "last"
-
-wandb_api_key: "7290cd5cb94c29300893438a08b4b6aa844149f3"

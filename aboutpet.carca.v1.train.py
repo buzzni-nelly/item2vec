@@ -15,16 +15,14 @@ from pytorch_lightning.loggers import WandbLogger
 
 from item2vec.configs import Settings
 from item2vec.volume import Volume
-from item2vec.models import GraphBPRItem2Vec
-from reranker.carca import CarcaDataModule, CARCA
+from item2vec.modules import GraphBPRItem2Vec
+from reranker.modules import CarcaDataModule, CARCA
 
 item2vec_config_path = directories.config("aboutpet", "item2vec", "v1")
 item2vec_settings = item2vec.configs.Settings.load(item2vec_config_path)
 
 carca_config_path = directories.config("aboutpet", "carca", "v1")
 carca_settings = reranker.configs.Settings.load(carca_config_path)
-
-os.environ["WANDB_API_KEY"] = carca_settings.wandb_api_key
 
 # Models
 EMBED_DIM = carca_settings.embed_dim
@@ -73,6 +71,7 @@ def main():
         vocab_size=volume.vocab_size(),
         purchase_edge_index_path=volume.workspace_path.joinpath("edge.purchase.indices.csv"),
         embed_dim=item2vec_settings.embed_dim,
+        num_layers=item2vec_settings.num_layers,
     )
 
     carca = CARCA(
@@ -86,7 +85,7 @@ def main():
         weight_decay=WEIGHT_DECAY,
     )
 
-    item_embeddings = item2vec_module.get_graph_embeddings()
+    item_embeddings = item2vec_module.get_graph_embeddings(num_layers=item2vec_settings.num_layers)
     carca.import_item_embeddings(item_embeddings)
 
     datamodule = CarcaDataModule(
