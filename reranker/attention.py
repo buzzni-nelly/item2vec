@@ -166,7 +166,8 @@ class TransformerEncoder(nn.Module):
         torch._C._log_api_usage_once(f"torch.nn.modules.{self.__class__.__name__}")
         self.layers = _get_clones(encoder_layer, num_layers)
         self.num_layers = num_layers
-        self.layer_norm = LayerNorm(128)
+        # item2vec pretrained 된 임베딩을 사용하기 때문에 필요 없는듯.. (성능 하락)
+        # self.layer_norm = LayerNorm(128)
         self.norm = norm
         self.mask_check = mask_check
 
@@ -209,7 +210,7 @@ class TransformerEncoder(nn.Module):
 
         weights = []
         for mod in self.layers:
-            q = self.layer_norm(q)
+            # q = self.layer_norm(q)
             output, weight = mod(
                 q,
                 k,
@@ -217,8 +218,8 @@ class TransformerEncoder(nn.Module):
                 src_mask=mask,
                 is_causal=is_causal,
                 src_key_padding_mask=src_key_padding_mask,
-                residual_strategy_1="multiply",
-                residual_strategy_2="multiply"
+                residual_strategy_1="sum",
+                residual_strategy_2="sum"
             )
             q, k, v = output, output, output
             weights.append(weight)
@@ -292,8 +293,8 @@ class TransformerDecoder(nn.Module):
                 src_mask=mask,
                 is_causal=is_causal,
                 src_key_padding_mask=src_key_padding_mask,
-                residual_strategy_1="none",
-                residual_strategy_2="none"
+                residual_strategy_1="sum",
+                residual_strategy_2="sum"
             )
             q = output
             weights.append(weight)
