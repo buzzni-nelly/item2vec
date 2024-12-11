@@ -71,6 +71,7 @@ def main():
         vocab_size=volume.vocab_size(),
         purchase_edge_index_path=volume.workspace_path.joinpath("edge.purchase.indices.csv"),
         embed_dim=item2vec_settings.embed_dim,
+        num_layers=item2vec_settings.num_layers,
     )
 
     carca = CARCA(

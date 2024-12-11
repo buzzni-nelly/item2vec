@@ -1,11 +1,8 @@
-import os
-
-import directories
-
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from pytorch_lightning.loggers import WandbLogger
 
+import directories
 from item2vec.configs import Settings
 from item2vec.datasets import SkipGramBPRDataModule
 from item2vec.modules import GraphBPRItem2Vec
@@ -15,6 +12,7 @@ settings = Settings.load(directories.config("gsshop", "item2vec", "v1"))
 
 # Models
 EMBED_DIM = settings.embed_dim
+NUM_LAYERS = settings.num_layers
 
 # Optimizers and training envs
 LR = settings.lr
@@ -64,6 +62,7 @@ def main():
         embed_dim=EMBED_DIM,
         lr=LR,
         weight_decay=WEIGHT_DECAY,
+        num_layers=NUM_LAYERS,
     )
 
     trainer = Trainer(
