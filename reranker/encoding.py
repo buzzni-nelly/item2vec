@@ -20,9 +20,10 @@ class PositionalEncoding(nn.Module):
         pe = pe.unsqueeze(0)
         self.register_buffer("pe", pe)
 
-    def forward(self, x):
-        x = x + self.pe[:, : x.size(1)]
-        return x
+    def forward(self, x, combine: bool = True):
+        if combine:
+            return x + self.pe[:, : x.size(1)]
+        return self.pe[:, : x.size(1)]
 
 
 class RotaryEncoding(nn.Module):

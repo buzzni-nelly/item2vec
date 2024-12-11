@@ -17,7 +17,7 @@ class TransformerEncoderLayer(nn.Module):
 
     def __init__(
         self,
-        d_model: int,
+        embed_dim: int,
         nhead: int,
         dim_feedforward: int = 2048,
         dropout: float = 0.1,
@@ -32,7 +32,7 @@ class TransformerEncoderLayer(nn.Module):
         factory_kwargs = {"device": device, "dtype": dtype}
         super().__init__()
         self.self_attn = MultiheadAttention(
-            d_model,
+            embed_dim,
             nhead,
             dropout=dropout,
             bias=bias,
@@ -40,13 +40,13 @@ class TransformerEncoderLayer(nn.Module):
             **factory_kwargs,
         )
         # Implementation of Feedforward model
-        self.linear1 = Linear(d_model, dim_feedforward, bias=bias, **factory_kwargs)
+        self.linear1 = Linear(embed_dim, dim_feedforward, bias=bias, **factory_kwargs)
         self.dropout = Dropout(dropout)
-        self.linear2 = Linear(dim_feedforward, d_model, bias=bias, **factory_kwargs)
+        self.linear2 = Linear(dim_feedforward, embed_dim, bias=bias, **factory_kwargs)
 
         self.norm_first = norm_first
-        self.norm1 = LayerNorm(d_model, eps=layer_norm_eps, bias=bias, **factory_kwargs)
-        self.norm2 = LayerNorm(d_model, eps=layer_norm_eps, bias=bias, **factory_kwargs)
+        self.norm1 = LayerNorm(embed_dim, eps=layer_norm_eps, bias=bias, **factory_kwargs)
+        self.norm2 = LayerNorm(embed_dim, eps=layer_norm_eps, bias=bias, **factory_kwargs)
         self.dropout1 = Dropout(dropout)
         self.dropout2 = Dropout(dropout)
         self.activation = activation
@@ -315,14 +315,14 @@ class CrossAttention(nn.Module):
     ):
         super(CrossAttention, self).__init__()
         encoder_layer = TransformerEncoderLayer(
-            d_model=embed_dim,
+            embed_dim=embed_dim,
             nhead=num_heads,
             dropout=dropout,
             activation=F.gelu,
             batch_first=True,
         )
         decoder_layer = TransformerEncoderLayer(
-            d_model=embed_dim,
+            embed_dim=embed_dim,
             nhead=num_heads,
             dropout=dropout,
             activation=F.gelu,

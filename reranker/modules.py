@@ -55,21 +55,7 @@ class CARCA(pl.LightningModule):
         last_idxs: torch.Tensor,
         candidate_idxs: torch.Tensor = None,
     ):
-        embeddings = self.item_embeddings(input_seqs)
-        embeddings = self.dropout(embeddings)
-        embeddings = self.position_embeddings(embeddings)
-
-        logits, _ = self.cross_attention(embeddings, src_key_padding_mask=src_key_padding_mask)
-        output = logits[torch.arange(logits.size(0)), last_idxs]
-
-        if candidate_idxs is not None:
-            candidate_embeddings = self.cross_attention.item_embeddings.weight[candidate_idxs]
-            scores = torch.matmul(output, candidate_embeddings.T)
-        else:
-            candidate_embeddings = self.cross_attention.item_embeddings.weight[:-2]
-            scores = torch.matmul(output, candidate_embeddings.T)
-
-        return scores
+        pass
 
     def training_step(self, batch: list[torch.Tensor], idx: int):
         # input_seqs shape: (256, 50)
@@ -81,7 +67,7 @@ class CARCA(pl.LightningModule):
 
         embeddings = self.item_embeddings(input_seqs)
         embeddings = self.dropout(embeddings)
-        embeddings = self.position_embeddings(embeddings)
+        embeddings = self.position_embeddings(embeddings, combine=True)
 
         # logits shape: (256, 50, 128)
         logits, _ = self.cross_attention(embeddings, src_key_padding_mask=src_key_padding_mask)
