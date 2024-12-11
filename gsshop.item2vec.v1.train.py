@@ -13,8 +13,6 @@ from item2vec.volume import Volume
 
 settings = Settings.load(directories.config("gsshop", "item2vec", "v1"))
 
-os.environ["WANDB_API_KEY"] = settings.wandb_api_key
-
 # Models
 EMBED_DIM = settings.embed_dim
 

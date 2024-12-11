@@ -64,12 +64,14 @@ class GraphBPRItem2Vec(pl.LightningModule):
         lr: float = 1e-3,
         weight_decay: float = 1e-2,
         dropout: float = 0.0,
+        num_layers: int = 2,
     ):
         super(GraphBPRItem2Vec, self).__init__()
         self.lr = lr
         self.weight_decay = weight_decay
         self.vocab_size = vocab_size
         self.embed_dim = embed_dim
+        self.num_layers = num_layers
 
         edge_df = pd.read_csv(purchase_edge_index_path.as_posix())
         sources, targets = edge_df["source"].values, edge_df["target"].values
@@ -121,7 +123,7 @@ class GraphBPRItem2Vec(pl.LightningModule):
         # seq_margins = 5 * seq_margins # val_graph_dot_ndcg@20=0.360
         seq_margins = 1 * seq_margins
 
-        embeddings = self.get_graph_embeddings(num_layers=3)
+        embeddings = self.get_graph_embeddings(num_layers=self.num_layers)
         seq_focus_embeddings = embeddings[seq_focus_items]
         seq_pos_embeddings = embeddings[seq_pos_items]
         seq_neg_embeddings = embeddings[seq_neg_items]
@@ -136,7 +138,7 @@ class GraphBPRItem2Vec(pl.LightningModule):
     def validation_step(self, batch: torch.Tensor, batch_idx: int) -> None:
         sources, labels = batch
         vanilla_embeddings = self.item2vec()
-        graph_embeddings = self.get_graph_embeddings(num_layers=3)
+        graph_embeddings = self.get_graph_embeddings(num_layers=self.num_layers)
 
         cos_ndcg = self.calc_cosine_ndcg(vanilla_embeddings, sources, labels, k=20)
         dot_ndcg = self.calc_dot_product_ndcg(vanilla_embeddings, sources, labels, k=20)

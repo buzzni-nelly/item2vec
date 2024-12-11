@@ -24,8 +24,6 @@ item2vec_settings = item2vec.configs.Settings.load(item2vec_config_path)
 carca_config_path = directories.config("aboutpet", "carca", "v1")
 carca_settings = reranker.configs.Settings.load(carca_config_path)
 
-os.environ["WANDB_API_KEY"] = carca_settings.wandb_api_key
-
 # Models
 EMBED_DIM = carca_settings.embed_dim
 NUM_HEADS = carca_settings.num_heads
@@ -86,7 +84,7 @@ def main():
         weight_decay=WEIGHT_DECAY,
     )
 
-    item_embeddings = item2vec_module.get_graph_embeddings()
+    item_embeddings = item2vec_module.get_graph_embeddings(num_layers=item2vec_settings.num_layers)
     carca.import_item_embeddings(item_embeddings)
 
     datamodule = CarcaDataModule(
