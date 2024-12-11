@@ -249,7 +249,7 @@ class CarcaTrainDataset(Dataset):
 
 class CarcaValidDataset(Dataset):
     def __init__(self, volume: Volume, max_len: int = 50):
-        self.histories = volume.migrate_user_histories(condition='greater')
+        self.histories = volume.migrate_user_histories(condition="greater")
         self.num_items = volume.vocab_size()
         self.mask_token_idx = self.num_items + 0
         self.pad_token_idx = self.num_items + 1
@@ -295,7 +295,7 @@ class CarcaDataModule(pl.LightningDataModule):
             persistent_workers=bool(self.num_workers > 0),
             pin_memory=True,
             shuffle=True,
-            collate_fn=self.carca_collate_fn
+            collate_fn=self.carca_collate_fn,
         )
 
     def val_dataloader(self):

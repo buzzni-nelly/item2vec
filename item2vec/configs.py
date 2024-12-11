@@ -37,9 +37,10 @@ class Settings(BaseSettings):
             print(k, v)
 
     @staticmethod
-    def load(filepath: Path) -> 'Settings':
+    def load(filepath: Path) -> "Settings":
         with filepath.open("r") as file:
             config = yaml.safe_load(file)
             return Settings(**config)
+
 
 settings = Settings()

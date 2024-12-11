@@ -40,8 +40,9 @@ class Settings(BaseSettings):
             print(k, v)
 
     @staticmethod
-    def load(filepath: Path) -> 'Settings':
+    def load(filepath: Path) -> "Settings":
         import yaml
+
         with filepath.open("r") as file:
             config = yaml.safe_load(file)
             return Settings(**config)

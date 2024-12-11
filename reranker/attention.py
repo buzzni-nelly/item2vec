@@ -108,7 +108,7 @@ class TransformerEncoderLayer(nn.Module):
         attn_mask: Optional[Tensor],
         key_padding_mask: Optional[Tensor],
         is_causal: bool = False,
-        need_weights: bool = False
+        need_weights: bool = False,
     ) -> tuple[Tensor, Tensor]:
         x, weights = self.self_attn(
             k,
@@ -291,6 +291,7 @@ def _generate_square_subsequent_mask(
         diagonal=1,
     )
 
+
 def _get_seq_len(src: Tensor, batch_first: bool) -> Optional[int]:
     if src.is_nested:
         return None
@@ -304,9 +305,11 @@ def _get_seq_len(src: Tensor, batch_first: bool) -> Optional[int]:
             seq_len_pos = 1 if batch_first else 0
             return src_size[seq_len_pos]
 
+
 def _get_clones(module, N):
     # FIXME: copy.deepcopy() is not defined on nn.module
     return ModuleList([copy.deepcopy(module) for i in range(N)])
+
 
 def _detect_is_causal_mask(
     mask: Optional[Tensor],
@@ -337,9 +340,7 @@ def _detect_is_causal_mask(
 
     if is_causal is None and mask is not None:
         sz = size if size is not None else mask.size(-2)
-        causal_comparison = _generate_square_subsequent_mask(
-            sz, device=mask.device, dtype=mask.dtype
-        )
+        causal_comparison = _generate_square_subsequent_mask(sz, device=mask.device, dtype=mask.dtype)
 
         # Do not use `torch.equal` so we handle batched masks by
         # broadcasting the comparison.

@@ -4,9 +4,4 @@ from reranker import configs
 from reranker import encoding
 
 
-__all__ = [
-    "attention",
-    "carca",
-    "configs",
-    "encoding"
-]
+__all__ = ["attention", "carca", "configs", "encoding"]

@@ -175,13 +175,8 @@ class Trace(Base):
         ]
 
     @staticmethod
-    def get_last_trace(session: Session) -> 'Trace | None':
-        return (
-            session.query(Trace)
-            .order_by(Trace.id.desc())
-            .limit(1)
-            .one_or_none()
-        )
+    def get_last_trace(session: Session) -> "Trace | None":
+        return session.query(Trace).order_by(Trace.id.desc()).limit(1).one_or_none()
 
     @staticmethod
     def insert_traces(session: Session, traces: list[dict]):
@@ -228,14 +223,14 @@ class Trace(Base):
     def aggregate_user_histories(
         session: Session,
         threshold: float = None,
-        condition: Literal['greater', 'smaller'] = 'smaller',
-        min_purchase_count:int=1,
+        condition: Literal["greater", "smaller"] = "smaller",
+        min_purchase_count: int = 1,
     ):
-        if condition not in ['greater', 'smaller']:
+        if condition not in ["greater", "smaller"]:
             raise Exception("condition must be 'greater' or 'smaller'")
 
         threshold = threshold or (Trace.get_last_trace(session).timestamp - 24 * 60 * 60)
-        operator = ">=" if condition == 'greater' else '<'
+        operator = ">=" if condition == "greater" else "<"
 
         query = text(
             f"""
@@ -361,17 +356,19 @@ class Volume:
 
         products_dict = {}
         for i in tqdm(range(0, len(pdids), chunk_size), desc="MongoDB 에서 product 정보를 가져옵니다."):
-            chunk_pdids = pdids[i:i + chunk_size]
+            chunk_pdids = pdids[i : i + chunk_size]
             products = clients.mongo.p32712.list_products(chunk_pdids, company_id=self.company_id)
-            products_dict.update({
-                x["_id"]: {
-                    "name": x.get("name") or "UNKNOWN",
-                    "category1": (x.get("category1") or "UNKNOWN").replace("*", "").replace("_", ""),
-                    "category2": (x.get("category2") or "UNKNOWN").replace("*", "").replace("_", ""),
-                    "category3": (x.get("category3") or "UNKNOWN").replace("*", "").replace("_", ""),
+            products_dict.update(
+                {
+                    x["_id"]: {
+                        "name": x.get("name") or "UNKNOWN",
+                        "category1": (x.get("category1") or "UNKNOWN").replace("*", "").replace("_", ""),
+                        "category2": (x.get("category2") or "UNKNOWN").replace("*", "").replace("_", ""),
+                        "category3": (x.get("category3") or "UNKNOWN").replace("*", "").replace("_", ""),
+                    }
+                    for x in products
                 }
-                for x in products
-            })
+            )
 
         items, pidx = [], 0
         for pdid, purchase_count, click_count in aggregates:
@@ -416,7 +413,7 @@ class Volume:
     def migrate_user_histories(
         self,
         threshold: float = None,
-        condition: Literal['greater', 'smaller'] = 'smaller',
+        condition: Literal["greater", "smaller"] = "smaller",
         min_purchase_count: int = 1,
     ):
         histories = Trace.aggregate_user_histories(
