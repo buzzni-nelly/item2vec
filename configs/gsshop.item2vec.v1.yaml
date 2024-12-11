@@ -1,10 +1,10 @@
-embed_dim: 128  # 32
+embed_dim: 64  # 32
 
 lr: 0.001
 weight_decay: 0.01
 
 datamodule_batch_size: 4096  # 2048
-datamodule_num_workers: 10
+datamodule_num_workers: 2
 datamodule_negative_k: 10
 
 trainer_max_epochs: 3

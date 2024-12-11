@@ -3,7 +3,7 @@ embed_dim: 128  # 32
 lr: 0.001
 weight_decay: 0.01
 
-datamodule_batch_size: 256
+datamodule_batch_size: 1024
 datamodule_num_workers: 10
 datamodule_negative_k: 10
 

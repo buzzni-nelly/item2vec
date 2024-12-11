@@ -18,10 +18,12 @@ from item2vec.volume import Volume
 from item2vec.models import GraphBPRItem2Vec
 from reranker.carca import CarcaDataModule, CARCA
 
-item2vec_config_path = directories.config("aboutpet", "item2vec", "v1")
+torch.set_float32_matmul_precision('medium')
+
+item2vec_config_path = directories.config("gsshop", "item2vec", "v1")
 item2vec_settings = item2vec.configs.Settings.load(item2vec_config_path)
 
-carca_config_path = directories.config("aboutpet", "carca", "v1")
+carca_config_path = directories.config("gsshop", "carca", "v1")
 carca_settings = reranker.configs.Settings.load(carca_config_path)
 
 os.environ["WANDB_API_KEY"] = carca_settings.wandb_api_key
@@ -66,7 +68,7 @@ WANDB_CONFIG = carca_settings.dict()
 def main():
     carca_settings.print()
 
-    volume = Volume(company_id="aboutpet", model="item2vec", version="v1")
+    volume = Volume(company_id="gsshop", model="item2vec", version="v1")
 
     item2vec_module = GraphBPRItem2Vec.load_from_checkpoint(
         f"{item2vec_settings.checkpoint_dirpath}/last.ckpt",
