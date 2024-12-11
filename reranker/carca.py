@@ -122,8 +122,13 @@ class CARCA(pl.LightningModule):
         # positive_idxs shape: (256, 2)
         # negative_idxs shape: (256, 2)
         input_seqs, src_key_padding_mask, masked_idxs, positive_idxs, negative_idxs = batch
+
+        embeddings = self.item_embeddings(input_seqs)
+        embeddings = self.dropout(embeddings)
+        embeddings = self.position_embeddings(embeddings)
+
         # logits shape: (256, 50, 128)
-        logits, _ = self.cross_attention(input_seqs, src_key_padding_mask=src_key_padding_mask)
+        logits, _ = self.cross_attention(embeddings, src_key_padding_mask=src_key_padding_mask)
         # batch_indices shape: (256, 1)
         batch_indices = torch.arange(logits.size(0)).unsqueeze(1).to(self.device)
         # output shape: (256, 2, 128)
@@ -131,8 +136,8 @@ class CARCA(pl.LightningModule):
 
         # positive_embeddings shape: (256, 2, 128)
         # negative_embeddings shape: (256, 2, 128)
-        positive_embeddings = self.cross_attention.item_embeddings.weight[positive_idxs]
-        negative_embeddings = self.cross_attention.item_embeddings.weight[negative_idxs]
+        positive_embeddings = self.item_embeddings.weight[positive_idxs]
+        negative_embeddings = self.item_embeddings.weight[negative_idxs]
 
         # positive_scores shape: (256, 2)
         # negative_scores shape: (256, 2)
@@ -146,9 +151,14 @@ class CARCA(pl.LightningModule):
 
     def validation_step(self, batch: list[torch.Tensor], idx: int):
         input_seqs, src_key_padding_mask, last_idxs, ground_truth_items = batch
-        logits, _ = self.cross_attention(input_seqs, src_key_padding_mask=src_key_padding_mask)
+
+        embeddings = self.item_embeddings(input_seqs)
+        embeddings = self.dropout(embeddings)
+        embeddings = self.position_embeddings(embeddings)
+
+        logits, _ = self.cross_attention(embeddings, src_key_padding_mask=src_key_padding_mask)
         output = logits[torch.arange(logits.size(0)), last_idxs, :]
-        scores = torch.matmul(output, self.cross_attention.item_embeddings.weight[:-2].T)
+        scores = torch.matmul(output, self.item_embeddings.weight[:-2].T)
 
         mrr = self.calc_mrr(scores, ground_truth_items)
         self.log("val_mrr", mrr, prog_bar=True)
@@ -204,7 +214,7 @@ class CARCA(pl.LightningModule):
         mask_embeddings = torch.zeros((1, item_embeddings.size(1))).to(item_embeddings.device)
         padding_embeddings = torch.zeros((1, item_embeddings.size(1))).to(item_embeddings.device)
         extended_embeddings = torch.cat([item_embeddings, mask_embeddings, padding_embeddings], dim=0)
-        self.cross_attention.item_embeddings.weight.data.copy_(extended_embeddings)
+        self.item_embeddings.weight.data.copy_(extended_embeddings)
 
 
 class CarcaTrainDataset(Dataset):
