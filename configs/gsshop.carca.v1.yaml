@@ -1,4 +1,4 @@
-embed_dim: 64
+embed_dim: 128
 num_heads: 1
 num_layers: 1
 max_len: 50
