@@ -319,7 +319,7 @@ class CrossAttention(nn.Module):
         super(CrossAttention, self).__init__()
 
         self.Hd = embed_dim // num_heads
-        self.rotary_encoding_kv = RotaryEncoding(embed_dim, max_len)
+        # self.rotary_encoding_kv = RotaryEncoding(embed_dim, max_len)
 
         encoder_layer = TransformerEncoderLayer(
             embed_dim=embed_dim,
