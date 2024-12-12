@@ -346,8 +346,8 @@ class CrossAttention(nn.Module):
             src_key_padding_mask=src_key_padding_mask,
         )
 
-        k = self.rotary_encoding_kv(encoder_output)
-        v = self.rotary_encoding_kv(encoder_output)
+        k = encoder_output  # self.rotary_encoding_kv(encoder_output)  # 성능 하락함.
+        v = encoder_output  # self.rotary_encoding_kv(encoder_output)  # 성능 하락함.
         decoder_output, decoder_weights = self.transformer_decoder(
             x,  # query
             k,  # key
