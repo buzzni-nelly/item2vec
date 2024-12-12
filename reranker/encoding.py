@@ -26,81 +26,106 @@ class PositionalEncoding(nn.Module):
 
 
 class RotaryEncoding(nn.Module):
-    """
-    Module for applying rotary positional encoding to input sequences.
+    def __init__(self, dim: int, max_len: int = 512):
+        """
+        Rotary Encoding 모듈
+        Args:
+            dim (int): 임베딩 차원 (홀수 차원은 지원하지 않음)
+            max_len (int): 최대 길이
+        """
+        super(RotaryEncoding, self).__init__()
+        assert dim % 2 == 0, "Dimension must be even for Rotary Encoding."
 
-    This module incorporates positional information into input sequences using rotary positional encoding.
-    It supports two modes: concatenation and addition. In concatenation mode, the positional embeddings
-    are concatenated with the input, followed by a linear transformation. In addition mode, the positional
-    embeddings are added directly to the input.
+        self.dim = dim
+        self.max_len = max_len
+
+        # precompute sin and cos for efficiency
+        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)  # (max_len, 1)
+        div_term = torch.exp(torch.arange(0, dim, 2).float() * -(math.log(10000.0) / dim))  # (dim // 2,)
+        self.register_buffer('sin', torch.sin(position * div_term))  # (max_len, dim // 2)
+        self.register_buffer('cos', torch.cos(position * div_term))  # (max_len, dim // 2)
+
+    def forward(self, embeddings: torch.Tensor):
+        """
+        Args:
+            embeddings (torch.Tensor): (batch_size, seq_len, dim)
+        Returns:
+            torch.Tensor: Rotary Encoding이 적용된 embeddings
+        """
+        seq_len = embeddings.size(1)
+        assert seq_len <= self.max_len, f"Sequence length ({seq_len}) exceeds maximum length ({self.max_len})."
+
+        # Split into even and odd dimensions
+        embeddings_odd = embeddings[..., 0::2]
+        embeddings_even = embeddings[..., 1::2]
+
+        # Apply rotary encoding
+        sin = self.sin[:seq_len, :].unsqueeze(0)  # (1, seq_len, dim // 2)
+        cos = self.cos[:seq_len, :].unsqueeze(0)  # (1, seq_len, dim // 2)
+        embeddings_rotated = torch.cat([
+            embeddings_odd * cos - embeddings_even * sin,
+            embeddings_odd * sin + embeddings_even * cos
+        ], dim=-1)
+
+        return embeddings_rotated
+
+
+class RelativePosition(nn.Module):
+    """
+    Module for generating relative positional embeddings.
+
+    This module computes relative positional embeddings for sequences of given lengths.
+    It utilizes a learnable embeddings table that is initialized with Xavier uniform initialization.
 
     Args:
-    - config (object): Configuration object with the following attributes:
-        - position_concatenation (bool): Whether to concatenate positional embeddings with input.
-        - maxlen (int): Maximum length of input sequences.
-        - embedding_d (int): Dimensionality of the input embeddings.
+    - num_units (int): The number of embedding units for each position.
+    - max_relative_position (int): The maximum relative position allowed.
 
     Attributes:
-    - concat (bool): Whether to concatenate positional embeddings with input.
-    - position_embeddings (nn.Embedding): Embedding layer for positional embeddings.
-    - encoding (nn.Linear): Linear layer for concatenation mode.
+    - num_units (int): The number of embedding units for each position.
+    - max_relative_position (int): The maximum relative position allowed.
+    - embeddings_table (nn.Parameter): Learnable parameter representing the embeddings table.
 
     Methods:
-    - forward(x: Tensor) -> Tensor: Apply rotary positional encoding to input tensor.
+    - forward(length_q, length_k): Compute relative positional embeddings for given sequence lengths.
 
     Example:
-    >> config = Configuration(position_concatenation=True, maxlen=100, embedding_d=512)
-    >> rotary_encoder = RotaryPositionalEncoding(config)
-    >> input_tensor = torch.rand((batch_size, sequence_length, embedding_dim))
-    >> output_tensor = rotary_encoder(input_tensor)
+    >> relative_position = RelativePosition(num_units=512, max_relative_position=128)
+    >> embeddings = relative_position(10, 12)
     """
 
-    def __init__(self, config):
+    def __init__(self, num_units, max_relative_position):
         """
-        Initialize the RotaryPositionalEncoding module.
+        Initialize the RelativePosition module.
+
         Args:
-        - config (object): Configuration object with required attributes.
+        - num_units (int): The number of embedding units for each position.
+        - max_relative_position (int): The maximum relative position allowed.
 
         """
         super().__init__()
-        self.concat = config.position_concatenation
-        L, H = config.maxlen, config.embedding_d
-        self.position_embeddings = nn.Embedding(L, H)
-        if self.concat:
-            self.encoding = nn.Linear(H * 2, H)
+        self.num_units = num_units
+        self.max_relative_position = max_relative_position
+        self.embeddings_table = nn.Parameter(torch.Tensor(max_relative_position * 2 + 1, num_units))
+        nn.init.xavier_uniform_(self.embeddings_table)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, length_q, length_k):
         """
-        Apply rotary positional encoding to the input tensor.
+        Compute relative positional embeddings for given sequence lengths.
 
         Args:
-        - x (Tensor): Input tensor with shape (batch_size, sequence_length, embedding_dim).
+        - length_q (int): Length of the query sequence.
+        - length_k (int): Length of the key sequence.
 
         Returns:
-        Tensor: Output tensor after applying rotary positional encoding.
+        torch.Tensor: Relative positional embeddings for the given lengths.
 
         """
-        # position_ids => L x H, rows [ 0, 1, 2, ...,H]
-        position_ids = torch.arange(0, x.size(1), device=x.device).unsqueeze(0).expand(x.size(0), -1)
-        position_embeddings = self.position_embeddings(position_ids)
-
-        # Rotary Positional Encoding
-        angles = position_embeddings / 10000.0
-        angle_rads = angles[:, :, 0::2] * 2 * math.pi
-
-        sin_angles = torch.sin(angle_rads)
-        cos_angles = torch.cos(angle_rads)
-
-        # Add rotation
-        sin_angles = sin_angles * torch.tensor([(-1) ** i for i in range(sin_angles.size(-1))], device=x.device)
-
-        # Combine sine and cosine embeddings
-        position_embeddings[:, :, 0::2] = sin_angles
-        position_embeddings[:, :, 1::2] = cos_angles
-
-        if not self.concat:
-            x = x + position_embeddings
-        else:
-            x = torch.cat([x, position_embeddings], -1)
-            x = self.encoding(x)
-        return x
+        range_vec_q = torch.arange(length_q)
+        range_vec_k = torch.arange(length_k)
+        distance_mat = range_vec_k[None, :] - range_vec_q[:, None]
+        distance_mat_clipped = torch.clamp(distance_mat, -self.max_relative_position, self.max_relative_position)
+        final_mat = distance_mat_clipped + self.max_relative_position
+        final_mat = torch.LongTensor(final_mat).cuda()
+        embeddings = self.embeddings_table[final_mat].cuda()
+        return embeddings

@@ -45,6 +45,7 @@ class CARCA(pl.LightningModule):
             embed_dim=embed_dim,
             num_heads=num_heads,
             num_layers=num_layers,
+            max_len=max_len,
             dropout=dropout,
         )
 
