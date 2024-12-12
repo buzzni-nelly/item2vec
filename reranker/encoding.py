@@ -43,8 +43,8 @@ class RotaryEncoding(nn.Module):
         # precompute sin and cos for efficiency
         position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)  # (max_len, 1)
         div_term = torch.exp(torch.arange(0, dim, 2).float() * -(math.log(10000.0) / dim))  # (dim // 2,)
-        self.register_buffer('sin', torch.sin(position * div_term))  # (max_len, dim // 2)
-        self.register_buffer('cos', torch.cos(position * div_term))  # (max_len, dim // 2)
+        self.register_buffer("sin", torch.sin(position * div_term))  # (max_len, dim // 2)
+        self.register_buffer("cos", torch.cos(position * div_term))  # (max_len, dim // 2)
 
     def forward(self, embeddings: torch.Tensor):
         """
@@ -63,10 +63,13 @@ class RotaryEncoding(nn.Module):
         # Apply rotary encoding
         sin = self.sin[:seq_len, :].unsqueeze(0)  # (1, seq_len, dim // 2)
         cos = self.cos[:seq_len, :].unsqueeze(0)  # (1, seq_len, dim // 2)
-        embeddings_rotated = torch.cat([
-            embeddings_odd * cos - embeddings_even * sin,
-            embeddings_odd * sin + embeddings_even * cos
-        ], dim=-1)
+        embeddings_rotated = torch.cat(
+            [
+                embeddings_odd * cos - embeddings_even * sin,
+                embeddings_odd * sin + embeddings_even * cos,
+            ],
+            dim=-1,
+        )
 
         return embeddings_rotated
 

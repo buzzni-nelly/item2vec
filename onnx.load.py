@@ -13,8 +13,8 @@ num_items = 1000  # num_items은 실제 모델에 따라 변경 필요.
 
 # 더미 입력 데이터 (실제 데이터로 교체 가능)
 input_seqs = np.random.randint(0, num_items, (batch_size, max_len)).astype(np.int64)  # 입력 시퀀스
-src_key_padding_mask = np.random.randint(0, 2, (batch_size, max_len)).astype(bool)   # 패딩 마스크
-last_idxs = np.random.randint(0, max_len, (batch_size,)).astype(np.int64)            # 마지막 인덱스
+src_key_padding_mask = np.random.randint(0, 2, (batch_size, max_len)).astype(bool)  # 패딩 마스크
+last_idxs = np.random.randint(0, max_len, (batch_size,)).astype(np.int64)  # 마지막 인덱스
 candidate_idxs = np.random.randint(0, num_items, (batch_size, num_candidates)).astype(np.int64)  # 후보군 인덱스
 
 print("Model Inputs:")

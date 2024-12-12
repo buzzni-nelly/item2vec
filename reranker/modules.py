@@ -61,9 +61,11 @@ class CARCA(pl.LightningModule):
         seq_embeddings = self.dropout(seq_embeddings)
         seq_embeddings = self.position_embeddings(seq_embeddings, combine=True)
 
-        # Cross Attention
-        logits, _ = self.cross_attention(seq_embeddings,
-                                         src_key_padding_mask=src_key_padding_mask)  # (batch_size, seq_len, embed_dim)
+        # (batch_size, seq_len, embed_dim)
+        logits, _ = self.cross_attention(
+            seq_embeddings,
+            src_key_padding_mask=src_key_padding_mask,
+        )
 
         # Masked Index에서 Output 추출
         batch_indices = torch.arange(logits.size(0)).unsqueeze(1).to(self.device)  # (batch_size, 1)
@@ -75,14 +77,14 @@ class CARCA(pl.LightningModule):
         # Masked Output과 Candidate Embeddings 간의 점수 계산
         scores = torch.matmul(output, candidate_embeddings.transpose(1, 2))  # (batch_size, num_masked, num_candidates)
 
-        # scores를 기준으로 정렬 (내림차순)
-        sorted_scores, sorted_indices = torch.sort(scores, dim=-1, descending=True)  # (batch_size, num_masked, num_candidates)
+        # (batch_size, num_masked, num_candidates)
+        sorted_scores, sorted_indices = torch.sort(scores, dim=-1, descending=True)
 
-        # candidate_idxs의 차원을 num_masked에 맞게 확장
-        candidate_idxs = candidate_idxs.unsqueeze(1).expand(-1, sorted_scores.size(1), -1)  # (batch_size, num_masked, num_candidates)
+        # (batch_size, num_masked, num_candidates)
+        candidate_idxs = candidate_idxs.unsqueeze(1).expand(-1, sorted_scores.size(1), -1)
 
-        # candidate_idxs를 scores 순위에 맞게 정렬
-        sorted_candidate_idxs = torch.gather(candidate_idxs, 2, sorted_indices)  # (batch_size, num_masked, num_candidates)
+        # (batch_size, num_masked, num_candidates)
+        sorted_candidate_idxs = torch.gather(candidate_idxs, 2, sorted_indices)
 
         return sorted_scores, sorted_candidate_idxs
 

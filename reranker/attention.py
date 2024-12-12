@@ -67,8 +67,8 @@ class TransformerEncoderLayer(nn.Module):
         src_key_padding_mask: Optional[Tensor] = None,
         is_causal: bool = False,
         need_weights: bool = False,
-        residual_strategy_1: Literal['sum', 'multiply', 'none'] = "sum",
-        residual_strategy_2: Literal['sum', 'multiply', 'none'] = "sum"
+        residual_strategy_1: Literal["sum", "multiply", "none"] = "sum",
+        residual_strategy_2: Literal["sum", "multiply", "none"] = "sum",
     ) -> tuple[Tensor, Tensor]:
 
         assert q.dtype == k.dtype == v.dtype, "k, q, v must have the same dtype"
@@ -221,7 +221,7 @@ class TransformerEncoder(nn.Module):
                 is_causal=is_causal,
                 src_key_padding_mask=src_key_padding_mask,
                 residual_strategy_1="sum",
-                residual_strategy_2="sum"
+                residual_strategy_2="sum",
             )
             q, k, v = output, output, output
             weights.append(weight)
@@ -296,7 +296,7 @@ class TransformerDecoder(nn.Module):
                 is_causal=is_causal,
                 src_key_padding_mask=src_key_padding_mask,
                 residual_strategy_1="sum",
-                residual_strategy_2="sum"
+                residual_strategy_2="sum",
             )
             q = output
             weights.append(weight)
