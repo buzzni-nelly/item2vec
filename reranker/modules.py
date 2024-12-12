@@ -56,6 +56,9 @@ class CARCA(pl.LightningModule):
         masked_idxs: torch.Tensor,
         candidate_idxs: torch.Tensor,
     ):
+        input_seqs[src_key_padding_mask] = self.pad_token_idx
+        input_seqs = input_seqs.scatter(1, masked_idxs.unsqueeze(-1), self.mask_token_idx)
+
         # Embedding 계산
         seq_embeddings = self.item_embeddings(input_seqs)  # (batch_size, seq_len, embed_dim)
         seq_embeddings = self.dropout(seq_embeddings)
