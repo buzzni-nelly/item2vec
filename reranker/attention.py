@@ -316,10 +316,11 @@ class CrossAttention(nn.Module):
         max_len: int = 50,
         dropout=0.1,
     ):
+        super(CrossAttention, self).__init__()
+
         self.Hd = embed_dim // num_heads
         self.rotary_encoding_kv = RotaryEncoding(embed_dim, max_len)
 
-        super(CrossAttention, self).__init__()
         encoder_layer = TransformerEncoderLayer(
             d_model=embed_dim,
             nhead=num_heads,
@@ -339,9 +340,9 @@ class CrossAttention(nn.Module):
 
     def forward(self, x: torch.Tensor, src_key_padding_mask: torch.Tensor) -> tuple[Tensor, Tensor]:
         encoder_output, encoder_weights = self.transformer_encoder(
-            x,
-            x,
-            x,
+            x,  # query
+            x,  # key
+            x,  # value
             src_key_padding_mask=src_key_padding_mask,
         )
 
