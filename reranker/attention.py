@@ -10,6 +10,8 @@ from torch.nn import LayerNorm
 from torch.nn import Linear
 from torch.nn import MultiheadAttention
 
+from reranker.encoding import RotaryEncoding
+
 
 class TransformerEncoderLayer(nn.Module):
 
@@ -311,9 +313,14 @@ class CrossAttention(nn.Module):
         embed_dim: int,
         num_heads: int,
         num_layers: int,
+        max_len: int = 50,
         dropout=0.1,
     ):
         super(CrossAttention, self).__init__()
+
+        self.Hd = embed_dim // num_heads
+        self.rotary_encoding_kv = RotaryEncoding(embed_dim, max_len)
+
         encoder_layer = TransformerEncoderLayer(
             embed_dim=embed_dim,
             nhead=num_heads,
@@ -333,15 +340,18 @@ class CrossAttention(nn.Module):
 
     def forward(self, x: torch.Tensor, src_key_padding_mask: torch.Tensor) -> tuple[Tensor, Tensor]:
         encoder_output, encoder_weights = self.transformer_encoder(
-            x,
-            x,
-            x,
+            x,  # query
+            x,  # key
+            x,  # value
             src_key_padding_mask=src_key_padding_mask,
         )
+
+        k = encoder_output  # self.rotary_encoding_kv(encoder_output)  # 성능 하락함.
+        v = encoder_output  # self.rotary_encoding_kv(encoder_output)  # 성능 하락함.
         decoder_output, decoder_weights = self.transformer_decoder(
-            x,
-            encoder_output,
-            encoder_output,
+            x,  # query
+            k,  # key
+            v,  # value
             src_key_padding_mask=src_key_padding_mask,
         )
         return decoder_output, decoder_weights
