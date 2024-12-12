@@ -4,8 +4,8 @@ num_layers: 0
 lr: 0.001
 weight_decay: 0.01
 
-datamodule_batch_size: 4096  # 2048
-datamodule_num_workers: 2
+datamodule_batch_size: 2048  # 2048
+datamodule_num_workers: 1
 datamodule_negative_k: 10
 
 trainer_max_epochs: 3
