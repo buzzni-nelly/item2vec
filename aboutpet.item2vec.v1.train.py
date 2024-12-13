@@ -1,15 +1,9 @@
-import os
-
-import directories
-from item2vec.configs import Settings
-
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
-os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
-
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from pytorch_lightning.loggers import WandbLogger
 
+import directories
+from item2vec.configs import Settings
 from item2vec.datasets import SkipGramBPRDataModule
 from item2vec.modules import GraphBPRItem2Vec
 from item2vec.volume import Volume

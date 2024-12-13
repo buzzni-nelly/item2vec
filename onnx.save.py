@@ -1,12 +1,12 @@
 import torch
 
 import directories
-import reranker
+import carca
 from item2vec.volume import Volume
-from reranker.modules import CARCA
+from carca.modules import CARCA
 
 carca_config_path = directories.config("aboutpet", "carca", "v1")
-carca_settings = reranker.configs.Settings.load(carca_config_path)
+carca_settings = carca.configs.Settings.load(carca_config_path)
 
 volume = Volume(company_id="aboutpet", model="item2vec", version="v1")
 

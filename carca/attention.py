@@ -10,7 +10,7 @@ from torch.nn import LayerNorm
 from torch.nn import Linear
 from torch.nn import MultiheadAttention
 
-from reranker.encoding import RotaryEncoding
+from carca.encoding import RotaryEncoding
 
 
 class TransformerEncoderLayer(nn.Module):

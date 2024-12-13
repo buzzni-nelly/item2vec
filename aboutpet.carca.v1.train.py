@@ -1,28 +1,21 @@
-import os
-
 import torch
-
-import directories
-import item2vec
-import reranker
-
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
-os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
-
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from pytorch_lightning.loggers import WandbLogger
 
+import carca
+import directories
+import item2vec
+from carca.modules import CarcaDataModule, CARCA
 from item2vec.configs import Settings
-from item2vec.volume import Volume
 from item2vec.modules import GraphBPRItem2Vec
-from reranker.modules import CarcaDataModule, CARCA
+from item2vec.volume import Volume
 
 item2vec_config_path = directories.config("aboutpet", "item2vec", "v1")
 item2vec_settings = item2vec.configs.Settings.load(item2vec_config_path)
 
 carca_config_path = directories.config("aboutpet", "carca", "v1")
-carca_settings = reranker.configs.Settings.load(carca_config_path)
+carca_settings = carca.configs.Settings.load(carca_config_path)
 
 # Models
 EMBED_DIM = carca_settings.embed_dim

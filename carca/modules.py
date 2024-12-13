@@ -8,8 +8,8 @@ from torch.optim import Optimizer
 from torch.utils.data import Dataset, DataLoader
 
 from item2vec.volume import Volume
-from reranker.attention import CrossAttention
-from reranker.encoding import PositionalEncoding
+from carca.attention import CrossAttention
+from carca.encoding import PositionalEncoding
 
 
 class CARCA(pl.LightningModule):
