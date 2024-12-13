@@ -165,7 +165,6 @@ class TransformerEncoder(nn.Module):
         mask_check: bool = True,
     ) -> None:
         super().__init__()
-        torch._C._log_api_usage_once(f"torch.nn.modules.{self.__class__.__name__}")
         self.layers = _get_clones(encoder_layer, num_layers)
         self.num_layers = num_layers
         # item2vec pretrained 된 임베딩을 사용하기 때문에 필요 없는듯.. (성능 하락)
@@ -244,7 +243,6 @@ class TransformerDecoder(nn.Module):
         mask_check: bool = True,
     ) -> None:
         super().__init__()
-        torch._C._log_api_usage_once(f"torch.nn.modules.{self.__class__.__name__}")
         self.layers = _get_clones(encoder_layer, num_layers)
         self.num_layers = num_layers
         self.norm = norm
