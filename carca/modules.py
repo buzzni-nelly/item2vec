@@ -195,7 +195,7 @@ class CARCA(pl.LightningModule):
 
 class CarcaTrainDataset(Dataset):
     def __init__(self, volume: Volume, max_len: int = 50):
-        self.histories = volume.migrate_user_histories()
+        self.histories = volume.list_user_histories()
         self.num_items = volume.vocab_size()
         self.mask_token_idx = self.num_items + 0
         self.pad_token_idx = self.num_items + 1
@@ -235,7 +235,7 @@ class CarcaTrainDataset(Dataset):
 
 class CarcaValidDataset(Dataset):
     def __init__(self, volume: Volume, max_len: int = 50):
-        self.histories = volume.migrate_user_histories(condition="greater")
+        self.histories = volume.list_user_histories(condition="greater")
         self.num_items = volume.vocab_size()
         self.mask_token_idx = self.num_items + 0
         self.pad_token_idx = self.num_items + 1

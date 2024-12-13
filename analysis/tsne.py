@@ -9,10 +9,10 @@ from item2vec.modules import GraphBPRItem2Vec
 from item2vec.volume import Volume
 
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = ''
 
-model_path = "/tmp/checkpoints/last.ckpt"
-volume = Volume("aboutpet", "item2vec", "v1")
+model_path = "/tmp/gsshop/item2vec/v1/checkpoints/last.ckpt"
+volume = Volume("gsshop", "item2vec", "v1")
 
 item2vec_module = GraphBPRItem2Vec.load_from_checkpoint(
     model_path,
@@ -68,7 +68,7 @@ fig = px.scatter(
     result_df,
     x="x",
     y="y",
-    color="category2",
+    color="category1",
     hover_data=["name", "category1", "category2", "category3", "click_count"],
 )
 fig.update_traces(marker_size=8)

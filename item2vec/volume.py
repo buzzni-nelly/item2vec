@@ -662,6 +662,25 @@ class Volume:
     def count_sequential_pairs(self):
         return SequentialPair.count_sequential_pairs(self.session)
 
+    def list_user_histories(
+        self,
+        threshold: float = None,
+        condition: Literal["greater", "smaller"] = "smaller",
+        min_purchase_count: int = 1,
+    ):
+        histories = Trace.aggregate_user_histories(
+            self.session,
+            threshold=threshold,
+            condition=condition,
+            min_purchase_count=min_purchase_count,
+        )
+        histories = [x["pidxs"].split(",") for x in histories]
+        result = []
+        for history in histories:
+            for i in range(2, len(history)):
+                cumulative_ids = history[max(0, i - 50) : i]
+                result.append(list(map(int, cumulative_ids)))
+        return result
 
 if __name__ == "__main__":
     migrator = Migrator(company_id="aboutpet", model="item2vec", version="v1")
