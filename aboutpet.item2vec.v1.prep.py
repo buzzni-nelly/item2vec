@@ -8,7 +8,7 @@ if __name__ == "__main__":
     volume.migrate_traces(begin_date=datetime(2024, 8, 1))
     volume.migrate_items()
     volume.migrate_users()
-    volume.generate_sequential_pairs_csv()
+    volume.migrate_sequential_pairs()
     volume.generate_click_purchase_footstep_csv(begin_date=datetime.now() - timedelta(days=7))
     volume.generate_click_click_footstep_csv(begin_date=datetime.now() - timedelta(days=4))
     volume.generate_edge_indices_csv()

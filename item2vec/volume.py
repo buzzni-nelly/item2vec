@@ -67,7 +67,15 @@ class Item(Base):
     category3 = Column(String, nullable=False)
 
     @staticmethod
-    def list_items(session: Session):
+    def get_item_by_pdid(session: Session, pdid: str) -> 'Item':
+        return session.query(Item).filter(Item.pdid == pdid).scalar()
+
+    @staticmethod
+    def get_item_by_pidx(session: Session, pidx: int) -> 'Item':
+        return session.query(Item).filter(Item.pidx == pidx).scalar()
+
+    @staticmethod
+    def list_items(session: Session) -> list:
         return session.query(Item).all()
 
     @staticmethod
@@ -150,7 +158,11 @@ class Trace(Base):
     timestamp = Column(Float, nullable=False)
 
     @staticmethod
-    def list_traces(session: Session):
+    def count_traces(session: Session) -> int:
+        return session.query(func.count(Trace.id)).scalar()
+
+    @staticmethod
+    def list_traces(session: Session, chunk_size: int = 10_000_000):
         raw_query = text(
             """
             SELECT 
@@ -161,18 +173,16 @@ class Trace(Base):
             FROM trace
             INNER JOIN user ON trace.user_id = user.user_id
             INNER JOIN item ON trace.pdid = item.pdid
-        """
+            """
         )
-        results = session.execute(raw_query).fetchall()
-        return [
-            {
+        result = session.execute(raw_query).yield_per(chunk_size)
+        for row in result:
+            yield {
                 "uidx": row.uidx,
                 "pidx": row.pidx,
                 "event": row.event,
                 "timestamp": row.timestamp,
             }
-            for row in results
-        ]
 
     @staticmethod
     def get_last_trace(session: Session) -> "Trace | None":
@@ -297,6 +307,21 @@ class Trace(Base):
         return result
 
 
+class SequentialPair(Base):
+    __tablename__ = "sequential_pair"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    source_pidx = Column(Integer)
+    target_pidx = Column(Integer)
+    is_purchased = Column(Integer, nullable=False)
+
+    @staticmethod
+    def get_sequential_pair(session: Session, idx: int):
+        return session.query(SequentialPair).filter(SequentialPair.id == idx).one_or_none()
+
+    @staticmethod
+    def count_sequential_pairs(session: Session) -> int:
+        return session.query(func.count(SequentialPair.id)).scalar()
+
 class Volume:
 
     def __init__(self, company_id: str, model: str, version: str, workspaces_path: Path = None):
@@ -319,8 +344,6 @@ class Volume:
 
         self._items_by_pdid = None
         self._items_by_pidx = None
-        self._pidx2pdid = None
-        self._pdid2pidx = None
 
     def migrate_traces(self, begin_date: datetime):
         current_date = begin_date
@@ -430,6 +453,29 @@ class Volume:
                 result.append(list(map(int, cumulative_ids)))
         return result
 
+    def migrate_sequential_pairs(self, chunk_size=10_000_000):
+        sequential_pairs = self.generate_sequential_pairs()
+
+        rows = []
+        insert_query = text("""
+        INSERT INTO sequential_pair (source_pidx, target_pidx, is_purchased)
+        VALUES (:source_pidx, :target_pidx, :is_purchased)
+        """)
+
+        for x, y, z in tqdm(sequential_pairs, desc="Inserting pairs into sqlite3.."):
+            rows.append({"source_pidx": x, "target_pidx": y, "is_purchased": z})
+
+            if len(rows) >= chunk_size:
+                self.session.execute(insert_query, rows)
+                self.session.commit()
+                rows.clear()  # 버퍼 초기화
+
+        if rows:
+            self.session.execute(insert_query, rows)
+            self.session.commit()
+
+        print(f"Migration completed: {sequential_pairs} rows inserted.")
+
     def generate_sequential_pairs(self, window_size: int = 5, time_delta: int = 60 * 3):
         traces = Trace.list_traces(self.session)
         queue = collections.deque(maxlen=window_size)
@@ -458,15 +504,8 @@ class Volume:
 
                 if pidx_1 and pidx_2:
                     item_pairs.append((pidx_1, pidx_2, weight))
-                    item_pairs.append((pidx_2, pidx_1, weight))
-
+                    # item_pairs.append((pidx_2, pidx_1, weight))
         return item_pairs
-
-    def generate_sequential_pairs_csv(self):
-        item_pairs = self.generate_sequential_pairs()
-        pairs_df = pd.DataFrame(item_pairs, columns=["target", "positive", "is_purchased"], dtype=int)
-        csv_path = self.workspace_path.joinpath(f"item.sequential.pairs.csv")
-        pairs_df.to_csv(csv_path, index=False)
 
     def fetch_click_purchase_footstep(self, begin_date: datetime) -> list:
         begin_date = begin_date.strftime("%Y-%m-%d")
@@ -575,34 +614,38 @@ class Volume:
             return self._items_by_pidx
 
     def pidx2pdid(self, pidx: int) -> str | None:
-        if not self._pidx2pdid:
-            print("Caching idx2pdid..")
-            self._pidx2pdid = {x["pidx"]: x["pdid"] for x in self.items().values()}
-        return self._pidx2pdid.get(pidx)
+        item = Item.get_item_by_pidx(self.session, pidx)
+        return item.pdid if item else None
 
     def pdid2pidx(self, pdid: str) -> int | None:
-        if not self._pdid2pidx:
-            print("Caching pdid2idx..")
-            self._pdid2pidx = {x["pdid"]: x["pidx"] for x in self.items().values()}
-        return self._pdid2pidx.get(pdid)
+        item = Item.get_item_by_pdid(self.session, pdid)
+        return item.pidx if item else None
 
     def vocab_size(self) -> int:
         return Item.count(self.session)
 
-    def pdids(self):
-        return sorted(self.items().values())
+    def pdids(self) -> list[str]:
+        items = Item.list_items(self.session)
+        return [x.pdid for x in items]
 
-    def pidxs(self):
-        return sorted(item["pidx"] for item in self.items().values())
+    def pidxs(self) -> list[int]:
+        items = Item.list_items(self.session)
+        return [x.pidx for x in items]
 
+    def get_sequential_pair(self, idx: int):
+        return SequentialPair.get_sequential_pair(self.session, idx)
+
+    def count_sequential_pairs(self):
+        return SequentialPair.count_sequential_pairs(self.session)
 
 if __name__ == "__main__":
-    volume = Volume(company_id="aboutpet", model="item2vec", version="v1")
-    # volume.migrate_traces(begin_date=datetime(2024, 8, 1))
-    # volume.migrate_items()
-    # volume.migrate_users()
-    # volume.generate_sequential_pairs_csv()
-    # volume.generate_click_purchase_footstep_csv(begin_date=datetime.now() - timedelta(days=7))
-    # volume.generate_click_click_footstep_csv(begin_date=datetime.now() - timedelta(days=4))
-    # volume.generate_edge_indices_csv()
+    volume = Volume(company_id="gsshop", model="item2vec", version="v1")
+    volume.migrate_traces(begin_date=datetime(2024, 8, 1))
+    volume.migrate_items()
+    volume.migrate_users()
+    volume.migrate_sequential_pairs()
+    volume.generate_click_purchase_footstep_csv(begin_date=datetime.now() - timedelta(days=7))
+    volume.generate_click_click_footstep_csv(begin_date=datetime.now() - timedelta(days=4))
+    volume.generate_edge_indices_csv()
     volume.migrate_user_histories()
+

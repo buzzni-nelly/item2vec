@@ -11,27 +11,27 @@ from item2vec.volume import Volume
 
 class SkipGramBPRTrainDataset(Dataset):
     def __init__(self, volume: Volume, negative_k: int = 10):
-        seq_pairs_csv_path = volume.workspace_path.joinpath("item.sequential.pairs.csv")
-        seq_pairs_df = pd.read_csv(seq_pairs_csv_path)
-        self.seq_pairs = seq_pairs_df.to_numpy().tolist()
+        self.volume = volume
         self.idxs = volume.pidxs()
         self.negative_k = negative_k
 
     def __len__(self) -> int:
-        return len(self.seq_pairs)
+        return self.volume.count_sequential_pairs()
 
     def __getitem__(self, idx):
-        seq_target, seq_positive, margin = self.seq_pairs[idx]
-        seq_negatives = random.sample(self.idxs, self.negative_k)
-        seq_target_tensor = torch.LongTensor([seq_target])
-        seq_positive_tensor = torch.LongTensor([seq_positive] * self.negative_k)
-        seq_margin_tensor = torch.LongTensor([margin] * self.negative_k)
-        seq_negative_tensor = torch.LongTensor(seq_negatives)
+        seq_pair = self.volume.get_sequential_pair(idx + 1)
+        sources, targets, margins = seq_pair.source_pidx, seq_pair.target_pidx, seq_pair.is_purchased
+        negatives = random.sample(self.idxs, self.negative_k)
+
+        target_tensor = torch.LongTensor([sources])
+        positive_tensor = torch.LongTensor([targets] * self.negative_k)
+        negative_tensor = torch.LongTensor(negatives)
+        margin_tensor = torch.LongTensor([margins] * self.negative_k)
         return (
-            seq_target_tensor,
-            seq_positive_tensor,
-            seq_margin_tensor,
-            seq_negative_tensor,
+            target_tensor,
+            positive_tensor,
+            margin_tensor,
+            negative_tensor,
         )
 
 
