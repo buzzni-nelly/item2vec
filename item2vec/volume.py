@@ -135,11 +135,6 @@ class User(Base):
         User.__table__.drop(session.bind, checkfirst=True)
         User.__table__.create(session.bind, checkfirst=True)
 
-    @staticmethod
-    def reset_table(session: Session):
-        User.__table__.drop(session.bind, checkfirst=True)
-        User.__table__.create(session.bind, checkfirst=True)
-
     def to_dict(self):
         return {
             "uidx": self.uidx,
@@ -323,8 +318,7 @@ class SequentialPair(Base):
         return session.query(func.count(SequentialPair.id)).scalar()
 
 
-class Volume:
-
+class Migrator:
     def __init__(self, company_id: str, model: str, version: str, workspaces_path: Path = None):
         self.company_id = company_id
         self.model = model
@@ -342,9 +336,6 @@ class Volume:
         self.session = SessionMaker()
 
         Base.metadata.create_all(self.engine)
-
-        self._items_by_pdid = None
-        self._items_by_pidx = None
 
     def migrate_traces(self, begin_date: datetime):
         current_date = begin_date
@@ -510,39 +501,12 @@ class Volume:
                     # item_pairs.append((pidx_2, pidx_1, weight))
         return item_pairs
 
-    def fetch_click_purchase_footstep(self, begin_date: datetime) -> list:
-        begin_date = begin_date.strftime("%Y-%m-%d")
-        query = queries.ABOUTPET_CLICK_PURCHASE_FOOTSTEP.format(date=begin_date)
-        rows, columns = clients.trinox.fetch(query)
-        df = pd.DataFrame(rows, columns=columns)
-        df = df.dropna(subset=["pid", "target_pid"])
-        df = df[df["purchase_time"].notna()]
-
-        df["source_pdid"] = df["pid"].apply(lambda x: f"{self.company_id}_{x}")
-        df["target_pdid"] = df["target_pid"].apply(lambda x: f"{self.company_id}_{x}")
-        df = df[["source_pdid", "target_pdid"]]
-        df = df[df["source_pdid"] != df["target_pdid"]]
-        return df.values.tolist()
-
     def generate_click_purchase_footstep_csv(self, begin_date: datetime):
         print("Extracting click-and-purchase item footsteps.")
         item_pairs = self.fetch_click_purchase_footstep(begin_date=begin_date)
         pairs_df = pd.DataFrame(item_pairs, columns=["source_pdid", "target_pdid"], dtype=str)
         save_path = self.workspace_path.joinpath("click-purchase.footstep.csv")
         pairs_df.to_csv(save_path.as_posix(), index=False)
-
-    def fetch_click_click_footstep(self, begin_date: datetime) -> list:
-        begin_date = begin_date.strftime("%Y-%m-%d")
-        query = queries.ABOUTPET_CLICK_CLICK_FOOTSTEP.format(date=begin_date)
-        rows, columns = clients.trinox.fetch(query)
-        df = pd.DataFrame(rows, columns=columns)
-        df = df.dropna(subset=["pid", "target_pid"])
-
-        df["source_pdid"] = df["pid"].apply(lambda x: f"{self.company_id}_{x}")
-        df["target_pdid"] = df["target_pid"].apply(lambda x: f"{self.company_id}_{x}")
-        df = df[["source_pdid", "target_pdid"]]
-        df = df[df["source_pdid"] != df["target_pdid"]]
-        return df.values.tolist()
 
     def generate_click_click_footstep_csv(self, begin_date: datetime):
         print("Extracting click-and-click item footsteps.")
@@ -600,21 +564,72 @@ class Volume:
         }
         return sorted_source_to_targets
 
+    def fetch_click_purchase_footstep(self, begin_date: datetime) -> list:
+        begin_date = begin_date.strftime("%Y-%m-%d")
+        query = queries.ABOUTPET_CLICK_PURCHASE_FOOTSTEP.format(date=begin_date)
+        rows, columns = clients.trinox.fetch(query)
+        df = pd.DataFrame(rows, columns=columns)
+        df = df.dropna(subset=["pid", "target_pid"])
+        df = df[df["purchase_time"].notna()]
+
+        df["source_pdid"] = df["pid"].apply(lambda x: f"{self.company_id}_{x}")
+        df["target_pdid"] = df["target_pid"].apply(lambda x: f"{self.company_id}_{x}")
+        df = df[["source_pdid", "target_pdid"]]
+        df = df[df["source_pdid"] != df["target_pdid"]]
+        return df.values.tolist()
+
+    def fetch_click_click_footstep(self, begin_date: datetime) -> list:
+        begin_date = begin_date.strftime("%Y-%m-%d")
+        query = queries.ABOUTPET_CLICK_CLICK_FOOTSTEP.format(date=begin_date)
+        rows, columns = clients.trinox.fetch(query)
+        df = pd.DataFrame(rows, columns=columns)
+        df = df.dropna(subset=["pid", "target_pid"])
+
+        df["source_pdid"] = df["pid"].apply(lambda x: f"{self.company_id}_{x}")
+        df["target_pdid"] = df["target_pid"].apply(lambda x: f"{self.company_id}_{x}")
+        df = df[["source_pdid", "target_pdid"]]
+        df = df[df["source_pdid"] != df["target_pdid"]]
+        return df.values.tolist()
+
+    def pidx2pdid(self, pidx: int) -> str | None:
+        item = Item.get_item_by_pidx(self.session, pidx)
+        return item.pdid if item else None
+
+    def pdid2pidx(self, pdid: str) -> int | None:
+        item = Item.get_item_by_pdid(self.session, pdid)
+        return item.pidx if item else None
+
+
+class Volume:
+
+    def __init__(self, company_id: str, model: str, version: str, workspaces_path: Path = None):
+        self.company_id = company_id
+        self.model = model
+        self.version = version
+
+        workspaces_path = workspaces_path or directories.workspaces
+        self.workspace_path = workspaces_path.joinpath(company_id, model, version)
+        self.sqlite3_path = self.workspace_path.joinpath(f"{company_id}-{model}-{version}.db")
+
+        if not self.workspace_path.exists():
+            self.workspace_path.mkdir(parents=True)
+
+        self.engine = create_engine(f"sqlite:///{self.sqlite3_path.as_posix()}")
+        SessionMaker = sqlalchemy.orm.sessionmaker(bind=self.engine)
+        self.session = SessionMaker()
+
+        self._items_by_pdid = None
+        self._items_by_pidx = None
+
     def list_popular_items(self, days: int = 30):
         criteria = time.time() - days * 24 * 60 * 7
         return Trace.list_popular_items(self.session, criteria=criteria)
 
     def items(self, by="pdid") -> dict:
-        if "pdid" == by:
-            if not self._items_by_pdid:
-                print("Loading items into memory from persistent volume..")
-                self._items_by_pdid = {x.pdid: x.to_dict() for x in Item.list_items(self.session)}
-            return self._items_by_pdid
+        if by == "pdid":
+            return {x.pdid: x.to_dict() for x in Item.list_items(self.session)}
         else:
-            if not self._items_by_pidx:
-                print("Loading items into memory from persistent volume..")
-                self._items_by_pidx = {x.pidx: x.to_dict() for x in Item.list_items(self.session)}
-            return self._items_by_pidx
+            return {x.pidx: x.to_dict() for x in Item.list_items(self.session)}
 
     def pidx2pdid(self, pidx: int) -> str | None:
         item = Item.get_item_by_pidx(self.session, pidx)
@@ -643,12 +658,12 @@ class Volume:
 
 
 if __name__ == "__main__":
-    volume = Volume(company_id="gsshop", model="item2vec", version="v1")
-    volume.migrate_traces(begin_date=datetime(2024, 8, 1))
-    volume.migrate_items()
-    volume.migrate_users()
-    volume.migrate_sequential_pairs()
-    volume.generate_click_purchase_footstep_csv(begin_date=datetime.now() - timedelta(days=7))
-    volume.generate_click_click_footstep_csv(begin_date=datetime.now() - timedelta(days=4))
-    volume.generate_edge_indices_csv()
-    volume.migrate_user_histories()
+    migrator = Migrator(company_id="aboutpet", model="item2vec", version="v1")
+    migrator.migrate_traces(begin_date=datetime(2024, 8, 1))
+    migrator.migrate_items()
+    migrator.migrate_users()
+    migrator.migrate_sequential_pairs()
+    migrator.generate_click_purchase_footstep_csv(begin_date=datetime.now() - timedelta(days=7))
+    migrator.generate_click_click_footstep_csv(begin_date=datetime.now() - timedelta(days=4))
+    migrator.generate_edge_indices_csv()
+    migrator.migrate_user_histories()

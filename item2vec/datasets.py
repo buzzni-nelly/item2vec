@@ -19,8 +19,8 @@ class SkipGramBPRTrainDataset(Dataset):
         return self.volume.count_sequential_pairs()
 
     def __getitem__(self, idx):
-        seq_pair = self.volume.get_sequential_pair(idx + 1)
-        sources, targets, margins = seq_pair.source_pidx, seq_pair.target_pidx, seq_pair.is_purchased
+        x = self.volume.get_sequential_pair(idx + 1)
+        sources, targets, margins = x.source_pidx, x.target_pidx, x.is_purchased
         negatives = random.sample(self.idxs, self.negative_k)
 
         target_tensor = torch.LongTensor([sources])
