@@ -317,6 +317,11 @@ class SequentialPair(Base):
     def count_sequential_pairs(session: Session) -> int:
         return session.query(func.count(SequentialPair.id)).scalar()
 
+    @staticmethod
+    def reset_table(session: Session):
+        SequentialPair.__table__.drop(session.bind, checkfirst=True)
+        SequentialPair.__table__.create(session.bind, checkfirst=True)
+
 
 class Migrator:
     def __init__(self, company_id: str, model: str, version: str, workspaces_path: Path = None):
@@ -446,6 +451,7 @@ class Migrator:
         return result
 
     def migrate_sequential_pairs(self, chunk_size=10_000_000):
+        SequentialPair.reset_table(self.session)
         sequential_pairs = self.generate_sequential_pairs()
 
         rows = []
