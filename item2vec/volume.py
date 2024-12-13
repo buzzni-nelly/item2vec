@@ -67,11 +67,11 @@ class Item(Base):
     category3 = Column(String, nullable=False)
 
     @staticmethod
-    def get_item_by_pdid(session: Session, pdid: str) -> 'Item':
+    def get_item_by_pdid(session: Session, pdid: str) -> "Item":
         return session.query(Item).filter(Item.pdid == pdid).scalar()
 
     @staticmethod
-    def get_item_by_pidx(session: Session, pidx: int) -> 'Item':
+    def get_item_by_pidx(session: Session, pidx: int) -> "Item":
         return session.query(Item).filter(Item.pidx == pidx).scalar()
 
     @staticmethod
@@ -322,6 +322,7 @@ class SequentialPair(Base):
     def count_sequential_pairs(session: Session) -> int:
         return session.query(func.count(SequentialPair.id)).scalar()
 
+
 class Volume:
 
     def __init__(self, company_id: str, model: str, version: str, workspaces_path: Path = None):
@@ -457,10 +458,12 @@ class Volume:
         sequential_pairs = self.generate_sequential_pairs()
 
         rows = []
-        insert_query = text("""
+        insert_query = text(
+            """
         INSERT INTO sequential_pair (source_pidx, target_pidx, is_purchased)
         VALUES (:source_pidx, :target_pidx, :is_purchased)
-        """)
+        """
+        )
 
         for x, y, z in tqdm(sequential_pairs, desc="Inserting pairs into sqlite3.."):
             rows.append({"source_pidx": x, "target_pidx": y, "is_purchased": z})
@@ -468,7 +471,7 @@ class Volume:
             if len(rows) >= chunk_size:
                 self.session.execute(insert_query, rows)
                 self.session.commit()
-                rows.clear()  # 버퍼 초기화
+                rows.clear()
 
         if rows:
             self.session.execute(insert_query, rows)
@@ -638,6 +641,7 @@ class Volume:
     def count_sequential_pairs(self):
         return SequentialPair.count_sequential_pairs(self.session)
 
+
 if __name__ == "__main__":
     volume = Volume(company_id="gsshop", model="item2vec", version="v1")
     volume.migrate_traces(begin_date=datetime(2024, 8, 1))
@@ -648,4 +652,3 @@ if __name__ == "__main__":
     volume.generate_click_click_footstep_csv(begin_date=datetime.now() - timedelta(days=4))
     volume.generate_edge_indices_csv()
     volume.migrate_user_histories()
-
