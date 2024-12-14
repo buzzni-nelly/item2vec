@@ -503,6 +503,8 @@ class Migrator:
         rows = []
         for current in traces:
             for prev in queue:
+                if current["event"] != "purchase":
+                    continue
                 if current["uidx"] != prev["uidx"]:
                     continue
                 if current["timestamp"] > prev["timestamp"] + 600:
