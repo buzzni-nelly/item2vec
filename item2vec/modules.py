@@ -74,7 +74,7 @@ class GraphBPRItem2Vec(pl.LightningModule):
         self.num_layers = num_layers
 
         edge_df = pd.read_csv(purchase_edge_index_path.as_posix())
-        sources, targets = edge_df["source"].values, edge_df["target"].values
+        sources, targets = edge_df["source_pidx"].values, edge_df["target_pidx"].values
         purchase_edge_index = torch.tensor([sources, targets], dtype=torch.long)
         self.register_buffer("purchase_edge_index", purchase_edge_index)
 

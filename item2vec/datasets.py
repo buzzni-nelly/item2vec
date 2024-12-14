@@ -16,10 +16,10 @@ class SkipGramBPRTrainDataset(Dataset):
         self.negative_k = negative_k
 
     def __len__(self) -> int:
-        return self.volume.count_sequential_pairs()
+        return self.volume.count_skip_grams()
 
     def __getitem__(self, idx):
-        x = self.volume.get_sequential_pair(idx + 1)
+        x = self.volume.get_skip_gram(idx + 1)
         sources, targets, margins = x.source_pidx, x.target_pidx, x.is_purchased
         negatives = random.sample(self.idxs, self.negative_k)
 

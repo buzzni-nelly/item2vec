@@ -3,12 +3,12 @@ import enum
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Type
 
 import pandas as pd
 import sqlalchemy.orm
 import sqlalchemy.orm
-from sqlalchemy import Column, Integer, String, Float, Enum, func, case, text, Sequence
+from sqlalchemy import Column, Integer, String, Float, Enum, func, case, text
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from tqdm import tqdm
@@ -307,25 +307,41 @@ class Trace(Base):
         return result
 
 
-class SequentialPair(Base):
-    __tablename__ = "sequential_pair"
+class SkipGram(Base):
+    __tablename__ = "skip_gram"
     id = Column(Integer, primary_key=True, autoincrement=True)
     source_pidx = Column(Integer)
     target_pidx = Column(Integer)
     is_purchased = Column(Integer, nullable=False)
 
     @staticmethod
-    def get_sequential_pair(session: Session, idx: int):
-        return session.query(SequentialPair).filter(SequentialPair.id == idx).one_or_none()
+    def get_skip_gram(session: Session, idx: int):
+        return session.query(SkipGram).filter(SkipGram.id == idx).one_or_none()
 
     @staticmethod
-    def count_sequential_pairs(session: Session) -> int:
-        return session.query(func.count(SequentialPair.id)).scalar()
+    def count_skip_grams(session: Session) -> int:
+        return session.query(func.count(SkipGram.id)).scalar()
 
     @staticmethod
     def reset_table(session: Session):
-        SequentialPair.__table__.drop(session.bind, checkfirst=True)
-        SequentialPair.__table__.create(session.bind, checkfirst=True)
+        SkipGram.__table__.drop(session.bind, checkfirst=True)
+        SkipGram.__table__.create(session.bind, checkfirst=True)
+
+
+class Click2PurchaseSequence(Base):
+    __tablename__ = "click2purchase_sequence"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    source_pidx = Column(Integer)
+    target_pidx = Column(Integer)
+
+    @staticmethod
+    def list_click2purchase_sequences(session: Session) -> list[Type['Click2PurchaseSequence']]:
+        return session.query(Click2PurchaseSequence).all()
+
+    @staticmethod
+    def reset_table(session: Session):
+        Click2PurchaseSequence.__table__.drop(session.bind, checkfirst=True)
+        Click2PurchaseSequence.__table__.create(session.bind, checkfirst=True)
 
 
 class Migrator:
@@ -455,19 +471,17 @@ class Migrator:
                 result.append(list(map(int, cumulative_ids)))
         return result
 
-    def migrate_sequential_pairs(self, chunk_size=10_000_000):
-        SequentialPair.reset_table(self.session)
-        sequential_pairs = self.generate_sequential_pairs()
+    def migrate_skip_grams(self, chunk_size=10_000_000):
+        SkipGram.reset_table(self.session)
+        skip_grams = self.list_skip_grams()
 
         rows = []
-        insert_query = text(
-            """
-        INSERT INTO sequential_pair (source_pidx, target_pidx, is_purchased)
+        insert_query = text("""
+        INSERT INTO skip_gram (source_pidx, target_pidx, is_purchased)
         VALUES (:source_pidx, :target_pidx, :is_purchased)
-        """
-        )
+        """)
 
-        for x, y, z in tqdm(sequential_pairs, desc="Inserting pairs into sqlite3.."):
+        for x, y, z in tqdm(skip_grams, desc="Inserting skip grams into sqlite3.."):
             rows.append({"source_pidx": x, "target_pidx": y, "is_purchased": z})
 
             if len(rows) >= chunk_size:
@@ -479,13 +493,48 @@ class Migrator:
             self.session.execute(insert_query, rows)
             self.session.commit()
 
-        print(f"Migration completed: {sequential_pairs} rows inserted.")
+        print(f"Migration completed: {len(skip_grams)} rows inserted.")
 
-    def generate_sequential_pairs(self, window_size: int = 5, time_delta: int = 60 * 3):
+    def migrate_click2purchase_sequences(self, begin_date: datetime, maxlen: int = 50):
+        print("Extracting click2purchase item sequences.")
+        Click2PurchaseSequence.reset_table(self.session)
+        traces = Trace.list_traces(self.session, timestamp=begin_date.timestamp())
+        queue = collections.deque(maxlen=maxlen)
+        rows = []
+        for current in traces:
+            for prev in queue:
+                if current["uidx"] != prev["uidx"]:
+                    continue
+                if current["timestamp"] > prev["timestamp"] + 600:
+                    continue
+                rows.append(
+                    {"source_pidx": prev["pidx"], "target_pidx": current["pidx"]}
+                )
+            queue.append(current)
+
+        insert_query = text("""
+        INSERT INTO click2purchase_sequence (source_pidx, target_pidx)
+        VALUES (:source_pidx, :target_pidx)
+        """)
+
+        self.session.execute(insert_query, rows)
+        self.session.commit()
+
+        print(f"Migration completed: {len(rows):,} rows inserted.")
+
+    def generate_edge_indices_csv(self):
+        sequences = Click2PurchaseSequence.list_click2purchase_sequences(self.session)
+        # swap source & target
+        sequences = [(x.target_pidx, x.source_pidx) for x in sequences]
+        purchase_edges_df = pd.DataFrame(sequences, columns=["source_pidx", "target_pidx"], dtype=int)
+        purchase_csv_path = self.workspace_path.joinpath(f"edge.purchase.indices.csv")
+        purchase_edges_df.to_csv(purchase_csv_path, index=False)
+
+    def list_skip_grams(self, window_size: int = 5, time_delta: int = 60 * 3):
         traces = Trace.list_traces(self.session)
         queue = collections.deque(maxlen=window_size)
         item_pairs = []
-        for trace in tqdm(traces, desc="Sequence Pair data 를 추출 중 입니다.."):
+        for trace in tqdm(traces, desc="Skip Gram data 를 추출 중 입니다.."):
             queue.append(trace)
 
             if len(queue) < window_size:
@@ -511,96 +560,6 @@ class Migrator:
                     item_pairs.append((pidx_1, pidx_2, weight))
                     # item_pairs.append((pidx_2, pidx_1, weight))
         return item_pairs
-
-    def generate_click_purchase_footstep_csv(self, begin_date: datetime):
-        print("Extracting click-and-purchase item footsteps.")
-        item_pairs = self.fetch_click_purchase_footstep(begin_date=begin_date)
-        pairs_df = pd.DataFrame(item_pairs, columns=["source_pdid", "target_pdid"], dtype=str)
-        save_path = self.workspace_path.joinpath("click-purchase.footstep.csv")
-        pairs_df.to_csv(save_path.as_posix(), index=False)
-
-    def generate_click_click_footstep_csv(self, begin_date: datetime):
-        print("Extracting click-and-click item footsteps.")
-        item_pairs = self.fetch_click_click_footstep(begin_date=begin_date)
-        pairs_df = pd.DataFrame(item_pairs, columns=["source_pdid", "target_pdid"], dtype=str)
-        save_path = self.workspace_path.joinpath("click-click.footstep.csv")
-        pairs_df.to_csv(save_path.as_posix(), index=False)
-
-    def generate_purchase_edge_indices(self):
-        footstep_path = self.workspace_path.joinpath("click-purchase.footstep.csv")
-        df = pd.read_csv(footstep_path.as_posix())
-        df["target"] = df["source_pdid"].apply(self.pdid2pidx)
-        df["source"] = df["target_pdid"].apply(self.pdid2pidx)
-        df = df.dropna()
-        df["target"] = df["target"].astype(int)
-        df["source"] = df["source"].astype(int)
-        df = df[["source", "target"]]
-        return df.values.tolist()
-
-    def generate_edge_indices_csv(self):
-        purchase_edge_indices = self.generate_purchase_edge_indices()
-        purchase_edges_df = pd.DataFrame(purchase_edge_indices, columns=["source", "target"], dtype=int)
-        purchase_csv_path = self.workspace_path.joinpath(f"edge.purchase.indices.csv")
-        purchase_edges_df.to_csv(purchase_csv_path, index=False)
-
-    def generate_source_to_targets_with_purchase(self):
-        filepath = self.workspace_path.joinpath("click-purchase.footstep.csv").as_posix()
-        df = pd.read_csv(filepath)
-        df["source"] = df["source_pdid"].apply(self.pdid2pidx)
-        df["target"] = df["target_pdid"].apply(self.pdid2pidx)
-        df = df.dropna()
-        df["source"] = df["source"].astype(int)
-        df["target"] = df["target"].astype(int)
-        df = df[["source", "target"]]
-        source_to_targets = df.groupby("source")["target"].apply(list).to_dict()
-        sorted_source_to_targets = {
-            source: sorted(set(targets), key=lambda x: targets.count(x), reverse=True)
-            for source, targets in source_to_targets.items()
-        }
-        return sorted_source_to_targets
-
-    def generate_source_to_targets_with_click(self):
-        filepath = self.workspace_path.joinpath("click-click.footstep.csv").as_posix()
-        df = pd.read_csv(filepath)
-        df["source"] = df["source_pdid"].apply(self.pdid2pidx)
-        df["target"] = df["target_pdid"].apply(self.pdid2pidx)
-        df = df.dropna()
-        df["source"] = df["source"].astype(int)
-        df["target"] = df["target"].astype(int)
-        df = df[["source", "target"]]
-        source_to_targets = df.groupby("source")["target"].apply(list).to_dict()
-        sorted_source_to_targets = {
-            source: sorted(set(targets), key=lambda x: targets.count(x), reverse=True)
-            for source, targets in source_to_targets.items()
-        }
-        return sorted_source_to_targets
-
-    def fetch_click_purchase_footstep(self, begin_date: datetime) -> list:
-        begin_date = begin_date.strftime("%Y-%m-%d")
-        query = queries.ABOUTPET_CLICK_PURCHASE_FOOTSTEP.format(date=begin_date)
-        rows, columns = clients.trinox.fetch(query)
-        df = pd.DataFrame(rows, columns=columns)
-        df = df.dropna(subset=["pid", "target_pid"])
-        df = df[df["purchase_time"].notna()]
-
-        df["source_pdid"] = df["pid"].apply(lambda x: f"{self.company_id}_{x}")
-        df["target_pdid"] = df["target_pid"].apply(lambda x: f"{self.company_id}_{x}")
-        df = df[["source_pdid", "target_pdid"]]
-        df = df[df["source_pdid"] != df["target_pdid"]]
-        return df.values.tolist()
-
-    def fetch_click_click_footstep(self, begin_date: datetime) -> list:
-        begin_date = begin_date.strftime("%Y-%m-%d")
-        query = queries.ABOUTPET_CLICK_CLICK_FOOTSTEP.format(date=begin_date)
-        rows, columns = clients.trinox.fetch(query)
-        df = pd.DataFrame(rows, columns=columns)
-        df = df.dropna(subset=["pid", "target_pid"])
-
-        df["source_pdid"] = df["pid"].apply(lambda x: f"{self.company_id}_{x}")
-        df["target_pdid"] = df["target_pid"].apply(lambda x: f"{self.company_id}_{x}")
-        df = df[["source_pdid", "target_pdid"]]
-        df = df[df["source_pdid"] != df["target_pdid"]]
-        return df.values.tolist()
 
     def pidx2pdid(self, pidx: int) -> str | None:
         item = Item.get_item_by_pidx(self.session, pidx)
@@ -661,11 +620,11 @@ class Volume:
         items = Item.list_items(self.session)
         return [x.pidx for x in items]
 
-    def get_sequential_pair(self, idx: int):
-        return SequentialPair.get_sequential_pair(self.session, idx)
+    def get_skip_gram(self, idx: int):
+        return SkipGram.get_skip_gram(self.session, idx)
 
-    def count_sequential_pairs(self):
-        return SequentialPair.count_sequential_pairs(self.session)
+    def count_skip_grams(self):
+        return SkipGram.count_skip_grams(self.session)
 
     def list_user_histories(
         self,
@@ -693,8 +652,8 @@ if __name__ == "__main__":
     migrator.migrate_traces(begin_date=datetime(2024, 8, 1))
     migrator.migrate_items()
     migrator.migrate_users()
-    migrator.migrate_sequential_pairs()
-    migrator.generate_click_purchase_footstep_csv(begin_date=datetime.now() - timedelta(days=7))
-    migrator.generate_click_click_footstep_csv(begin_date=datetime.now() - timedelta(days=4))
-    migrator.generate_edge_indices_csv()
     migrator.migrate_user_histories()
+    migrator.migrate_skip_grams()
+    migrator.migrate_click2purchase_sequences(begin_date=datetime.now() - timedelta(days=7))
+    migrator.generate_edge_indices_csv()
+
