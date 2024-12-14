@@ -335,7 +335,7 @@ class Click2PurchaseSequence(Base):
     target_pidx = Column(Integer)
 
     @staticmethod
-    def list_click2purchase_sequences(session: Session) -> list[Type['Click2PurchaseSequence']]:
+    def list_click2purchase_sequences(session: Session) -> list:
         return session.query(Click2PurchaseSequence).all()
 
     @staticmethod
@@ -645,6 +645,9 @@ class Volume:
                 cumulative_ids = history[max(0, i - 50) : i]
                 result.append(list(map(int, cumulative_ids)))
         return result
+
+    def list_click2purchase_sequences(self) -> list[Click2PurchaseSequence]:
+        return Click2PurchaseSequence.list_click2purchase_sequences(self.session)
 
 
 if __name__ == "__main__":

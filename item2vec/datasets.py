@@ -1,6 +1,5 @@
 import random
 
-import pandas as pd
 import torch
 from pytorch_lightning import LightningDataModule
 from pytorch_lightning.utilities.types import EVAL_DATALOADERS
@@ -37,20 +36,17 @@ class SkipGramBPRTrainDataset(Dataset):
 
 class SkipGramBPRValidDataset(Dataset):
     def __init__(self, volume: Volume):
-        pairs_csv_path = volume.workspace_path.joinpath("click-purchase.footstep.csv")
-        pairs_df = pd.read_csv(pairs_csv_path)
-        pairs = pairs_df.to_numpy().tolist()
-        pairs = [(volume.pdid2pidx(x), volume.pdid2pidx(y)) for x, y in pairs]
-        self.pairs = [(x, y) for x, y in pairs if x and y]
+        sequences = volume.list_click2purchase_sequences()
+        self.pairs = [(x.source_pidx, x.target_pidx) for x in sequences]
 
     def __len__(self) -> int:
         return len(self.pairs)
 
     def __getitem__(self, idx):
-        source, label = self.pairs[idx]
+        source, target = self.pairs[idx]
         source_tensor = torch.LongTensor([source])
-        label_tensor = torch.LongTensor([label])
-        return source_tensor, label_tensor
+        target_tensor = torch.LongTensor([target])
+        return source_tensor, target_tensor
 
 
 class SkipGramBPRDataModule(LightningDataModule):
