@@ -157,9 +157,8 @@ class Trace(Base):
         return session.query(func.count(Trace.id)).scalar()
 
     @staticmethod
-    def list_traces(session: Session, chunk_size: int = 10_000_000):
-        raw_query = text(
-            """
+    def list_traces(session: Session, chunk_size: int = 10_000_000, timestamp: float | None = None):
+        base_query = """
             SELECT 
                 user.uidx AS uidx,
                 item.pidx AS pidx,
@@ -168,9 +167,15 @@ class Trace(Base):
             FROM trace
             INNER JOIN user ON trace.user_id = user.user_id
             INNER JOIN item ON trace.pdid = item.pdid
-            """
-        )
-        result = session.execute(raw_query).yield_per(chunk_size)
+        """
+        query_args = {}
+
+        if timestamp:
+            base_query += " WHERE trace.timestamp > :timestamp"
+            query_args["timestamp"] = timestamp
+
+        raw_query = text(base_query)
+        result = session.execute(raw_query, query_args).yield_per(chunk_size)
         for row in result:
             yield {
                 "uidx": row.uidx,
@@ -681,6 +686,7 @@ class Volume:
                 cumulative_ids = history[max(0, i - 50) : i]
                 result.append(list(map(int, cumulative_ids)))
         return result
+
 
 if __name__ == "__main__":
     migrator = Migrator(company_id="aboutpet", model="item2vec", version="v1")
