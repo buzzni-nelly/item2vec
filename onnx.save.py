@@ -25,10 +25,21 @@ model.eval()
 model.cpu()
 
 # 더미 입력 텐서 생성
-batch_size = 32
-input_seqs = torch.randint(0, model.num_items, (batch_size, model.max_len))  # 입력 시퀀스
-src_key_padding_mask = torch.randint(0, 2, (batch_size, model.max_len)).bool()  # 패딩 마스크
-last_idxs = torch.randint(0, model.max_len, (batch_size,))  # 마지막 인덱스
+batch_size = 2
+max_len = 10
+input_seqs = torch.LongTensor(
+    [
+        [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        [11, 12, 13, 14, 15, 16, 17, 18, 19, 20],
+    ]
+)
+src_key_padding_mask = torch.BoolTensor(
+    [
+        [False, False, False, False, False, False, False, True, True, True],
+        [False, False, False, False, False, False, False, False, False, False],
+    ]
+)
+last_idxs = torch.LongTensor([[6],[9]])
 candidate_idxs = torch.randint(0, model.num_items, (batch_size, 10))  # 후보군 인덱스 (선택 사항)
 
 # ONNX로 저장
@@ -44,8 +55,8 @@ torch.onnx.export(
     dynamic_axes={  # 동적 축 설정
         "input_seqs": {0: "batch_size", 1: "sequence_length"},
         "src_key_padding_mask": {0: "batch_size", 1: "sequence_length"},
-        "last_idxs": {0: "batch_size"},
-        "candidate_idxs": {0: "batch_size", 1: "num_candidates"},
-        "output": {0: "batch_size", 1: "num_candidates"},
+        "masked_idxs": {0: "batch_size"},
+        "candidate_pidxs": {0: "batch_size", 1: "num_candidates"},
+        "output": {0: "batch_size", 1: "num_scores"},
     },
 )

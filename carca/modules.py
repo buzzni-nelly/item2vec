@@ -54,42 +54,40 @@ class CARCA(pl.LightningModule):
         input_seqs: torch.Tensor,
         src_key_padding_mask: torch.Tensor,
         masked_idxs: torch.Tensor,
-        candidate_idxs: torch.Tensor,
+        candidate_pidxs: torch.Tensor,
     ):
+        # input_seq shape: (batch_size, seq_len)
         input_seqs[src_key_padding_mask] = self.pad_token_idx
-        input_seqs = input_seqs.scatter(1, masked_idxs.unsqueeze(-1), self.mask_token_idx)
+        input_seqs = input_seqs.scatter(1, masked_idxs, self.mask_token_idx)
 
         # Embedding 계산
+        # seq_embeddings shape: (batch_size, seq_len, embed_dim)
         seq_embeddings = self.item_embeddings(input_seqs)  # (batch_size, seq_len, embed_dim)
-        seq_embeddings = self.dropout(seq_embeddings)
         seq_embeddings = self.position_embeddings(seq_embeddings, combine=True)
 
         # (batch_size, seq_len, embed_dim)
-        logits, _ = self.cross_attention(
-            seq_embeddings,
-            src_key_padding_mask=src_key_padding_mask,
-        )
+        logits, _ = self.cross_attention(seq_embeddings, src_key_padding_mask=src_key_padding_mask)
 
-        # Masked Index에서 Output 추출
+        # Masked Index 에서 Output 추출
+        # batch_indices shape: (batch_size, 1)
         batch_indices = torch.arange(logits.size(0)).unsqueeze(1).to(self.device)  # (batch_size, 1)
+        # output shape: (batch_size, 1, embed_dim)
         output = logits[batch_indices, masked_idxs]  # (batch_size, num_masked, embed_dim)
 
-        # Candidate Indices에 해당하는 임베딩 추출
-        candidate_embeddings = self.item_embeddings(candidate_idxs)  # (batch_size, num_candidates, embed_dim)
+        # Candidate Indices 에 해당하는 임베딩 추출
+        # candidate_embeddings shape: (batch_size, seq_len, embed_dim)
+        candidate_embeddings = self.item_embeddings(candidate_pidxs)  # (batch_size, num_candidates, embed_dim)
 
-        # Masked Output과 Candidate Embeddings 간의 점수 계산
-        scores = torch.matmul(output, candidate_embeddings.transpose(1, 2))  # (batch_size, num_masked, num_candidates)
+        # Masked Output 과 Candidate Embeddings 간의 점수 계산
+        # score shape: (batch_size, seq_len)
+        scores = torch.matmul(output, candidate_embeddings.transpose(1, 2)).squeeze(1)  # (batch_size, num_masked, num_candidates)
 
-        # (batch_size, num_masked, num_candidates)
+        # (batch_size, num_candidates)
         sorted_scores, sorted_indices = torch.sort(scores, dim=-1, descending=True)
-
-        # (batch_size, num_masked, num_candidates)
-        candidate_idxs = candidate_idxs.unsqueeze(1).expand(-1, sorted_scores.size(1), -1)
-
-        # (batch_size, num_masked, num_candidates)
-        sorted_candidate_idxs = torch.gather(candidate_idxs, 2, sorted_indices)
-
+        # (batch_size, num_candidates)
+        sorted_candidate_idxs = torch.gather(candidate_pidxs, 1, sorted_indices)
         return sorted_scores, sorted_candidate_idxs
+
 
     def training_step(self, batch: list[torch.Tensor], idx: int):
         # input_seqs shape: (256, 50)
