@@ -51,24 +51,25 @@ CHECKPOINT_DIRPATH = carca_settings.checkpoint_dirpath
 CKPT_PATH = carca_settings.checkpoint_path
 
 # Wandb
-WANDB_CONFIG = carca_settings.dict()
+WANDB_CONFIG = carca_settings.model_dump()
 
 
 def main():
     carca_settings.print()
 
-    volume = Volume(company_id="aboutpet", model="item2vec", version="v1")
+    volume_i = Volume(company_id="aboutpet", model="item2vec", version="v1")
+    volume_c = Volume(company_id="aboutpet", model="carca", version="v1")
 
     item2vec_module = GraphBPRItem2Vec.load_from_checkpoint(
-        f"{item2vec_settings.checkpoint_dirpath}/last.ckpt",
-        vocab_size=volume.vocab_size(),
-        purchase_edge_index_path=volume.workspace_path.joinpath("edge.purchase.indices.csv"),
+        checkpoint_path=volume_i.workspace_path.joinpath("checkpoints", "last.ckpt"),
+        vocab_size=volume_i.vocab_size(),
+        purchase_edge_index_path=volume_i.workspace_path.joinpath("edge.purchase.indices.csv"),
         embed_dim=item2vec_settings.embed_dim,
         num_layers=item2vec_settings.num_layers,
     )
 
     carca = CARCA(
-        num_items=volume.vocab_size(),
+        num_items=volume_i.vocab_size(),
         embed_dim=EMBED_DIM,
         num_heads=NUM_HEADS,
         num_layers=NUM_LAYERS,
@@ -82,7 +83,7 @@ def main():
     carca.import_item_embeddings(item_embeddings)
 
     datamodule = CarcaDataModule(
-        volume=volume,
+        volume=volume_i,
         batch_size=DATAMODULE_BATCH_SIZE,
         num_workers=DATAMODULE_NUM_WORKERS,
     )
@@ -90,12 +91,12 @@ def main():
     trainer = Trainer(
         limit_train_batches=TRAINER_LIMIT_TRAIN_BATCHES,
         max_epochs=TRAINER_MAX_EPOCHS,
-        logger=WandbLogger(),
+        logger=WandbLogger(project="carca", version="v1"),
         profiler=TRAINER_PROFILER,
         precision=TRAINER_PRECISION,
         callbacks=[
             ModelCheckpoint(
-                dirpath=CHECKPOINT_DIRPATH,
+                dirpath=volume_c.workspace_path.joinpath("checkpoints"),
                 monitor=CHECKPOINT_MONITOR,
                 mode=CHECKPOINT_MODE,
                 every_n_train_steps=CHECKPOINT_EVERY_N_TRAIN_STEPS,

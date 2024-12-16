@@ -580,6 +580,7 @@ class Volume:
         self.version = version
 
         workspaces_path = workspaces_path or directories.workspaces
+        self.workspaces_path = workspaces_path
         self.workspace_path = workspaces_path.joinpath(company_id, model, version)
         self.sqlite3_path = self.workspace_path.joinpath(f"{company_id}-{model}-{version}.db")
 

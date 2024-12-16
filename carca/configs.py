@@ -5,6 +5,8 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
 
+    version: str = "v1"
+
     embed_dim: int = 128
     num_heads: int = 1
     num_layers: int = 1
