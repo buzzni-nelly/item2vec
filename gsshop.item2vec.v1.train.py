@@ -12,11 +12,14 @@ from item2vec.volume import Volume
 def main():
     config_path = directories.config("gsshop", "item2vec", "v1")
     item2vec_settings = Item2vecSettings.load(config_path)
-
     item2vec_settings.print()
 
-    logger = WandbLogger(project="gsshop", prefix="item2vec", version="v1")
+    logger = WandbLogger(project="gsshop.item2vec")
+    logger.log_hyperparams(item2vec_settings.to_dict())
+
     volume = Volume(company_id="gsshop", model="item2vec", version="v1")
+
+    item2vec_checkpoint_dir_path = volume.workspace_path.joinpath("checkpoints")
 
     data_module = SkipGramBPRDataModule(
         volume=volume,
@@ -43,7 +46,7 @@ def main():
         precision=item2vec_settings.trainer_precision,
         callbacks=[
             ModelCheckpoint(
-                dirpath=item2vec_settings.checkpoint_dirpath,
+                dirpath=item2vec_checkpoint_dir_path,
                 monitor=item2vec_settings.checkpoint_monitor,
                 mode=item2vec_settings.checkpoint_mode,
                 every_n_train_steps=item2vec_settings.checkpoint_every_n_train_steps,

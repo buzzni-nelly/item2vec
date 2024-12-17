@@ -13,24 +13,25 @@ from item2vec.volume import Volume
 
 def main():
     item2vec_config_path = directories.config("gsshop", "item2vec", "v1")
-    item2vec_settings = Item2vecSettings.load(item2vec_config_path)
-
     carca_config_path = directories.config("gsshop", "carca", "v1")
+    item2vec_settings = Item2vecSettings.load(item2vec_config_path)
     carca_settings = CarcaSettings.load(carca_config_path)
-
     carca_settings.print()
 
-    logger = WandbLogger(project="gsshop", prefix="carca", version="v1")
+    logger = WandbLogger(project="gsshop.carca")
+    logger.log_hyperparams(carca_settings.to_dict())
+
     volume_i = Volume(company_id="gsshop", model="item2vec", version="v1")
     volume_c = Volume(company_id="gsshop", model="carca", version="v1")
 
     item2vec_checkpoint_path = volume_i.workspace_path.joinpath("checkpoints", "last.ckpt")
-    carca_checkpoint_path = volume_c.workspace_path.joinpath("checkpoints", "last.ckpt")
+    carca_checkpoint_dir_path = volume_c.workspace_path.joinpath("checkpoints")
 
+    purchase_edge_index_path = volume_i.workspace_path.joinpath("edge.purchase.indices.csv")
     item2vec_module = GraphBPRItem2Vec.load_from_checkpoint(
         checkpoint_path=item2vec_checkpoint_path,
         vocab_size=volume_i.vocab_size(),
-        purchase_edge_index_path=volume_i.workspace_path.joinpath("edge.purchase.indices.csv"),
+        purchase_edge_index_path=purchase_edge_index_path,
         embed_dim=item2vec_settings.embed_dim,
         num_layers=item2vec_settings.num_layers,
     )
@@ -63,7 +64,7 @@ def main():
         precision=carca_settings.trainer_precision,
         callbacks=[
             ModelCheckpoint(
-                dirpath=carca_checkpoint_path,
+                dirpath=carca_checkpoint_dir_path,
                 monitor=carca_settings.checkpoint_monitor,
                 mode=carca_settings.checkpoint_mode,
                 every_n_train_steps=carca_settings.checkpoint_every_n_train_steps,
