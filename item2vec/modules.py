@@ -80,7 +80,7 @@ class GraphBPRItem2Vec(pl.LightningModule):
 
         self.item2vec = Item2Vec(self.vocab_size, embed_dim=self.embed_dim)
         self.conv = LightGCNConv()
-        self.layer_norm = nn.LayerNorm(embed_dim)
+        # self.layer_norm = nn.LayerNorm(embed_dim)
         self.dropout = nn.Dropout(p=dropout)
 
     def setup(self, stage=None):
