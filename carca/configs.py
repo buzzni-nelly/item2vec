@@ -48,3 +48,6 @@ class Settings(BaseSettings):
         with filepath.open("r") as file:
             config = yaml.safe_load(file)
             return Settings(**config)
+
+    def to_dict(self):
+        return self.model_dump()
