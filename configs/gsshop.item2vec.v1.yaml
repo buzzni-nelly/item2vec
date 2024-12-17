@@ -23,4 +23,4 @@ checkpoint_monitor: "train_loss"
 checkpoint_filename: "{epoch}-{step}-{train_loss:.2f}"
 checkpoint_mode: "min"
 checkpoint_every_n_train_steps: 10000
-checkpoint_path: "last"
+ckpt_path: "last"

@@ -23,4 +23,4 @@ checkpoint_monitor: "val_graph_dot_ndcg@20"
 checkpoint_filename: "{epoch}-{step}-{train_loss:.2f}"
 checkpoint_mode: "max"
 checkpoint_every_n_train_steps: 10000
-checkpoint_path: "last"
+ckpt_path: "last"
