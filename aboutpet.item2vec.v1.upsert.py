@@ -19,7 +19,8 @@ MODEL_NAME = "item2vec"
 
 VERSION = "v1"
 
-settings = Settings.load(directories.config(COMPANY_ID, MODEL_NAME, VERSION))
+config_path = directories.config(COMPANY_ID, MODEL_NAME, VERSION)
+settings = Settings.load(config_path)
 
 
 def debug(
@@ -53,12 +54,13 @@ def debug(
 
 
 def load_embeddings(volume: Volume, embed_dim: int = 256, num_layers: int = 2):
-    model_path = f"{settings.checkpoint_dirpath}/last.ckpt"
+    checkpoint_path = volume.workspace_path.joinpath("checkpoints", "last.ckpt")
+    purchase_edge_index_path = volume.workspace_path.joinpath("edge.purchase.indices.csv")
     vocab_size = volume.vocab_size()
     item2vec_module = GraphBPRItem2Vec.load_from_checkpoint(
-        model_path,
+        checkpoint_path=checkpoint_path,
         vocab_size=vocab_size,
-        purchase_edge_index_path=volume.workspace_path.joinpath("edge.purchase.indices.csv"),
+        purchase_edge_index_path=purchase_edge_index_path,
         embed_dim=embed_dim,
     )
     item2vec_module.setup()
