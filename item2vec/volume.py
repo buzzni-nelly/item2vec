@@ -562,7 +562,7 @@ class Migrator:
 
                 if pidx_1 and pidx_2:
                     item_pairs.append((pidx_1, pidx_2, weight))
-                    # item_pairs.append((pidx_2, pidx_1, weight))
+                    item_pairs.append((pidx_2, pidx_1, weight))
         return item_pairs
 
     def pidx2pdid(self, pidx: int) -> str | None:
