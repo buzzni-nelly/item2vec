@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import collections
 import enum
 import time
@@ -110,6 +112,81 @@ class Item(Base):
         }
 
 
+class Category1(Base):
+    __tablename__ = "category1"
+    cidx = Column(Integer, primary_key=True)
+    name = Column(String, nullable=False)
+
+    @staticmethod
+    def reset_table(session: Session):
+        Category1.__table__.drop(session.bind, checkfirst=True)
+        Category1.__table__.create(session.bind, checkfirst=True)
+
+    @staticmethod
+    def get_category_by_cidx(session: Session, cidx: int) -> Type[Category1] | None:
+        category = session.query(Category1).filter(Category1.cidx == cidx).one_or_none()
+        return category
+
+    @staticmethod
+    def get_category_by_name(session: Session, name: str) -> Type[Category1] | None:
+        category = session.query(Category1).filter(Category1.name == name).one_or_none()
+        return category
+
+    @staticmethod
+    def count_categories(session: Session) -> int:
+        return session.query(func.count(Category1.cidx)).scalar()
+
+
+class Category2(Base):
+    __tablename__ = "category2"
+    cidx = Column(Integer, primary_key=True)
+    name = Column(String, nullable=False)
+
+    @staticmethod
+    def reset_table(session: Session):
+        Category2.__table__.drop(session.bind, checkfirst=True)
+        Category2.__table__.create(session.bind, checkfirst=True)
+
+    @staticmethod
+    def get_category_by_cidx(session: Session, cidx: int) -> Type[Category2] | None:
+        category = session.query(Category2).filter(Category2.cidx == cidx).one_or_none()
+        return category
+
+    @staticmethod
+    def get_category_by_name(session: Session, name: str) -> Type[Category2] | None:
+        category = session.query(Category2).filter(Category2.name == name).one_or_none()
+        return category
+
+    @staticmethod
+    def count_categories(session: Session) -> int:
+        return session.query(func.count(Category2.cidx)).scalar()
+
+
+class Category3(Base):
+    __tablename__ = "category3"
+    cidx = Column(Integer, primary_key=True)
+    name = Column(String, nullable=False)
+
+    @staticmethod
+    def reset_table(session: Session):
+        Category3.__table__.drop(session.bind, checkfirst=True)
+        Category3.__table__.create(session.bind, checkfirst=True)
+
+    @staticmethod
+    def get_category_by_cidx(session: Session, cidx: int) -> Type[Category3] | None:
+        category = session.query(Category3).filter(Category3.cidx == cidx).one_or_none()
+        return category
+
+    @staticmethod
+    def get_category_by_name(session: Session, name: str) -> Type[Category3] | None:
+        category = session.query(Category3).filter(Category3.name == name).one_or_none()
+        return category
+
+    @staticmethod
+    def count_categories(session: Session) -> int:
+        return session.query(func.count(Category3.cidx)).scalar()
+
+
 class User(Base):
     __tablename__ = "user"
     uidx = Column(Integer, primary_key=True)
@@ -159,14 +236,14 @@ class Trace(Base):
     @staticmethod
     def list_traces(session: Session, chunk_size: int = 10_000_000, timestamp: float | None = None):
         base_query = """
-            SELECT 
-                user.uidx AS uidx,
-                item.pidx AS pidx,
-                trace.event AS event,
-                trace.timestamp AS timestamp
-            FROM trace
-            INNER JOIN user ON trace.user_id = user.user_id
-            INNER JOIN item ON trace.pdid = item.pdid
+        SELECT 
+            user.uidx AS uidx,
+            item.pidx AS pidx,
+            trace.event AS event,
+            trace.timestamp AS timestamp
+        FROM trace
+        INNER JOIN user ON trace.user_id = user.user_id
+        INNER JOIN item ON trace.pdid = item.pdid
         """
         query_args = {}
 
@@ -248,19 +325,17 @@ class Trace(Base):
                 user_id,
                 GROUP_CONCAT(pidx, ',') AS pidxs,
                 GROUP_CONCAT(event, ',') AS events
-            --     GROUP_CONCAT(category1, ',') AS category1,
-            --     GROUP_CONCAT(category2, ',') AS category2,
-            --     GROUP_CONCAT(category3, ',') AS category3,
-            --     GROUP_CONCAT(timestamp, ',') AS timestamps,
+                GROUP_CONCAT(category1, ',') AS category1s,
+                GROUP_CONCAT(category2, ',') AS category2s,
+                GROUP_CONCAT(category3, ',') AS category3s,
             FROM (
                 SELECT
                     t.user_id as user_id,
                     i.pidx as pidx,
                     t.event as event
-            --         i.category1 as category1,
-            --         i.category2 as category2,
-            --         i.category3 as category3,
-            --         t.timestamp as timestamp
+                    i.category1 as category1,
+                    i.category2 as category2,
+                    i.category3 as category3,
                 FROM
                     trace AS t
                 INNER JOIN item AS i ON t.pdid = i.pdid
@@ -270,7 +345,7 @@ class Trace(Base):
             )
             GROUP BY
                 user_id
-        """
+            """
         )
         results = session.execute(query).fetchall()
         return [
@@ -301,7 +376,7 @@ class Trace(Base):
             WHERE category1 IS NOT NULL AND category2 IS NOT NULL
             GROUP BY category1, category2
             ORDER BY category1, cnt DESC ;
-        """
+            """
         )
         result = session.execute(query, {"criteria": criteria}).fetchall()
         return result
@@ -411,13 +486,23 @@ class Migrator:
                 }
             )
 
-        items, pidx = [], 0
+        items = [
+            Item(
+                pidx=0,
+                pdid="UNKNOWN",
+                purchase_count=0,
+                click_count=0,
+                name="UNKNOWN",
+                category1="UNKNOWN",
+                category2="UNKNOWN",
+                category3="UNKNOWN",
+            )
+        ]
         for pdid, purchase_count, click_count in aggregates:
             if pdid not in products_dict:
                 continue
             items.append(
                 Item(
-                    pidx=pidx,
                     pdid=pdid,
                     purchase_count=purchase_count,
                     click_count=click_count,
@@ -427,7 +512,6 @@ class Migrator:
                     category3=products_dict[pdid]["category3"],
                 )
             )
-            pidx += 1
 
         self.session.bulk_save_objects(items)
         self.session.commit()
@@ -437,11 +521,17 @@ class Migrator:
 
         aggregates = Trace.aggregate_users(self.session)
 
-        users = []
-        for uidx, (user_id, purchase_count, click_count) in enumerate(aggregates):
+        users = [
+            User(
+                uidx=0,
+                user_id="UNKNOWN",
+                purchase_count=0,
+                click_count=0,
+            )
+        ]
+        for user_id, purchase_count, click_count in aggregates:
             users.append(
                 User(
-                    uidx=uidx,
                     user_id=user_id,
                     purchase_count=purchase_count,
                     click_count=click_count,
@@ -449,6 +539,38 @@ class Migrator:
             )
 
         self.session.bulk_save_objects(users)
+        self.session.commit()
+
+    def migrate_categories(self):
+        # 테이블 초기화
+        Category1.reset_table(self.session)
+        Category2.reset_table(self.session)
+        Category3.reset_table(self.session)
+
+        # UNKNOWN 카테고리 추가
+        self.session.add(Category1(cidx=0, name="UNKNOWN"))
+        self.session.add(Category2(cidx=0, name="UNKNOWN"))
+        self.session.add(Category3(cidx=0, name="UNKNOWN"))
+        self.session.commit()
+
+        # distinct category 가져오기
+        distinct_category_1 = [x[0] for x in self.session.query(Item.category1).distinct().all()]
+        distinct_category_2 = [x[0] for x in self.session.query(Item.category2).distinct().all()]
+        distinct_category_3 = [x[0] for x in self.session.query(Item.category3).distinct().all()]
+
+        # UNKNOWN 제외한 실제 카테고리들 정렬
+        distinct_category_1 = sorted([c for c in distinct_category_1 if c != "UNKNOWN"])
+        distinct_category_2 = sorted([c for c in distinct_category_2 if c != "UNKNOWN"])
+        distinct_category_3 = sorted([c for c in distinct_category_3 if c != "UNKNOWN"])
+
+        # 카테고리 삽입
+        category1_objects = [Category1(name=c) for c in distinct_category_1]
+        category2_objects = [Category2(name=c) for c in distinct_category_2]
+        category3_objects = [Category3(name=c) for c in distinct_category_3]
+
+        self.session.bulk_save_objects(category1_objects)
+        self.session.bulk_save_objects(category2_objects)
+        self.session.bulk_save_objects(category3_objects)
         self.session.commit()
 
     def migrate_user_histories(
@@ -631,6 +753,51 @@ class Volume:
     def count_skip_grams(self):
         return SkipGram.count_skip_grams(self.session)
 
+    def get_category_1_by_cidx(self, cidx: int) -> Type[Category1] | None:
+        category = Category1.get_category_by_cidx(self.session, cidx)
+        if not category:
+            return Category1.get_category_by_cidx(self.session, 0)
+        return category
+
+    def get_category_2_by_cidx(self, cidx: int) -> Type[Category2] | None:
+        category = Category2.get_category_by_cidx(self.session, cidx)
+        if not category:
+            return Category2.get_category_by_cidx(self.session, 0)
+        return category
+
+    def get_category_3_by_cidx(self, cidx: int) -> Type[Category3] | None:
+        category = Category3.get_category_by_cidx(self.session, cidx)
+        if not category:
+            return Category3.get_category_by_cidx(self.session, 0)
+        return category
+
+    def get_category_1_by_name(self, name: str) -> Type[Category1] | None:
+        category = Category1.get_category_by_name(self.session, name)
+        if not category:
+            return Category1.get_category_by_cidx(self.session, 0)
+        return category
+
+    def get_category_2_by_name(self, name: str) -> Type[Category2] | None:
+        category = Category2.get_category_by_name(self.session, name)
+        if not category:
+            return Category2.get_category_by_cidx(self.session, 0)
+        return category
+
+    def get_category_3_by_name(self, name: str) -> Type[Category3] | None:
+        category = Category3.get_category_by_name(self.session, name)
+        if not category:
+            return Category3.get_category_by_cidx(self.session, 0)
+        return category
+
+    def count_category_1(self) -> int:
+        return Category1.count_categories(self.session)
+
+    def count_category_2(self) -> int:
+        return Category2.count_categories(self.session)
+
+    def count_category_3(self) -> int:
+        return Category3.count_categories(self.session)
+
     def list_user_histories(
         self,
         threshold: float = None,
@@ -660,6 +827,7 @@ if __name__ == "__main__":
     migrator.migrate_traces(begin_date=datetime(2024, 8, 1))
     migrator.migrate_items()
     migrator.migrate_users()
+    migrator.migrate_categories()
     migrator.migrate_user_histories()
     migrator.migrate_skip_grams()
     migrator.migrate_click2purchase_sequences(begin_date=datetime.now() - timedelta(days=7))
