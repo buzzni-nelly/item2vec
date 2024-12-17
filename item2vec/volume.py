@@ -476,10 +476,12 @@ class Migrator:
         skip_grams = self.list_skip_grams()
 
         rows = []
-        insert_query = text("""
+        insert_query = text(
+        """
         INSERT INTO skip_gram (source_pidx, target_pidx, is_purchased)
         VALUES (:source_pidx, :target_pidx, :is_purchased)
-        """)
+        """
+        )
 
         for x, y, z in tqdm(skip_grams, desc="Inserting skip grams into sqlite3.."):
             rows.append({"source_pidx": x, "target_pidx": y, "is_purchased": z})
@@ -509,15 +511,15 @@ class Migrator:
                     continue
                 if current["timestamp"] > prev["timestamp"] + 600:
                     continue
-                rows.append(
-                    {"source_pidx": prev["pidx"], "target_pidx": current["pidx"]}
-                )
+                rows.append({"source_pidx": prev["pidx"], "target_pidx": current["pidx"]})
             queue.append(current)
 
-        insert_query = text("""
+        insert_query = text(
+        """
         INSERT INTO click2purchase_sequence (source_pidx, target_pidx)
         VALUES (:source_pidx, :target_pidx)
-        """)
+        """
+        )
 
         self.session.execute(insert_query, rows)
         self.session.commit()
@@ -662,4 +664,3 @@ if __name__ == "__main__":
     migrator.migrate_skip_grams()
     migrator.migrate_click2purchase_sequences(begin_date=datetime.now() - timedelta(days=7))
     migrator.generate_edge_indices_csv()
-

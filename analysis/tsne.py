@@ -9,7 +9,7 @@ from item2vec.modules import GraphBPRItem2Vec
 from item2vec.volume import Volume
 
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
-os.environ["CUDA_VISIBLE_DEVICES"] = ''
+# os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
 model_path = "/tmp/gsshop/item2vec/v1/checkpoints/last.ckpt"
 volume = Volume("gsshop", "item2vec", "v1")

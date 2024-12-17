@@ -3,65 +3,32 @@ from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from pytorch_lightning.loggers import WandbLogger
 
-import carca
 import directories
-import item2vec
+from carca.configs import Settings as CarcaSettings
 from carca.modules import CarcaDataModule, CARCA
-from item2vec.configs import Settings
+from item2vec.configs import Settings as Item2vecSettings
 from item2vec.modules import GraphBPRItem2Vec
 from item2vec.volume import Volume
 
-item2vec_config_path = directories.config("aboutpet", "item2vec", "v1")
-item2vec_settings = item2vec.configs.Settings.load(item2vec_config_path)
-
-carca_config_path = directories.config("aboutpet", "carca", "v1")
-carca_settings = carca.configs.Settings.load(carca_config_path)
-
-# Models
-EMBED_DIM = carca_settings.embed_dim
-NUM_HEADS = carca_settings.num_heads
-NUM_LAYERS = carca_settings.num_layers
-MAX_LEN = carca_settings.max_len
-DROPOUT = carca_settings.dropout
-
-# Optimizers and training envs
-LR = carca_settings.lr
-WEIGHT_DECAY = carca_settings.weight_decay
-
-# Trainers
-TRAINER_STRATEGY = carca_settings.trainer_strategy
-TRAINER_PRECISION = carca_settings.trainer_precision
-TRAINER_LIMIT_TRAIN_BATCHES = carca_settings.trainer_limit_train_batches
-TRAINER_LIMIT_VAL_BATCHES = carca_settings.trainer_limit_val_batches
-TRAINER_LIMIT_TEST_BATCHES = carca_settings.trainer_limit_test_batches
-TRAINER_MAX_EPOCHS = carca_settings.trainer_max_epochs
-TRAINER_PROFILER = carca_settings.trainer_profiler
-
-# DataModules
-DATAMODULE_BATCH_SIZE = carca_settings.datamodule_batch_size
-DATAMODULE_NUM_WORKERS = carca_settings.datamodule_num_workers
-DATAMODULE_NEGATIVE_K = carca_settings.datamodule_negative_k
-
-# Checkpoints
-CHECKPOINT_MONITOR = carca_settings.checkpoint_monitor
-CHECKPOINT_MODE = carca_settings.checkpoint_mode
-CHECKPOINT_EVERY_N_TRAIN_STEPS = carca_settings.checkpoint_every_n_train_steps
-CHECKPOINT_FILENAME = carca_settings.checkpoint_filename
-CHECKPOINT_DIRPATH = carca_settings.checkpoint_dirpath
-CKPT_PATH = carca_settings.checkpoint_path
-
-# Wandb
-WANDB_CONFIG = carca_settings.model_dump()
-
 
 def main():
+    item2vec_config_path = directories.config("aboutpet", "item2vec", "v1")
+    carca_config_path = directories.config("aboutpet", "carca", "v1")
+
+    item2vec_settings = Item2vecSettings.load(item2vec_config_path)
+    carca_settings = CarcaSettings.load(carca_config_path)
+
     carca_settings.print()
 
+    logger = WandbLogger(project="aboutpet", prefix="carca", version="v1")
     volume_i = Volume(company_id="aboutpet", model="item2vec", version="v1")
     volume_c = Volume(company_id="aboutpet", model="carca", version="v1")
 
+    item2vec_checkpoint_path = volume_i.workspace_path.joinpath("checkpoints", "last.ckpt")
+    carca_checkpoint_path = volume_c.workspace_path.joinpath("checkpoints", "last.ckpt")
+
     item2vec_module = GraphBPRItem2Vec.load_from_checkpoint(
-        checkpoint_path=volume_i.workspace_path.joinpath("checkpoints", "last.ckpt"),
+        checkpoint_path=item2vec_checkpoint_path,
         vocab_size=volume_i.vocab_size(),
         purchase_edge_index_path=volume_i.workspace_path.joinpath("edge.purchase.indices.csv"),
         embed_dim=item2vec_settings.embed_dim,
@@ -70,13 +37,13 @@ def main():
 
     carca = CARCA(
         num_items=volume_i.vocab_size(),
-        embed_dim=EMBED_DIM,
-        num_heads=NUM_HEADS,
-        num_layers=NUM_LAYERS,
-        max_len=MAX_LEN,
-        dropout=DROPOUT,
-        lr=LR,
-        weight_decay=WEIGHT_DECAY,
+        embed_dim=carca_settings.embed_dim,
+        num_heads=carca_settings.num_heads,
+        num_layers=carca_settings.num_layers,
+        max_len=carca_settings.max_len,
+        dropout=carca_settings.dropout,
+        lr=carca_settings.lr,
+        weight_decay=carca_settings.weight_decay,
     )
 
     item_embeddings = item2vec_module.get_graph_embeddings(num_layers=item2vec_settings.num_layers)
@@ -84,35 +51,35 @@ def main():
 
     datamodule = CarcaDataModule(
         volume=volume_i,
-        batch_size=DATAMODULE_BATCH_SIZE,
-        num_workers=DATAMODULE_NUM_WORKERS,
+        batch_size=carca_settings.datamodule_batch_size,
+        num_workers=carca_settings.datamodule_num_workers,
     )
 
     trainer = Trainer(
-        limit_train_batches=TRAINER_LIMIT_TRAIN_BATCHES,
-        max_epochs=TRAINER_MAX_EPOCHS,
-        logger=WandbLogger(project="carca", version="v1"),
-        profiler=TRAINER_PROFILER,
-        precision=TRAINER_PRECISION,
+        limit_train_batches=carca_settings.trainer_limit_train_batches,
+        max_epochs=carca_settings.trainer_max_epochs,
+        logger=logger,
+        profiler=carca_settings.trainer_profiler,
+        precision=carca_settings.trainer_precision,
         callbacks=[
             ModelCheckpoint(
-                dirpath=volume_c.workspace_path.joinpath("checkpoints"),
-                monitor=CHECKPOINT_MONITOR,
-                mode=CHECKPOINT_MODE,
-                every_n_train_steps=CHECKPOINT_EVERY_N_TRAIN_STEPS,
-                filename=CHECKPOINT_FILENAME,
+                dirpath=carca_checkpoint_path,
+                monitor=carca_settings.checkpoint_monitor,
+                mode=carca_settings.checkpoint_mode,
+                every_n_train_steps=carca_settings.checkpoint_every_n_train_steps,
+                filename=carca_settings.checkpoint_filename,
                 save_last=True,
             ),
             EarlyStopping(
-                monitor=CHECKPOINT_MONITOR,
-                mode=CHECKPOINT_MODE,
+                monitor=carca_settings.checkpoint_monitor,
+                mode=carca_settings.checkpoint_mode,
                 patience=10,
                 verbose=True,
             ),
         ],
     )
-    trainer.fit(model=carca, datamodule=datamodule, ckpt_path=CKPT_PATH)
-    trainer.test(model=carca, datamodule=datamodule, ckpt_path=CKPT_PATH)
+    trainer.fit(model=carca, datamodule=datamodule, ckpt_path=carca_settings.ckpt_path)
+    trainer.test(model=carca, datamodule=datamodule, ckpt_path=carca_settings.ckpt_path)
 
 
 if __name__ == "__main__":

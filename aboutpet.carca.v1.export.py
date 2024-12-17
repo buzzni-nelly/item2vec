@@ -16,8 +16,9 @@ def export_onnx():
     carca_config_path = directories.config("aboutpet", "carca", "v1")
     carca_settings = carca.configs.Settings.load(carca_config_path)
 
+    checkpoint_path = volume_c.workspace_path.joinpath("checkpoints", "last.ckpt")
     model = CARCA.load_from_checkpoint(
-        volume_c.workspace_path.joinpath("checkpoints", "last.ckpt"),
+        checkpoint_path=checkpoint_path,
         num_items=volume_i.vocab_size(),
         embed_dim=carca_settings.embed_dim,
         num_heads=carca_settings.num_heads,
@@ -73,10 +74,7 @@ def export_sqlite3():
 def compress():
     volume_c = Volume(company_id="aboutpet", model="carca", version="v1")
     tools.compress(
-        file_paths=[
-            volume_c.workspace_path.joinpath("CARCA.onnx"),
-            volume_c.sqlite3_path
-        ],
+        file_paths=[volume_c.workspace_path.joinpath("CARCA.onnx"), volume_c.sqlite3_path],
         tar_gz_path=volume_c.workspace_path.joinpath(f"{datetime.now().strftime('%Y%m%d%H%M%S')}.tar.gz"),
     )
 
@@ -92,4 +90,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     checkpoint_filename: str = "{epoch}-{step}-{train_loss:.2f}"
     checkpoint_mode: str = "max"
     checkpoint_every_n_train_steps: int = 10_000
-    checkpoint_path: str | None = "last"
+    ckpt_path: str | None = "last"
 
     def print(self):
         for k, v in self.model_dump().items():

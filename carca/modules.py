@@ -80,14 +80,15 @@ class CARCA(pl.LightningModule):
 
         # Masked Output 과 Candidate Embeddings 간의 점수 계산
         # score shape: (batch_size, seq_len)
-        scores = torch.matmul(output, candidate_embeddings.transpose(1, 2)).squeeze(1)  # (batch_size, num_masked, num_candidates)
+        scores = torch.matmul(output, candidate_embeddings.transpose(1, 2)).squeeze(
+            1
+        )  # (batch_size, num_masked, num_candidates)
 
         # (batch_size, num_candidates)
         sorted_scores, sorted_indices = torch.sort(scores, dim=-1, descending=True)
         # (batch_size, num_candidates)
         sorted_candidate_idxs = torch.gather(candidate_pidxs, 1, sorted_indices)
         return sorted_scores, sorted_candidate_idxs
-
 
     def training_step(self, batch: list[torch.Tensor], idx: int):
         # input_seqs shape: (256, 50)

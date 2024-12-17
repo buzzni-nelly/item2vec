@@ -149,7 +149,7 @@ CHECKPOINT_MONITOR = settings.checkpoint_monitor
 CHECKPOINT_MODE = settings.checkpoint_mode
 CHECKPOINT_EVERY_N_TRAIN_STEPS = settings.checkpoint_every_n_train_steps
 CHECKPOINT_FILENAME = settings.checkpoint_filename
-CKPT_PATH = settings.checkpoint_path
+CKPT_PATH = settings.ckpt_path
 
 # Wandb
 WANDB_CONFIG = settings.dict()

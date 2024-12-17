@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     checkpoint_filename: str = "{epoch}-{step}-{train_loss:.2f}"
     checkpoint_mode: str = "max"
     checkpoint_every_n_train_steps: int = 10_000
-    checkpoint_path: str | None = "last"
+    ckpt_path: str | None = "last"
 
     wandb_api_key: str = "7290cd5cb94c29300893438a08b4b6aa844149f3"
 
