@@ -19,8 +19,6 @@ def main():
 
     volume = Volume(company_id="aboutpet", model="item2vec", version="v1")
 
-    item2vec_checkpoint_dir_path = volume.workspace_path.joinpath("checkpoints")
-
     data_module = SkipGramBPRDataModule(
         volume=volume,
         batch_size=item2vec_settings.datamodule_batch_size,
@@ -38,6 +36,7 @@ def main():
         num_layers=item2vec_settings.num_layers,
     )
 
+    item2vec_checkpoint_dir_path = volume.workspace_path.joinpath("checkpoints")
     trainer = Trainer(
         limit_train_batches=item2vec_settings.trainer_limit_train_batches,
         max_epochs=item2vec_settings.trainer_max_epochs,

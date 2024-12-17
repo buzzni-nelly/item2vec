@@ -78,6 +78,8 @@ def compress():
         tar_gz_path=volume_c.workspace_path.joinpath(f"{datetime.now().strftime('%Y%m%d%H%M%S')}.tar.gz"),
     )
 
+def remove():
+    volume_c = Volume(company_id="aboutpet", model="carca", version="v1")
     volume_c.workspace_path.joinpath("CARCA.onnx").unlink()
     volume_c.sqlite3_path.unlink()
 
@@ -86,6 +88,7 @@ def main():
     export_onnx()
     export_sqlite3()
     compress()
+    remove()
 
 
 if __name__ == "__main__":
