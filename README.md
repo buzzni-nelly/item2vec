@@ -20,6 +20,8 @@ PyTorch 모델 실행 시, 특정 GPU를 사용하거나 메모리 할당 전략
 터미널에서 아래 명령어를 실행하여 환경 변수를 설정합니다:
 
 ```bash
+export CUDA_VISIBLE_DEVICES=0
 export CUDA_VISIBLE_DEVICES=1
+export CUDA_VISIBLE_DEVICES=0,1
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 ```
