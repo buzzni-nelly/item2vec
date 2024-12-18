@@ -44,7 +44,7 @@ def export_onnx():
     torch.onnx.export(
         model=model,
         args=(input_seqs, src_key_padding_mask, last_idxs, candidate_idxs),
-        f=volume_c.workspace_path.joinpath("CARCA.onnx"),
+        f=volume_c.workspace_path.joinpath("aboutpet-carca-v1.onnx"),
         export_params=True,
         opset_version=14,
         do_constant_folding=True,
@@ -74,14 +74,14 @@ def export_sqlite3():
 def compress():
     volume_c = Volume(company_id="aboutpet", model="carca", version="v1")
     tools.compress(
-        file_paths=[volume_c.workspace_path.joinpath("CARCA.onnx"), volume_c.sqlite3_path],
+        file_paths=[volume_c.workspace_path.joinpath("aboutpet-carca-v1.onnx"), volume_c.sqlite3_path],
         tar_gz_path=volume_c.workspace_path.joinpath(f"{datetime.now().strftime('%Y%m%d%H%M%S')}.tar.gz"),
     )
 
 
 def remove():
     volume_c = Volume(company_id="aboutpet", model="carca", version="v1")
-    volume_c.workspace_path.joinpath("CARCA.onnx").unlink()
+    volume_c.workspace_path.joinpath("aboutpet-carca-v1.onnx").unlink()
     volume_c.sqlite3_path.unlink()
 
 

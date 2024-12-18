@@ -427,7 +427,7 @@ class Migrator:
 
         workspaces_path = workspaces_path or directories.workspaces
         self.workspace_path = workspaces_path.joinpath(company_id, model, version)
-        self.sqlite3_path = self.workspace_path.joinpath(f"{company_id}-{model}-{version}.db")
+        self.sqlite3_path = self.workspace_path.joinpath(f"{company_id}-{model}-{version}.sqlite3")
 
         if not self.workspace_path.exists():
             self.workspace_path.mkdir(parents=True)
@@ -706,7 +706,7 @@ class Volume:
         workspaces_path = workspaces_path or directories.workspaces
         self.workspaces_path = workspaces_path
         self.workspace_path = workspaces_path.joinpath(company_id, model, version)
-        self.sqlite3_path = self.workspace_path.joinpath(f"{company_id}-{model}-{version}.db")
+        self.sqlite3_path = self.workspace_path.joinpath(f"{company_id}-{model}-{version}.sqlite3")
 
         if not self.workspace_path.exists():
             self.workspace_path.mkdir(parents=True)
