@@ -19,9 +19,13 @@ def export_onnx():
     carca_settings = carca.configs.Settings.load(carca_config_path)
 
     checkpoint_path = volume_c.workspace_path.joinpath("checkpoints", "last.ckpt")
+    num_category1, num_category2, num_category3 = volume_i.count_categories()
     model = CARCA.load_from_checkpoint(
         checkpoint_path=checkpoint_path,
         num_items=volume_i.vocab_size(),
+        num_category1=num_category1,
+        num_category2=num_category2,
+        num_category3=num_category3,
         embed_dim=carca_settings.embed_dim,
         num_heads=carca_settings.num_heads,
         num_layers=carca_settings.num_layers,
