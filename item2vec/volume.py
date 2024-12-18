@@ -599,10 +599,10 @@ class Migrator:
 
         rows = []
         insert_query = text(
-        """
-        INSERT INTO skip_gram (source_pidx, target_pidx, is_purchased)
-        VALUES (:source_pidx, :target_pidx, :is_purchased)
-        """
+            """
+            INSERT INTO skip_gram (source_pidx, target_pidx, is_purchased)
+            VALUES (:source_pidx, :target_pidx, :is_purchased)
+            """
         )
 
         for x, y, z in tqdm(skip_grams, desc="Inserting skip grams into sqlite3.."):
@@ -637,10 +637,10 @@ class Migrator:
             queue.append(current)
 
         insert_query = text(
-        """
-        INSERT INTO click2purchase_sequence (source_pidx, target_pidx)
-        VALUES (:source_pidx, :target_pidx)
-        """
+            """
+            INSERT INTO click2purchase_sequence (source_pidx, target_pidx)
+            VALUES (:source_pidx, :target_pidx)
+            """
         )
 
         self.session.execute(insert_query, rows)
