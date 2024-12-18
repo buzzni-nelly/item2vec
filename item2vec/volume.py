@@ -801,10 +801,10 @@ class Volume:
             condition=condition,
             min_purchase_count=min_purchase_count,
         )
-        pidxs_list = [tuple(map(int, x["pidxs"].split(","))) for x in histories]
-        category1s_list = [tuple(map(int, x["category1s"].split(","))) for x in histories]
-        category2s_list = [tuple(map(int, x["category2s"].split(","))) for x in histories]
-        category3s_list = [tuple(map(int, x["category3s"].split(","))) for x in histories]
+        pidxs_list = [list(map(int, x["pidxs"].split(","))) for x in histories]
+        category1s_list = [list(map(int, x["category1s"].split(","))) for x in histories]
+        category2s_list = [list(map(int, x["category2s"].split(","))) for x in histories]
+        category3s_list = [list(map(int, x["category3s"].split(","))) for x in histories]
 
         assert len(pidxs_list) == len(category1s_list) == len(category2s_list) == len(category3s_list)
 
