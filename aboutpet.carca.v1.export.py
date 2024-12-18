@@ -73,7 +73,7 @@ def export_sqlite3():
     tools.migrate_tables(
         old_sqlite3_path=volume_i.sqlite3_path,
         new_sqlite3_path=volume_c.sqlite3_path,
-        tables=["item"],
+        tables=["item", "category1", "category2", "category3"],
     )
 
 
