@@ -266,6 +266,10 @@ class Trace(Base):
         return session.query(Trace).order_by(Trace.id.desc()).limit(1).one_or_none()
 
     @staticmethod
+    def get_last_timestamp(session: Session) -> int | None:
+        return session.query(func.max(Trace.timestamp)).scalar()
+
+    @staticmethod
     def insert_traces(session: Session, traces: list[dict]):
         session.bulk_insert_mappings(Trace, traces)
 
@@ -309,47 +313,49 @@ class Trace(Base):
     @staticmethod
     def aggregate_user_histories(
         session: Session,
-        threshold: float = None,
-        condition: Literal["greater", "smaller"] = "smaller",
+        condition: Literal["full", "training", "test"] = "full",
         min_purchase_count: int = 1,
+        offset_seconds=2 * 60 * 60,
     ):
-        if condition not in ["greater", "smaller"]:
-            raise Exception("condition must be 'greater' or 'smaller'")
+        last_timestamp = Trace.get_last_timestamp(session)
+        threshold = last_timestamp - offset_seconds
 
-        threshold = threshold or (Trace.get_last_trace(session).timestamp - 24 * 60 * 60)
-        operator = ">=" if condition == "greater" else "<"
-
-        query = text(
-            f"""
+        query = f"""
+        SELECT
+            user_id,
+            GROUP_CONCAT(pidx, ',') AS pidxs,
+            GROUP_CONCAT(event, ',') AS events,
+            GROUP_CONCAT(cidx_1, ',') AS category1s,
+            GROUP_CONCAT(cidx_2, ',') AS category2s,
+            GROUP_CONCAT(cidx_3, ',') AS category3s
+        FROM (
             SELECT
-                user_id,
-                GROUP_CONCAT(pidx, ',') AS pidxs,
-                GROUP_CONCAT(event, ',') AS events,
-                GROUP_CONCAT(cidx_1, ',') AS category1s,
-                GROUP_CONCAT(cidx_2, ',') AS category2s,
-                GROUP_CONCAT(cidx_3, ',') AS category3s
-            FROM (
-                SELECT
-                    t.user_id AS user_id,
-                    i.pidx AS pidx,
-                    t.event AS event,
-                    COALESCE(c1.cidx, 0) AS cidx_1,
-                    COALESCE(c2.cidx, 0) AS cidx_2,
-                    COALESCE(c3.cidx, 0) AS cidx_3
-                FROM
-                    trace AS t
-                INNER JOIN item AS i ON t.pdid = i.pdid
-                INNER JOIN user AS u ON t.user_id = u.user_id
-                LEFT JOIN category1 AS c1 ON i.category1 = c1.name
-                LEFT JOIN category2 AS c2 ON i.category2 = c2.name
-                LEFT JOIN category3 AS c3 ON i.category3 = c3.name
-                WHERE u.purchase_count >= {min_purchase_count}
-                  AND t.timestamp {operator} {threshold}
-            ) AS subquery
-            GROUP BY
-                user_id
-            """
-        )
+                t.user_id AS user_id,
+                i.pidx AS pidx,
+                t.event AS event,
+                COALESCE(c1.cidx, 0) AS cidx_1,
+                COALESCE(c2.cidx, 0) AS cidx_2,
+                COALESCE(c3.cidx, 0) AS cidx_3,
+                t.timestamp AS event_timestamp
+            FROM
+                trace AS t
+            INNER JOIN item AS i ON t.pdid = i.pdid
+            INNER JOIN user AS u ON t.user_id = u.user_id
+            LEFT JOIN category1 AS c1 ON i.category1 = c1.name
+            LEFT JOIN category2 AS c2 ON i.category2 = c2.name
+            LEFT JOIN category3 AS c3 ON i.category3 = c3.name
+            WHERE u.purchase_count >= {min_purchase_count}
+        ) AS subquery
+        GROUP BY
+            user_id
+        """
+
+        if condition == "training":
+            query += f"HAVING MAX(event_timestamp) < {threshold}"
+        elif condition == "test":
+            query += f"HAVING MAX(event_timestamp) >= {threshold}"
+
+        query = text(query)
         results = session.execute(query).fetchall()
         return [
             {
@@ -360,7 +366,7 @@ class Trace(Base):
                 "category2s": row.category2s,
                 "category3s": row.category3s,
             }
-            for row in results
+            for row in tqdm(results, desc="Aggregating user histories..")
         ]
 
     @staticmethod
@@ -579,26 +585,6 @@ class Migrator:
         self.session.bulk_save_objects(category3_objects)
         self.session.commit()
 
-    def migrate_user_histories(
-        self,
-        threshold: float = None,
-        condition: Literal["greater", "smaller"] = "smaller",
-        min_purchase_count: int = 1,
-    ):
-        histories = Trace.aggregate_user_histories(
-            self.session,
-            threshold=threshold,
-            condition=condition,
-            min_purchase_count=min_purchase_count,
-        )
-        histories = [x["pidxs"].split(",") for x in histories]
-        result = []
-        for history in histories:
-            for i in range(2, len(history)):
-                cumulative_ids = history[max(0, i - 50) : i]
-                result.append(list(map(int, cumulative_ids)))
-        return result
-
     def migrate_skip_grams(self, chunk_size=10_000_000):
         SkipGram.reset_table(self.session)
         skip_grams = self.list_skip_grams()
@@ -807,26 +793,26 @@ class Volume:
 
     def list_user_histories(
         self,
-        threshold: float = None,
-        condition: Literal["greater", "smaller"] = "smaller",
+        condition: Literal["full", "training", "test"] = "training",
         min_purchase_count: int = 1,
     ):
         histories = Trace.aggregate_user_histories(
             self.session,
-            threshold=threshold,
             condition=condition,
             min_purchase_count=min_purchase_count,
         )
-        pidxs_list = [list(map(int, x["pidxs"].split(","))) for x in histories]
-        category1s_list = [list(map(int, x["category1s"].split(","))) for x in histories]
-        category2s_list = [list(map(int, x["category2s"].split(","))) for x in histories]
-        category3s_list = [list(map(int, x["category3s"].split(","))) for x in histories]
+        pidxs_list = [tuple(map(int, x["pidxs"].split(","))) for x in histories]
+        category1s_list = [tuple(map(int, x["category1s"].split(","))) for x in histories]
+        category2s_list = [tuple(map(int, x["category2s"].split(","))) for x in histories]
+        category3s_list = [tuple(map(int, x["category3s"].split(","))) for x in histories]
+
+        assert len(pidxs_list) == len(category1s_list) == len(category2s_list) == len(category3s_list)
+
         result = []
         zipped = zip(pidxs_list, category1s_list, category2s_list, category3s_list)
-        for pidxs, category1s, category2s, category3s in zipped:
-
+        iteration = tqdm(zipped, total=len(pidxs_list), desc=f"Partitioning user histories into 50-sequence windows")
+        for pidxs, category1s, category2s, category3s in iteration:
             assert len(pidxs) == len(category1s) == len(category2s) == len(category3s)
-
             for i in range(2, len(pidxs)):
                 s = max(0, i - 50)
                 s_pidxs = pidxs[s: i]
@@ -835,6 +821,8 @@ class Volume:
                 s_category3s = category3s[s: i]
                 result.append((s_pidxs, s_category1s, s_category2s, s_category3s))
 
+        print(f">>> List user histories completed.")
+        print(f">>> Aggregated total {len(result):,} rows")
         return result
 
     def list_click2purchase_sequences(self) -> list[Click2PurchaseSequence]:
@@ -847,9 +835,8 @@ if __name__ == "__main__":
     # migrator.migrate_items()
     # migrator.migrate_users()
     # migrator.migrate_categories()
-    # migrator.migrate_user_histories()
     # migrator.migrate_skip_grams()
     # migrator.migrate_click2purchase_sequences(begin_date=datetime.now() - timedelta(days=7))
     # migrator.generate_edge_indices_csv()
     volume = Volume(company_id="aboutpet", model="item2vec", version="v1")
-    volume.list_user_histories(condition="smaller")
+    volume.list_user_histories(condition="training")
