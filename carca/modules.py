@@ -91,14 +91,14 @@ class CARCA(pl.LightningModule):
         return sorted_scores, sorted_candidate_idxs
 
     def training_step(self, batch: list[torch.Tensor], idx: int):
-        # input_seqs shape: (256, 50)
+        # pidxs shape: (256, 50)
         # src_key_padding_mask shape: (256, 50)
         # masked_idxs shape: (256, 2)
         # positive_idxs shape: (256, 2)
         # negative_idxs shape: (256, 2)
-        input_seqs, src_key_padding_mask, masked_idxs, positive_idxs, negative_idxs = batch
+        pidxs, _1, _2, _3, src_key_padding_mask, masked_idxs, positive_idxs, negative_idxs = batch
 
-        embeddings = self.item_embeddings(input_seqs)
+        embeddings = self.item_embeddings(pidxs)
         embeddings = self.dropout(embeddings)
         embeddings = self.position_embeddings(embeddings, combine=True)
 
@@ -205,13 +205,20 @@ class CarcaTrainDataset(Dataset):
         return len(self.histories)
 
     def __getitem__(self, idx: int):
-        history_pidxs = self.histories[idx]
-        seq_len = len(history_pidxs)
+        pidxs, category1s, category2s, category3s = self.histories[idx]
+        seq_len = len(pidxs)
         pad_len = self.max_len - seq_len
 
-        input_seqs = history_pidxs + ([self.pad_token_idx] * pad_len)
-        input_seqs = torch.tensor(input_seqs, dtype=torch.long)
-        padding_mask = input_seqs == self.pad_token_idx
+        pidxs = pidxs + ([self.pad_token_idx] * pad_len)
+        pidxs = torch.tensor(pidxs, dtype=torch.long)
+        category1s = category1s + ([0] * pad_len)
+        category1s = torch.tensor(category1s, dtype=torch.long)
+        category2s = category2s + ([0] * pad_len)
+        category2s = torch.tensor(category2s, dtype=torch.long)
+        category3s = category3s + ([0] * pad_len)
+        category3s = torch.tensor(category3s, dtype=torch.long)
+
+        padding_mask = pidxs == self.pad_token_idx
 
         valid_positions = list(range(seq_len))
         if seq_len >= self.num_masked:
@@ -221,15 +228,24 @@ class CarcaTrainDataset(Dataset):
 
         masked_positions = torch.tensor(masked_positions, dtype=torch.long)
 
-        positive_pidxs = input_seqs[masked_positions].clone()
-        input_seqs[masked_positions] = self.mask_token_idx
+        positive_pidxs = pidxs[masked_positions].clone()
+        pidxs[masked_positions] = self.mask_token_idx
 
         negative_pidxs = torch.randint(0, self.num_items, (len(masked_positions),), dtype=torch.long)
         for i in range(len(negative_pidxs)):
             while negative_pidxs[i] == positive_pidxs[i]:
                 negative_pidxs[i] = torch.randint(0, self.num_items, ()).item()
 
-        return input_seqs, padding_mask, masked_positions, positive_pidxs, negative_pidxs
+        return (
+            pidxs,
+            category1s,
+            category2s,
+            category3s,
+            padding_mask,
+            masked_positions,
+            positive_pidxs,
+            negative_pidxs,
+        )
 
 
 class CarcaValidDataset(Dataset):
@@ -244,19 +260,19 @@ class CarcaValidDataset(Dataset):
         return len(self.histories)
 
     def __getitem__(self, idx: int) -> tuple:
-        history_pidxs = self.histories[idx]
-        pad_len = self.max_len - len(history_pidxs)
+        pidxs, _1, _2, _3 = self.histories[idx]
+        pad_len = self.max_len - len(pidxs)
 
-        input_seqs = history_pidxs + ([self.pad_token_idx] * pad_len)
-        input_seqs = torch.tensor(input_seqs, dtype=torch.long)
-        padding_mask = input_seqs == self.pad_token_idx
+        pidxs_tensor = pidxs + ([self.pad_token_idx] * pad_len)
+        pidxs_tensor = torch.tensor(pidxs_tensor, dtype=torch.long)
+        padding_mask = pidxs_tensor == self.pad_token_idx
 
         last_idx = (~padding_mask).sum(dim=0) - 1
 
-        ground_truth_item = input_seqs[last_idx].item()
-        input_seqs[last_idx] = self.mask_token_idx
+        ground_truth_item = pidxs_tensor[last_idx].item()
+        pidxs_tensor[last_idx] = self.mask_token_idx
 
-        return input_seqs, padding_mask, last_idx, ground_truth_item
+        return pidxs_tensor, padding_mask, last_idx, ground_truth_item
 
 
 class CarcaDataModule(pl.LightningDataModule):
@@ -280,7 +296,7 @@ class CarcaDataModule(pl.LightningDataModule):
             persistent_workers=bool(self.num_workers > 0),
             pin_memory=True,
             shuffle=True,
-            collate_fn=self.carca_collate_fn,
+            # collate_fn=self.carca_collate_fn,
         )
 
     def val_dataloader(self):

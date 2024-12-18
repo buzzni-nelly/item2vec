@@ -324,25 +324,28 @@ class Trace(Base):
             SELECT
                 user_id,
                 GROUP_CONCAT(pidx, ',') AS pidxs,
-                GROUP_CONCAT(event, ',') AS events
-                GROUP_CONCAT(category1, ',') AS category1s,
-                GROUP_CONCAT(category2, ',') AS category2s,
-                GROUP_CONCAT(category3, ',') AS category3s,
+                GROUP_CONCAT(event, ',') AS events,
+                GROUP_CONCAT(cidx_1, ',') AS category1s,
+                GROUP_CONCAT(cidx_2, ',') AS category2s,
+                GROUP_CONCAT(cidx_3, ',') AS category3s
             FROM (
                 SELECT
-                    t.user_id as user_id,
-                    i.pidx as pidx,
-                    t.event as event
-                    i.category1 as category1,
-                    i.category2 as category2,
-                    i.category3 as category3,
+                    t.user_id AS user_id,
+                    i.pidx AS pidx,
+                    t.event AS event,
+                    COALESCE(c1.cidx, 0) AS cidx_1,
+                    COALESCE(c2.cidx, 0) AS cidx_2,
+                    COALESCE(c3.cidx, 0) AS cidx_3
                 FROM
                     trace AS t
                 INNER JOIN item AS i ON t.pdid = i.pdid
                 INNER JOIN user AS u ON t.user_id = u.user_id
+                LEFT JOIN category1 AS c1 ON i.category1 = c1.name
+                LEFT JOIN category2 AS c2 ON i.category2 = c2.name
+                LEFT JOIN category3 AS c3 ON i.category3 = c3.name
                 WHERE u.purchase_count >= {min_purchase_count}
                   AND t.timestamp {operator} {threshold}
-            )
+            ) AS subquery
             GROUP BY
                 user_id
             """
@@ -353,6 +356,9 @@ class Trace(Base):
                 "user_id": row.user_id,
                 "pidxs": row.pidxs,
                 "events": row.events,
+                "category1s": row.category1s,
+                "category2s": row.category2s,
+                "category3s": row.category3s,
             }
             for row in results
         ]
@@ -427,7 +433,7 @@ class Migrator:
 
         workspaces_path = workspaces_path or directories.workspaces
         self.workspace_path = workspaces_path.joinpath(company_id, model, version)
-        self.sqlite3_path = self.workspace_path.joinpath(f"{company_id}-{model}-{version}.db")
+        self.sqlite3_path = self.workspace_path.joinpath(f"{company_id}-{model}-{version}.sqlite3")
 
         if not self.workspace_path.exists():
             self.workspace_path.mkdir(parents=True)
@@ -706,7 +712,7 @@ class Volume:
         workspaces_path = workspaces_path or directories.workspaces
         self.workspaces_path = workspaces_path
         self.workspace_path = workspaces_path.joinpath(company_id, model, version)
-        self.sqlite3_path = self.workspace_path.joinpath(f"{company_id}-{model}-{version}.db")
+        self.sqlite3_path = self.workspace_path.joinpath(f"{company_id}-{model}-{version}.sqlite3")
 
         if not self.workspace_path.exists():
             self.workspace_path.mkdir(parents=True)
@@ -810,12 +816,24 @@ class Volume:
             condition=condition,
             min_purchase_count=min_purchase_count,
         )
-        histories = [x["pidxs"].split(",") for x in histories]
+        pidxs_list = [list(map(int, x["pidxs"].split(","))) for x in histories]
+        category1s_list = [list(map(int, x["category1s"].split(","))) for x in histories]
+        category2s_list = [list(map(int, x["category2s"].split(","))) for x in histories]
+        category3s_list = [list(map(int, x["category3s"].split(","))) for x in histories]
         result = []
-        for history in histories:
-            for i in range(2, len(history)):
-                cumulative_ids = history[max(0, i - 50) : i]
-                result.append(list(map(int, cumulative_ids)))
+        zipped = zip(pidxs_list, category1s_list, category2s_list, category3s_list)
+        for pidxs, category1s, category2s, category3s in zipped:
+
+            assert len(pidxs) == len(category1s) == len(category2s) == len(category3s)
+
+            for i in range(2, len(pidxs)):
+                s = max(0, i - 50)
+                s_pidxs = pidxs[s: i]
+                s_category1s = category1s[s: i]
+                s_category2s = category2s[s: i]
+                s_category3s = category3s[s: i]
+                result.append((s_pidxs, s_category1s, s_category2s, s_category3s))
+
         return result
 
     def list_click2purchase_sequences(self) -> list[Click2PurchaseSequence]:
@@ -823,12 +841,14 @@ class Volume:
 
 
 if __name__ == "__main__":
-    migrator = Migrator(company_id="aboutpet", model="item2vec", version="v1")
-    migrator.migrate_traces(begin_date=datetime(2024, 8, 1))
-    migrator.migrate_items()
-    migrator.migrate_users()
-    migrator.migrate_categories()
-    migrator.migrate_user_histories()
-    migrator.migrate_skip_grams()
-    migrator.migrate_click2purchase_sequences(begin_date=datetime.now() - timedelta(days=7))
-    migrator.generate_edge_indices_csv()
+    # migrator = Migrator(company_id="aboutpet", model="item2vec", version="v1")
+    # migrator.migrate_traces(begin_date=datetime(2024, 8, 1))
+    # migrator.migrate_items()
+    # migrator.migrate_users()
+    # migrator.migrate_categories()
+    # migrator.migrate_user_histories()
+    # migrator.migrate_skip_grams()
+    # migrator.migrate_click2purchase_sequences(begin_date=datetime.now() - timedelta(days=7))
+    # migrator.generate_edge_indices_csv()
+    volume = Volume(company_id="aboutpet", model="item2vec", version="v1")
+    volume.list_user_histories(condition="smaller")
