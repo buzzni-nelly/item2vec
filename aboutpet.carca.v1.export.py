@@ -1,12 +1,14 @@
+import pathlib
 from datetime import datetime
 
 import torch
+import z3
 
-import directories
 import carca
+import directories
 import tools
-from item2vec.volume import Volume
 from carca.modules import CARCA
+from item2vec.volume import Volume
 
 
 def export_onnx():
@@ -44,7 +46,7 @@ def export_onnx():
     torch.onnx.export(
         model=model,
         args=(input_seqs, src_key_padding_mask, last_idxs, candidate_idxs),
-        f=volume_c.workspace_path.joinpath("aboutpet-carca-v1.onnx"),
+        f=volume_c.onnx_path,
         export_params=True,
         opset_version=14,
         do_constant_folding=True,
@@ -73,22 +75,36 @@ def export_sqlite3():
 
 def compress():
     volume_c = Volume(company_id="aboutpet", model="carca", version="v1")
+    filename = datetime.now().strftime('%Y%m%d%H%M%S')
     tools.compress(
-        file_paths=[volume_c.workspace_path.joinpath("aboutpet-carca-v1.onnx"), volume_c.sqlite3_path],
-        tar_gz_path=volume_c.workspace_path.joinpath(f"{datetime.now().strftime('%Y%m%d%H%M%S')}.tar.gz"),
+        file_paths=[
+            volume_c.onnx_path,
+            volume_c.sqlite3_path,
+        ],
+        tar_gz_path=volume_c.workspace_path.joinpath(f"{filename}.tar.gz"),
     )
+    return volume_c.workspace_path.joinpath(f"{filename}.tar.gz")
 
 
 def remove():
     volume_c = Volume(company_id="aboutpet", model="carca", version="v1")
-    volume_c.workspace_path.joinpath("aboutpet-carca-v1.onnx").unlink()
+    volume_c.onnx_path.unlink()
     volume_c.sqlite3_path.unlink()
+
+
+def upload(filepath: pathlib.Path = None):
+    z3.put_object(
+        bucket_name="ailab-recommenders",
+        object_key=f"aboutpet/carca/v1/{filepath.name}",
+        local_path=filepath,
+    )
 
 
 def main():
     export_onnx()
     export_sqlite3()
-    compress()
+    compressed_file_path = compress()
+    upload(compressed_file_path)
     remove()
 
 
