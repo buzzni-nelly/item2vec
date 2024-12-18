@@ -36,8 +36,12 @@ def main():
         num_layers=item2vec_settings.num_layers,
     )
 
+    num_category1, num_category2, num_category3 = volume_i.count_categories()
     carca = CARCA(
         num_items=volume_i.vocab_size(),
+        num_category1=num_category1,
+        num_category2=num_category2,
+        num_category3=num_category3,
         embed_dim=carca_settings.embed_dim,
         num_heads=carca_settings.num_heads,
         num_layers=carca_settings.num_layers,

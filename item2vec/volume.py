@@ -782,6 +782,9 @@ class Volume:
             return Category3.get_category_by_cidx(self.session, 0)
         return category
 
+    def count_categories(self) -> tuple[int, int, int]:
+        return self.count_category_1(), self.count_category_2(), self.count_category_3()
+
     def count_category_1(self) -> int:
         return Category1.count_categories(self.session)
 
