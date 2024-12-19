@@ -19,10 +19,11 @@ def export_onnx():
     carca_settings = carca.configs.Settings.load(carca_config_path)
 
     checkpoint_path = volume_c.workspace_path.joinpath("checkpoints", "last.ckpt")
+    num_items = volume_i.vocab_size()
     num_category1, num_category2, num_category3 = volume_i.count_categories()
     model = CARCA.load_from_checkpoint(
         checkpoint_path=checkpoint_path,
-        num_items=volume_i.vocab_size(),
+        num_items=num_items,
         num_category1=num_category1,
         num_category2=num_category2,
         num_category3=num_category3,
@@ -48,7 +49,7 @@ def export_onnx():
     category2_cidxs = torch.randint(0, num_category2, (batch_size, max_len), dtype=torch.int64)
     category3_cidxs = torch.randint(0, num_category3, (batch_size, max_len), dtype=torch.int64)
     src_key_padding_mask = torch.randint(0, 2, (batch_size, max_len), dtype=torch.bool)
-    last_idxs = torch.randint(0, max_len, (batch_size, 1), dtype=torch.int64)
+    masked_idxs = torch.randint(0, max_len, (batch_size, 1), dtype=torch.int64)
     candidate_idxs = torch.randint(0, num_items, (batch_size, num_candidates), dtype=torch.int64)
 
     torch.onnx.export(
@@ -59,7 +60,7 @@ def export_onnx():
             category2_cidxs,
             category3_cidxs,
             src_key_padding_mask,
-            last_idxs,
+            masked_idxs,
             candidate_idxs,
         ),
         f=volume_c.onnx_path,
