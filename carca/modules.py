@@ -65,43 +65,51 @@ class CARCA(pl.LightningModule):
 
     def forward(
         self,
-        input_seqs: torch.Tensor,
+        sequence_pidxs: torch.Tensor,
+        category1_cidxs: torch.Tensor,
+        category2_cidxs: torch.Tensor,
+        category3_cidxs: torch.Tensor,
         src_key_padding_mask: torch.Tensor,
         masked_idxs: torch.Tensor,
         candidate_pidxs: torch.Tensor,
     ):
-        # input_seq shape: (batch_size, seq_len)
-        input_seqs[src_key_padding_mask] = self.pad_token_idx
-        input_seqs = input_seqs.scatter(1, masked_idxs, self.mask_token_idx)
+        # Replace padding indices for masked positions
+        sequence_pidxs[src_key_padding_mask] = self.pad_token_idx
+        sequence_pidxs = sequence_pidxs.scatter(1, masked_idxs, self.mask_token_idx)
 
-        # Embedding 계산
-        # seq_embeddings shape: (batch_size, seq_len, embed_dim)
-        seq_embeddings = self.item_embeddings(input_seqs)  # (batch_size, seq_len, embed_dim)
-        seq_embeddings = self.position_embeddings(seq_embeddings, combine=True)
+        # Compute item embeddings
+        seq_item_embeddings = self.item_embeddings(sequence_pidxs)  # (batch_size, seq_len, embed_dim)
 
-        # (batch_size, seq_len, embed_dim)
-        logits, _ = self.cross_attention(seq_embeddings, src_key_padding_mask=src_key_padding_mask)
+        # Compute category embeddings
+        cat1_emb = self.category1_embeddings(category1_cidxs)  # (batch_size, seq_len, 4)
+        cat2_emb = self.category2_embeddings(category2_cidxs)  # (batch_size, seq_len, 4)
+        cat3_emb = self.category3_embeddings(category3_cidxs)  # (batch_size, seq_len, 4)
 
-        # Masked Index 에서 Output 추출
-        # batch_indices shape: (batch_size, 1)
+        # Concatenate embeddings
+        embeddings = torch.cat([seq_item_embeddings, cat1_emb, cat2_emb, cat3_emb], dim=-1)
+        embeddings = self.concat_linear(embeddings)
+        embeddings = self.dropout(embeddings)
+        embeddings = self.position_embeddings(embeddings, combine=True)
+
+        # Cross-attention logits
+        logits, _ = self.cross_attention(embeddings, src_key_padding_mask=src_key_padding_mask)
+
+        # Extract masked outputs
         batch_indices = torch.arange(logits.size(0)).unsqueeze(1).to(self.device)  # (batch_size, 1)
-        # output shape: (batch_size, 1, embed_dim)
         output = logits[batch_indices, masked_idxs]  # (batch_size, num_masked, embed_dim)
 
-        # Candidate Indices 에 해당하는 임베딩 추출
-        # candidate_embeddings shape: (batch_size, seq_len, embed_dim)
-        candidate_embeddings = self.item_embeddings(candidate_pidxs)  # (batch_size, num_candidates, embed_dim)
+        # Candidate embeddings
+        # (batch_size, num_candidates, embed_dim)
+        candidate_embeddings = self.item_embeddings(candidate_pidxs)
 
-        # Masked Output 과 Candidate Embeddings 간의 점수 계산
-        # score shape: (batch_size, seq_len)
-        scores = torch.matmul(output, candidate_embeddings.transpose(1, 2)).squeeze(
-            1
-        )  # (batch_size, num_masked, num_candidates)
+        # Compute scores
+        # (batch_size, num_masked, num_candidates)
+        scores = torch.matmul(output, candidate_embeddings.transpose(1, 2)).squeeze(1)
 
-        # (batch_size, num_candidates)
+        # Sort scores and candidates
         sorted_scores, sorted_indices = torch.sort(scores, dim=-1, descending=True)
-        # (batch_size, num_candidates)
         sorted_candidate_idxs = torch.gather(candidate_pidxs, 1, sorted_indices)
+
         return sorted_scores, sorted_candidate_idxs
 
     def training_step(self, batch: list[torch.Tensor], idx: int):
@@ -111,16 +119,15 @@ class CARCA(pl.LightningModule):
         # positive_idxs shape: (256, 2)
         # negative_idxs shape: (256, 2)
 
-        # 여기서 category1, category2, category3 이 추가 됨
-        pidxs, category1s, category2s, category3s, src_key_padding_mask, masked_idxs, positive_idxs, negative_idxs = batch
+        seq_pidxs, cate1_cidxs, cate2_cidxs, cate3_cidxs, src_key_padding_mask, masked_idxs, positive_idxs, negative_idxs = batch
 
         # item embeddings
-        seq_item_embeddings = self.item_embeddings(pidxs)  # (batch_size, seq_len, embed_dim)
+        seq_item_embeddings = self.item_embeddings(seq_pidxs)  # (batch_size, seq_len, embed_dim)
 
         # category embeddings
-        cat1_emb = self.category1_embeddings(category1s)  # (batch_size, seq_len, embed_dim)
-        cat2_emb = self.category2_embeddings(category2s)  # (batch_size, seq_len, embed_dim)
-        cat3_emb = self.category3_embeddings(category3s)  # (batch_size, seq_len, embed_dim)
+        cat1_emb = self.category1_embeddings(cate1_cidxs)  # (batch_size, seq_len, embed_dim)
+        cat2_emb = self.category2_embeddings(cate2_cidxs)  # (batch_size, seq_len, embed_dim)
+        cat3_emb = self.category3_embeddings(cate3_cidxs)  # (batch_size, seq_len, embed_dim)
 
         # concat
         embeddings = torch.cat([seq_item_embeddings, cat1_emb, cat2_emb, cat3_emb], dim=-1)
@@ -151,15 +158,15 @@ class CARCA(pl.LightningModule):
         return train_loss
 
     def validation_step(self, batch: list[torch.Tensor], idx: int):
-        pidxs, category1s, category2s, category3s, src_key_padding_mask, last_idxs, labeled_items = batch
+        seq_pidxs, cate_cidxs, cate_cidxs, cate_cidxs, src_key_padding_mask, masked_idx, labeled_item_idxs = batch
 
         # item embeddings
-        seq_item_embeddings = self.item_embeddings(pidxs)  # (batch_size, seq_len, embed_dim)
+        seq_item_embeddings = self.item_embeddings(seq_pidxs)  # (batch_size, seq_len, embed_dim)
 
         # category embeddings
-        cat1_emb = self.category1_embeddings(category1s)  # (batch_size, seq_len, embed_dim)
-        cat2_emb = self.category2_embeddings(category2s)  # (batch_size, seq_len, embed_dim)
-        cat3_emb = self.category3_embeddings(category3s)  # (batch_size, seq_len, embed_dim)
+        cat1_emb = self.category1_embeddings(cate_cidxs)  # (batch_size, seq_len, embed_dim)
+        cat2_emb = self.category2_embeddings(cate_cidxs)  # (batch_size, seq_len, embed_dim)
+        cat3_emb = self.category3_embeddings(cate_cidxs)  # (batch_size, seq_len, embed_dim)
 
         # concat
         embeddings = torch.cat([seq_item_embeddings, cat1_emb, cat2_emb, cat3_emb], dim=-1)
@@ -168,24 +175,24 @@ class CARCA(pl.LightningModule):
         embeddings = self.position_embeddings(embeddings)
 
         logits, _ = self.cross_attention(embeddings, src_key_padding_mask=src_key_padding_mask)
-        output = logits[torch.arange(logits.size(0)), last_idxs, :]
+        output = logits[torch.arange(logits.size(0)), masked_idx, :]
         scores = torch.matmul(output, self.item_embeddings.weight[:-2].T)
 
-        mrr = self.calc_mrr(scores, labeled_items)
+        mrr = self.calc_mrr(scores, labeled_item_idxs)
         self.log("val_mrr", mrr, prog_bar=True, sync_dist=True)
 
-        hr_5 = self.calc_hr_at_k(scores, labeled_items, k=5)
-        ndcg_5 = self.calc_ndcg_at_k(scores, labeled_items, k=5)
+        hr_5 = self.calc_hr_at_k(scores, labeled_item_idxs, k=5)
+        ndcg_5 = self.calc_ndcg_at_k(scores, labeled_item_idxs, k=5)
         self.log(f"val_hr@5", hr_5, prog_bar=True, sync_dist=True)
         self.log(f"val_ndcg@5", ndcg_5, prog_bar=True, sync_dist=True)
 
-        hr_10 = self.calc_hr_at_k(scores, labeled_items, k=10)
-        ndcg_10 = self.calc_ndcg_at_k(scores, labeled_items, k=10)
+        hr_10 = self.calc_hr_at_k(scores, labeled_item_idxs, k=10)
+        ndcg_10 = self.calc_ndcg_at_k(scores, labeled_item_idxs, k=10)
         self.log(f"val_hr@10", hr_10, prog_bar=True, sync_dist=True)
         self.log(f"val_ndcg@10", ndcg_10, prog_bar=True, sync_dist=True)
 
-        hr_20 = self.calc_hr_at_k(scores, labeled_items, k=20)
-        ndcg_20 = self.calc_ndcg_at_k(scores, labeled_items, k=20)
+        hr_20 = self.calc_hr_at_k(scores, labeled_item_idxs, k=20)
+        ndcg_20 = self.calc_ndcg_at_k(scores, labeled_item_idxs, k=20)
         self.log(f"val_hr@20", hr_20, prog_bar=True, sync_dist=True)
         self.log(f"val_ndcg@20", ndcg_20, prog_bar=True, sync_dist=True)
 

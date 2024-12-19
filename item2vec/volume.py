@@ -115,7 +115,7 @@ class Item(Base):
 class Category1(Base):
     __tablename__ = "category1"
     cidx = Column(Integer, primary_key=True)
-    name = Column(String, nullable=False)
+    name = Column(String, index=True, nullable=False)
 
     @staticmethod
     def reset_table(session: Session):
@@ -140,7 +140,7 @@ class Category1(Base):
 class Category2(Base):
     __tablename__ = "category2"
     cidx = Column(Integer, primary_key=True)
-    name = Column(String, nullable=False)
+    name = Column(String, index=True, nullable=False)
 
     @staticmethod
     def reset_table(session: Session):
@@ -165,7 +165,7 @@ class Category2(Base):
 class Category3(Base):
     __tablename__ = "category3"
     cidx = Column(Integer, primary_key=True)
-    name = Column(String, nullable=False)
+    name = Column(String, index=True, nullable=False)
 
     @staticmethod
     def reset_table(session: Session):
