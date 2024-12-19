@@ -53,7 +53,15 @@ def export_onnx():
 
     torch.onnx.export(
         model=model,
-        args=(seq_pidxs, category1_cidxs, category2_cidxs, category3_cidxs, src_key_padding_mask, last_idxs, candidate_idxs),
+        args=(
+            seq_pidxs,
+            category1_cidxs,
+            category2_cidxs,
+            category3_cidxs,
+            src_key_padding_mask,
+            last_idxs,
+            candidate_idxs,
+        ),
         f=volume_c.onnx_path,
         export_params=True,
         opset_version=14,
@@ -94,7 +102,7 @@ def export_sqlite3():
 
 def compress():
     volume_c = Volume(company_id="aboutpet", model="carca", version="v1")
-    filename = datetime.now().strftime('%Y%m%d%H%M%S')
+    filename = datetime.now().strftime("%Y%m%d%H%M%S")
     tools.compress(
         file_paths=[
             volume_c.onnx_path,

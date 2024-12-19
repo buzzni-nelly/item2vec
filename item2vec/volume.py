@@ -818,10 +818,10 @@ class Volume:
             assert len(pidxs) == len(category1s) == len(category2s) == len(category3s)
             for i in range(2, len(pidxs)):
                 s = max(0, i - 50)
-                s_pidxs = pidxs[s: i]
-                s_category1s = category1s[s: i]
-                s_category2s = category2s[s: i]
-                s_category3s = category3s[s: i]
+                s_pidxs = pidxs[s:i]
+                s_category1s = category1s[s:i]
+                s_category2s = category2s[s:i]
+                s_category3s = category3s[s:i]
                 result.append((s_pidxs, s_category1s, s_category2s, s_category3s))
 
         print(f">>> List user histories completed.")

@@ -119,7 +119,16 @@ class CARCA(pl.LightningModule):
         # positive_idxs shape: (256, 2)
         # negative_idxs shape: (256, 2)
 
-        seq_pidxs, cate1_cidxs, cate2_cidxs, cate3_cidxs, src_key_padding_mask, masked_idxs, positive_idxs, negative_idxs = batch
+        (
+            seq_pidxs,
+            cate1_cidxs,
+            cate2_cidxs,
+            cate3_cidxs,
+            src_key_padding_mask,
+            masked_idxs,
+            positive_idxs,
+            negative_idxs,
+        ) = batch
 
         # item embeddings
         seq_item_embeddings = self.item_embeddings(seq_pidxs)  # (batch_size, seq_len, embed_dim)
