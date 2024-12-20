@@ -110,9 +110,9 @@ class CARCA(pl.LightningModule):
 
         (
             seq_pidxs,
-            cate1_cidxs,
-            cate2_cidxs,
-            cate3_cidxs,
+            cat1_cidxs,
+            cat2_cidxs,
+            cat3_cidxs,
             src_key_padding_mask,
             src_mask_idxs,
             positive_idxs,
@@ -123,9 +123,9 @@ class CARCA(pl.LightningModule):
         seq_item_embeddings = self.item_embeddings(seq_pidxs)  # (batch_size, seq_len, embed_dim)
 
         # category embeddings
-        cat1_emb = self.category1_embeddings(cate1_cidxs)  # (batch_size, seq_len, embed_dim)
-        cat2_emb = self.category2_embeddings(cate2_cidxs)  # (batch_size, seq_len, embed_dim)
-        cat3_emb = self.category3_embeddings(cate3_cidxs)  # (batch_size, seq_len, embed_dim)
+        cat1_emb = self.category1_embeddings(cat1_cidxs)  # (batch_size, seq_len, embed_dim)
+        cat2_emb = self.category2_embeddings(cat2_cidxs)  # (batch_size, seq_len, embed_dim)
+        cat3_emb = self.category3_embeddings(cat3_cidxs)  # (batch_size, seq_len, embed_dim)
 
         # concat
         embeddings = torch.cat([seq_item_embeddings, cat1_emb, cat2_emb, cat3_emb], dim=-1)
@@ -156,7 +156,7 @@ class CARCA(pl.LightningModule):
         return train_loss
 
     def validation_step(self, batch: list[torch.Tensor], idx: int):
-        seq_pidxs, cat1_cidxs, cat2_cidxs, cat3_cidxs, src_key_padding_mask, src_mask_idxs, labeled_item_idxs = batch
+        seq_pidxs, cat1_cidxs, cat2_cidxs, cat3_cidxs, src_key_padding_mask, src_mask_idxs, labeled_pidxs = batch
 
         # item embeddings
         seq_item_embeddings = self.item_embeddings(seq_pidxs)  # (batch_size, seq_len, embed_dim)
@@ -176,21 +176,21 @@ class CARCA(pl.LightningModule):
         output = logits[torch.arange(logits.size(0)), src_mask_idxs.squeeze(-1), :]
         scores = torch.matmul(output, self.item_embeddings.weight[:-2].T)
 
-        mrr = self.calc_mrr(scores, labeled_item_idxs)
+        mrr = self.calc_mrr(scores, labeled_pidxs)
         self.log("val_mrr", mrr, prog_bar=True, sync_dist=True)
 
-        hr_5 = self.calc_hr_at_k(scores, labeled_item_idxs, k=5)
-        ndcg_5 = self.calc_ndcg_at_k(scores, labeled_item_idxs, k=5)
+        hr_5 = self.calc_hr_at_k(scores, labeled_pidxs, k=5)
+        ndcg_5 = self.calc_ndcg_at_k(scores, labeled_pidxs, k=5)
         self.log(f"val_hr@5", hr_5, prog_bar=True, sync_dist=True)
         self.log(f"val_ndcg@5", ndcg_5, prog_bar=True, sync_dist=True)
 
-        hr_10 = self.calc_hr_at_k(scores, labeled_item_idxs, k=10)
-        ndcg_10 = self.calc_ndcg_at_k(scores, labeled_item_idxs, k=10)
+        hr_10 = self.calc_hr_at_k(scores, labeled_pidxs, k=10)
+        ndcg_10 = self.calc_ndcg_at_k(scores, labeled_pidxs, k=10)
         self.log(f"val_hr@10", hr_10, prog_bar=True, sync_dist=True)
         self.log(f"val_ndcg@10", ndcg_10, prog_bar=True, sync_dist=True)
 
-        hr_20 = self.calc_hr_at_k(scores, labeled_item_idxs, k=20)
-        ndcg_20 = self.calc_ndcg_at_k(scores, labeled_item_idxs, k=20)
+        hr_20 = self.calc_hr_at_k(scores, labeled_pidxs, k=20)
+        ndcg_20 = self.calc_ndcg_at_k(scores, labeled_pidxs, k=20)
         self.log(f"val_hr@20", hr_20, prog_bar=True, sync_dist=True)
         self.log(f"val_ndcg@20", ndcg_20, prog_bar=True, sync_dist=True)
 
@@ -200,22 +200,22 @@ class CARCA(pl.LightningModule):
     def configure_optimizers(self) -> Optimizer:
         return optim.AdamW(self.parameters(), lr=self.lr, weight_decay=self.weight_decay)
 
-    def calc_mrr(self, scores: torch.Tensor, ground_truth_items: torch.Tensor):
-        gt_scores = scores.gather(1, ground_truth_items.unsqueeze(1)).squeeze(1)
+    def calc_mrr(self, scores: torch.Tensor, labeled_pidxs: torch.Tensor):
+        gt_scores = scores.gather(1, labeled_pidxs.unsqueeze(1)).squeeze(1)
         ranks = (scores > gt_scores.unsqueeze(1)).sum(dim=1) + 1
         reciprocal_ranks = 1.0 / ranks.float()
         mrr = torch.mean(reciprocal_ranks).item()
         return mrr
 
-    def calc_hr_at_k(self, scores: torch.Tensor, ground_truth_items: torch.Tensor, k: int):
+    def calc_hr_at_k(self, scores: torch.Tensor, labeled_pidxs: torch.Tensor, k: int):
         topk_scores, topk_indices = torch.topk(scores, k, dim=1)
-        hits = (topk_indices == ground_truth_items.unsqueeze(1)).any(dim=1).float()
+        hits = (topk_indices == labeled_pidxs.unsqueeze(1)).any(dim=1).float()
         hit_rate = torch.mean(hits).item()
         return hit_rate
 
-    def calc_ndcg_at_k(self, scores: torch.Tensor, ground_truth_items: torch.Tensor, k: int):
+    def calc_ndcg_at_k(self, scores: torch.Tensor, labeled_pidxs: torch.Tensor, k: int):
         topk_scores, topk_indices = torch.topk(scores, k, dim=1)
-        match_positions = (topk_indices == ground_truth_items.unsqueeze(1)).nonzero(as_tuple=False)
+        match_positions = (topk_indices == labeled_pidxs.unsqueeze(1)).nonzero(as_tuple=False)
         dcg = torch.zeros(scores.size(0), device=scores.device)
         dcg[match_positions[:, 0]] = 1.0 / torch.log2(match_positions[:, 1].float() + 2)
         idcg = 1.0
@@ -259,20 +259,20 @@ class CarcaTrainDataset(Dataset):
         cat3_cidxs = cat3_cidxs + ([0] * pad_len)
         cat3_cidxs = torch.tensor(cat3_cidxs, dtype=torch.long)
 
-        padding_mask = seq_pidxs == self.pad_token_idx
+        src_key_padding_mask = seq_pidxs == self.pad_token_idx
 
         valid_positions = list(range(seq_len))
         if seq_len >= self.num_masked:
-            masked_positions = random.sample(valid_positions, self.num_masked)
+            src_mask_idxs = random.sample(valid_positions, self.num_masked)
         else:
-            masked_positions = random.choices(valid_positions, k=self.num_masked)
+            src_mask_idxs = random.choices(valid_positions, k=self.num_masked)
 
-        masked_positions = torch.tensor(masked_positions, dtype=torch.long)
+        src_mask_idxs = torch.tensor(src_mask_idxs, dtype=torch.long)
 
-        positive_pidxs = seq_pidxs[masked_positions].clone()
-        seq_pidxs[masked_positions] = self.mask_token_idx
+        positive_pidxs = seq_pidxs[src_mask_idxs].clone()
+        seq_pidxs[src_mask_idxs] = self.mask_token_idx
 
-        negative_pidxs = torch.randint(0, self.num_items, (len(masked_positions),), dtype=torch.long)
+        negative_pidxs = torch.randint(0, self.num_items, (len(src_mask_idxs),), dtype=torch.long)
         for i in range(len(negative_pidxs)):
             while negative_pidxs[i] == positive_pidxs[i]:
                 negative_pidxs[i] = torch.randint(0, self.num_items, ()).item()
@@ -282,8 +282,8 @@ class CarcaTrainDataset(Dataset):
             cat1_cidxs,
             cat2_cidxs,
             cat3_cidxs,
-            padding_mask,
-            masked_positions,
+            src_key_padding_mask,
+            src_mask_idxs,
             positive_pidxs,
             negative_pidxs,
         )
@@ -304,8 +304,8 @@ class CarcaValidDataset(Dataset):
         seq_pidxs, cat1_cidxs, cat2_cidxs, cat3_cidxs = self.histories[idx]
         pad_len = self.max_len - len(seq_pidxs)
 
-        pidxs_tensor = seq_pidxs + ([self.pad_token_idx] * pad_len)
-        pidxs_tensor = torch.tensor(pidxs_tensor, dtype=torch.long)
+        seq_pidxs = seq_pidxs + ([self.pad_token_idx] * pad_len)
+        seq_pidxs = torch.tensor(seq_pidxs, dtype=torch.long)
         cat1_cidxs = cat1_cidxs + ([0] * pad_len)
         cat1_cidxs = torch.tensor(cat1_cidxs, dtype=torch.long)
         cat2_cidxs = cat2_cidxs + ([0] * pad_len)
@@ -313,21 +313,21 @@ class CarcaValidDataset(Dataset):
         cat3_cidxs = cat3_cidxs + ([0] * pad_len)
         cat3_cidxs = torch.tensor(cat3_cidxs, dtype=torch.long)
 
-        src_key_padding_mask = pidxs_tensor == self.pad_token_idx
+        src_key_padding_mask = seq_pidxs == self.pad_token_idx
 
         src_mask_idxs = ((~src_key_padding_mask).sum(dim=0) - 1).unsqueeze(-1)
 
-        labeled_item_pidxs = pidxs_tensor[src_mask_idxs].item()
-        pidxs_tensor[src_mask_idxs] = self.mask_token_idx
+        labeled_pidxs = seq_pidxs[src_mask_idxs].item()
+        seq_pidxs[src_mask_idxs] = self.mask_token_idx
 
         return (
-            pidxs_tensor,
+            seq_pidxs,
             cat1_cidxs,
             cat2_cidxs,
             cat3_cidxs,
             src_key_padding_mask,
             src_mask_idxs,
-            labeled_item_pidxs,
+            labeled_pidxs,
         )
 
 

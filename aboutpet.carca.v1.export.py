@@ -50,7 +50,7 @@ def export_onnx():
     category3_cidxs = torch.randint(0, num_category3, (batch_size, max_len), dtype=torch.int64)
     src_key_padding_mask = torch.randint(0, 2, (batch_size, max_len), dtype=torch.bool)
     src_mask_idxs = torch.randint(0, max_len, (batch_size, 1), dtype=torch.int64)
-    candidate_idxs = torch.randint(0, num_items, (batch_size, num_candidates), dtype=torch.int64)
+    candidate_pidxs = torch.randint(0, num_items, (batch_size, num_candidates), dtype=torch.int64)
 
     torch.onnx.export(
         model=model,
@@ -61,7 +61,7 @@ def export_onnx():
             category3_cidxs,
             src_key_padding_mask,
             src_mask_idxs,
-            candidate_idxs,
+            candidate_pidxs,
         ),
         f=volume_c.onnx_path,
         export_params=True,
@@ -74,7 +74,7 @@ def export_onnx():
             "category3_cidxs",
             "src_key_padding_mask",
             "src_mask_idxs",
-            "candidate_idxs",
+            "candidate_pidxs",
         ],
         output_names=["output"],
         dynamic_axes={
@@ -83,8 +83,8 @@ def export_onnx():
             "category2_cidxs": {0: "batch_size", 1: "sequence_length"},
             "category3_cidxs": {0: "batch_size", 1: "sequence_length"},
             "src_key_padding_mask": {0: "batch_size", 1: "sequence_length"},
-            "src_mask_idxs": {0: "batch_size", 1: "src_mask_idxs_dim"},
-            "candidate_idxs": {0: "batch_size", 1: "num_candidates"},
+            "src_mask_idxs": {0: "batch_size", 1: "dim_src_mask"},
+            "candidate_pidxs": {0: "batch_size", 1: "num_candidates"},
             "output": {0: "batch_size", 1: "num_scores"},
         },
     )
