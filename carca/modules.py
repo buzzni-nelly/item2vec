@@ -70,7 +70,7 @@ class CARCA(pl.LightningModule):
         category2_cidxs: torch.Tensor,
         category3_cidxs: torch.Tensor,
         src_key_padding_mask: torch.Tensor,
-        masked_idxs: torch.Tensor,
+        src_mask_idxs: torch.Tensor,
         candidate_pidxs: torch.Tensor,
     ):
         seq_item_embeddings = self.item_embeddings(sequence_pidxs)  # (batch_size, seq_len, embed_dim)
@@ -83,11 +83,10 @@ class CARCA(pl.LightningModule):
         # concat
         embeddings = torch.cat([seq_item_embeddings, cat1_emb, cat2_emb, cat3_emb], dim=-1)
         embeddings = self.concat_linear(embeddings)  # (batch_size, seq_len, embed_dim)
-        # embeddings = self.dropout(embeddings)
         embeddings = self.position_embeddings(embeddings)
 
         logits, _ = self.cross_attention(embeddings, src_key_padding_mask=src_key_padding_mask)
-        output = logits[torch.arange(logits.size(0)), masked_idxs.squeeze(1), :]
+        output = logits[torch.arange(logits.size(0)), src_mask_idxs.squeeze(1), :]
 
         # output shape: torch.Size([batch_size, embed_dim])
         # candidate_item_embeddings shape: torch.Size([batch_size, num_candidate, embed_dim])
@@ -105,17 +104,17 @@ class CARCA(pl.LightningModule):
         # seq_pidxs shape: (256, 50)
         # category_cidxs shape: (256, 50)
         # src_key_padding_mask shape: (256, 50)
-        # masked_idxs shape: (256, 2)
+        # src_mask_idxs shape: (256, 2)
         # positive_idxs shape: (256, 2)
         # negative_idxs shape: (256, 2)
 
         (
             seq_pidxs,
-            cate1_cidxs,
-            cate2_cidxs,
-            cate3_cidxs,
+            cat1_cidxs,
+            cat2_cidxs,
+            cat3_cidxs,
             src_key_padding_mask,
-            masked_idxs,
+            src_mask_idxs,
             positive_idxs,
             negative_idxs,
         ) = batch
@@ -124,9 +123,9 @@ class CARCA(pl.LightningModule):
         seq_item_embeddings = self.item_embeddings(seq_pidxs)  # (batch_size, seq_len, embed_dim)
 
         # category embeddings
-        cat1_emb = self.category1_embeddings(cate1_cidxs)  # (batch_size, seq_len, embed_dim)
-        cat2_emb = self.category2_embeddings(cate2_cidxs)  # (batch_size, seq_len, embed_dim)
-        cat3_emb = self.category3_embeddings(cate3_cidxs)  # (batch_size, seq_len, embed_dim)
+        cat1_emb = self.category1_embeddings(cat1_cidxs)  # (batch_size, seq_len, embed_dim)
+        cat2_emb = self.category2_embeddings(cat2_cidxs)  # (batch_size, seq_len, embed_dim)
+        cat3_emb = self.category3_embeddings(cat3_cidxs)  # (batch_size, seq_len, embed_dim)
 
         # concat
         embeddings = torch.cat([seq_item_embeddings, cat1_emb, cat2_emb, cat3_emb], dim=-1)
@@ -139,7 +138,7 @@ class CARCA(pl.LightningModule):
         # batch_indices shape: (256, 1)
         batch_indices = torch.arange(logits.size(0)).unsqueeze(1).to(self.device)
         # output shape: (256, 2, 128)
-        output = logits[batch_indices, masked_idxs]
+        output = logits[batch_indices, src_mask_idxs]
 
         # positive_embeddings shape: (256, 2, 128)
         # negative_embeddings shape: (256, 2, 128)
@@ -157,15 +156,15 @@ class CARCA(pl.LightningModule):
         return train_loss
 
     def validation_step(self, batch: list[torch.Tensor], idx: int):
-        seq_pidxs, cate1_cidxs, cate2_cidxs, cate3_cidxs, src_key_padding_mask, masked_idxs, labeled_item_idxs = batch
+        seq_pidxs, cat1_cidxs, cat2_cidxs, cat3_cidxs, src_key_padding_mask, src_mask_idxs, labeled_pidxs = batch
 
         # item embeddings
         seq_item_embeddings = self.item_embeddings(seq_pidxs)  # (batch_size, seq_len, embed_dim)
 
         # category embeddings
-        cat1_emb = self.category1_embeddings(cate1_cidxs)  # (batch_size, seq_len, embed_dim)
-        cat2_emb = self.category2_embeddings(cate2_cidxs)  # (batch_size, seq_len, embed_dim)
-        cat3_emb = self.category3_embeddings(cate3_cidxs)  # (batch_size, seq_len, embed_dim)
+        cat1_emb = self.category1_embeddings(cat1_cidxs)  # (batch_size, seq_len, embed_dim)
+        cat2_emb = self.category2_embeddings(cat2_cidxs)  # (batch_size, seq_len, embed_dim)
+        cat3_emb = self.category3_embeddings(cat3_cidxs)  # (batch_size, seq_len, embed_dim)
 
         # concat
         embeddings = torch.cat(tensors=[seq_item_embeddings, cat1_emb, cat2_emb, cat3_emb], dim=-1)
@@ -174,24 +173,24 @@ class CARCA(pl.LightningModule):
         embeddings = self.position_embeddings(embeddings)
 
         logits, _ = self.cross_attention(embeddings, src_key_padding_mask=src_key_padding_mask)
-        output = logits[torch.arange(logits.size(0)), masked_idxs.squeeze(-1), :]
+        output = logits[torch.arange(logits.size(0)), src_mask_idxs.squeeze(-1), :]
         scores = torch.matmul(output, self.item_embeddings.weight[:-2].T)
 
-        mrr = self.calc_mrr(scores, labeled_item_idxs)
+        mrr = self.calc_mrr(scores, labeled_pidxs)
         self.log("val_mrr", mrr, prog_bar=True, sync_dist=True)
 
-        hr_5 = self.calc_hr_at_k(scores, labeled_item_idxs, k=5)
-        ndcg_5 = self.calc_ndcg_at_k(scores, labeled_item_idxs, k=5)
+        hr_5 = self.calc_hr_at_k(scores, labeled_pidxs, k=5)
+        ndcg_5 = self.calc_ndcg_at_k(scores, labeled_pidxs, k=5)
         self.log(f"val_hr@5", hr_5, prog_bar=True, sync_dist=True)
         self.log(f"val_ndcg@5", ndcg_5, prog_bar=True, sync_dist=True)
 
-        hr_10 = self.calc_hr_at_k(scores, labeled_item_idxs, k=10)
-        ndcg_10 = self.calc_ndcg_at_k(scores, labeled_item_idxs, k=10)
+        hr_10 = self.calc_hr_at_k(scores, labeled_pidxs, k=10)
+        ndcg_10 = self.calc_ndcg_at_k(scores, labeled_pidxs, k=10)
         self.log(f"val_hr@10", hr_10, prog_bar=True, sync_dist=True)
         self.log(f"val_ndcg@10", ndcg_10, prog_bar=True, sync_dist=True)
 
-        hr_20 = self.calc_hr_at_k(scores, labeled_item_idxs, k=20)
-        ndcg_20 = self.calc_ndcg_at_k(scores, labeled_item_idxs, k=20)
+        hr_20 = self.calc_hr_at_k(scores, labeled_pidxs, k=20)
+        ndcg_20 = self.calc_ndcg_at_k(scores, labeled_pidxs, k=20)
         self.log(f"val_hr@20", hr_20, prog_bar=True, sync_dist=True)
         self.log(f"val_ndcg@20", ndcg_20, prog_bar=True, sync_dist=True)
 
@@ -201,22 +200,22 @@ class CARCA(pl.LightningModule):
     def configure_optimizers(self) -> Optimizer:
         return optim.AdamW(self.parameters(), lr=self.lr, weight_decay=self.weight_decay)
 
-    def calc_mrr(self, scores: torch.Tensor, ground_truth_items: torch.Tensor):
-        gt_scores = scores.gather(1, ground_truth_items.unsqueeze(1)).squeeze(1)
+    def calc_mrr(self, scores: torch.Tensor, labeled_pidxs: torch.Tensor):
+        gt_scores = scores.gather(1, labeled_pidxs.unsqueeze(1)).squeeze(1)
         ranks = (scores > gt_scores.unsqueeze(1)).sum(dim=1) + 1
         reciprocal_ranks = 1.0 / ranks.float()
         mrr = torch.mean(reciprocal_ranks).item()
         return mrr
 
-    def calc_hr_at_k(self, scores: torch.Tensor, ground_truth_items: torch.Tensor, k: int):
+    def calc_hr_at_k(self, scores: torch.Tensor, labeled_pidxs: torch.Tensor, k: int):
         topk_scores, topk_indices = torch.topk(scores, k, dim=1)
-        hits = (topk_indices == ground_truth_items.unsqueeze(1)).any(dim=1).float()
+        hits = (topk_indices == labeled_pidxs.unsqueeze(1)).any(dim=1).float()
         hit_rate = torch.mean(hits).item()
         return hit_rate
 
-    def calc_ndcg_at_k(self, scores: torch.Tensor, ground_truth_items: torch.Tensor, k: int):
+    def calc_ndcg_at_k(self, scores: torch.Tensor, labeled_pidxs: torch.Tensor, k: int):
         topk_scores, topk_indices = torch.topk(scores, k, dim=1)
-        match_positions = (topk_indices == ground_truth_items.unsqueeze(1)).nonzero(as_tuple=False)
+        match_positions = (topk_indices == labeled_pidxs.unsqueeze(1)).nonzero(as_tuple=False)
         dcg = torch.zeros(scores.size(0), device=scores.device)
         dcg[match_positions[:, 0]] = 1.0 / torch.log2(match_positions[:, 1].float() + 2)
         idcg = 1.0
@@ -247,44 +246,44 @@ class CarcaTrainDataset(Dataset):
         return len(self.histories)
 
     def __getitem__(self, idx: int):
-        pidxs, cate1_cidxs, cate2_cidxs, cate3_cidxs = self.histories[idx]
-        seq_len = len(pidxs)
+        seq_pidxs, cat1_cidxs, cat2_cidxs, cat3_cidxs = self.histories[idx]
+        seq_len = len(seq_pidxs)
         pad_len = self.max_len - seq_len
 
-        pidxs = pidxs + ([self.pad_token_idx] * pad_len)
-        pidxs = torch.tensor(pidxs, dtype=torch.long)
-        cate1_cidxs = cate1_cidxs + ([0] * pad_len)
-        cate1_cidxs = torch.tensor(cate1_cidxs, dtype=torch.long)
-        cate2_cidxs = cate2_cidxs + ([0] * pad_len)
-        cate2_cidxs = torch.tensor(cate2_cidxs, dtype=torch.long)
-        cate3_cidxs = cate3_cidxs + ([0] * pad_len)
-        cate3_cidxs = torch.tensor(cate3_cidxs, dtype=torch.long)
+        seq_pidxs = seq_pidxs + ([self.pad_token_idx] * pad_len)
+        seq_pidxs = torch.tensor(seq_pidxs, dtype=torch.long)
+        cat1_cidxs = cat1_cidxs + ([0] * pad_len)
+        cat1_cidxs = torch.tensor(cat1_cidxs, dtype=torch.long)
+        cat2_cidxs = cat2_cidxs + ([0] * pad_len)
+        cat2_cidxs = torch.tensor(cat2_cidxs, dtype=torch.long)
+        cat3_cidxs = cat3_cidxs + ([0] * pad_len)
+        cat3_cidxs = torch.tensor(cat3_cidxs, dtype=torch.long)
 
-        padding_mask = pidxs == self.pad_token_idx
+        src_key_padding_mask = seq_pidxs == self.pad_token_idx
 
         valid_positions = list(range(seq_len))
         if seq_len >= self.num_masked:
-            masked_positions = random.sample(valid_positions, self.num_masked)
+            src_mask_idxs = random.sample(valid_positions, self.num_masked)
         else:
-            masked_positions = random.choices(valid_positions, k=self.num_masked)
+            src_mask_idxs = random.choices(valid_positions, k=self.num_masked)
 
-        masked_positions = torch.tensor(masked_positions, dtype=torch.long)
+        src_mask_idxs = torch.tensor(src_mask_idxs, dtype=torch.long)
 
-        positive_pidxs = pidxs[masked_positions].clone()
-        pidxs[masked_positions] = self.mask_token_idx
+        positive_pidxs = seq_pidxs[src_mask_idxs].clone()
+        seq_pidxs[src_mask_idxs] = self.mask_token_idx
 
-        negative_pidxs = torch.randint(0, self.num_items, (len(masked_positions),), dtype=torch.long)
+        negative_pidxs = torch.randint(0, self.num_items, (len(src_mask_idxs),), dtype=torch.long)
         for i in range(len(negative_pidxs)):
             while negative_pidxs[i] == positive_pidxs[i]:
                 negative_pidxs[i] = torch.randint(0, self.num_items, ()).item()
 
         return (
-            pidxs,
-            cate1_cidxs,
-            cate2_cidxs,
-            cate3_cidxs,
-            padding_mask,
-            masked_positions,
+            seq_pidxs,
+            cat1_cidxs,
+            cat2_cidxs,
+            cat3_cidxs,
+            src_key_padding_mask,
+            src_mask_idxs,
             positive_pidxs,
             negative_pidxs,
         )
@@ -302,33 +301,33 @@ class CarcaValidDataset(Dataset):
         return len(self.histories)
 
     def __getitem__(self, idx: int) -> tuple:
-        pidxs, category1s, category2s, category3s = self.histories[idx]
-        pad_len = self.max_len - len(pidxs)
+        seq_pidxs, cat1_cidxs, cat2_cidxs, cat3_cidxs = self.histories[idx]
+        pad_len = self.max_len - len(seq_pidxs)
 
-        pidxs_tensor = pidxs + ([self.pad_token_idx] * pad_len)
-        pidxs_tensor = torch.tensor(pidxs_tensor, dtype=torch.long)
-        category1s = category1s + ([0] * pad_len)
-        category1s = torch.tensor(category1s, dtype=torch.long)
-        category2s = category2s + ([0] * pad_len)
-        category2s = torch.tensor(category2s, dtype=torch.long)
-        category3s = category3s + ([0] * pad_len)
-        category3s = torch.tensor(category3s, dtype=torch.long)
+        seq_pidxs = seq_pidxs + ([self.pad_token_idx] * pad_len)
+        seq_pidxs = torch.tensor(seq_pidxs, dtype=torch.long)
+        cat1_cidxs = cat1_cidxs + ([0] * pad_len)
+        cat1_cidxs = torch.tensor(cat1_cidxs, dtype=torch.long)
+        cat2_cidxs = cat2_cidxs + ([0] * pad_len)
+        cat2_cidxs = torch.tensor(cat2_cidxs, dtype=torch.long)
+        cat3_cidxs = cat3_cidxs + ([0] * pad_len)
+        cat3_cidxs = torch.tensor(cat3_cidxs, dtype=torch.long)
 
-        src_key_padding_mask = pidxs_tensor == self.pad_token_idx
+        src_key_padding_mask = seq_pidxs == self.pad_token_idx
 
-        masked_idx = ((~src_key_padding_mask).sum(dim=0) - 1).unsqueeze(-1)
+        src_mask_idxs = ((~src_key_padding_mask).sum(dim=0) - 1).unsqueeze(-1)
 
-        labeled_item_pidxs = pidxs_tensor[masked_idx].item()
-        pidxs_tensor[masked_idx] = self.mask_token_idx
+        labeled_pidxs = seq_pidxs[src_mask_idxs].item()
+        seq_pidxs[src_mask_idxs] = self.mask_token_idx
 
         return (
-            pidxs_tensor,
-            category1s,
-            category2s,
-            category3s,
+            seq_pidxs,
+            cat1_cidxs,
+            cat2_cidxs,
+            cat3_cidxs,
             src_key_padding_mask,
-            masked_idx,
-            labeled_item_pidxs,
+            src_mask_idxs,
+            labeled_pidxs,
         )
 
 
@@ -353,7 +352,6 @@ class CarcaDataModule(pl.LightningDataModule):
             persistent_workers=bool(self.num_workers > 0),
             pin_memory=True,
             shuffle=True,
-            # collate_fn=self.carca_collate_fn,
         )
 
     def val_dataloader(self):
@@ -375,42 +373,3 @@ class CarcaDataModule(pl.LightningDataModule):
             pin_memory=True,
             shuffle=False,
         )
-
-    def carca_collate_fn(self, batch):
-        """
-        CARCA 데이터셋을 위한 collate_fn.
-
-        Args:
-            batch (list of tuples): 각 샘플은 (input_seqs, padding_mask, masked_positions, positive_pidxs, negative_pidxs) 형태.
-
-        Returns:
-            Tensor 형태의 배치 데이터:
-            - input_seqs: (batch_size, max_len)
-            - padding_masks: (batch_size, max_len)
-            - masked_positions: (batch_size, max_masked)
-            - positive_pidxs: (batch_size, max_masked)
-            - negative_pidxs: (batch_size, max_masked)
-        """
-        # 모든 샘플에서 텐서 추출
-        input_seqs = torch.stack([item[0] for item in batch])  # shape: (batch_size, max_len)
-        padding_masks = torch.stack([item[1] for item in batch])  # shape: (batch_size, max_len)
-
-        # 각 샘플의 마스크된 위치와 positive, negative 인덱스를 패딩 처리
-        max_masked = max(len(item[2]) for item in batch)  # 배치에서 최대 마스크 개수
-        batch_size = len(batch)
-
-        pad_token_idx = self.train_dataset.pad_token_idx
-
-        # 배치를 위한 텐서 초기화 (패딩은 0으로)
-        masked_positions = torch.full((batch_size, max_masked), pad_token_idx, dtype=torch.long)
-        positive_pidxs = torch.full((batch_size, max_masked), pad_token_idx, dtype=torch.long)
-        negative_pidxs = torch.full((batch_size, max_masked), pad_token_idx, dtype=torch.long)
-
-        # 각 샘플의 데이터를 텐서에 채워 넣기
-        for i, (seq, mask, masked_pos, pos_idx, neg_idx) in enumerate(batch):
-            length = len(masked_pos)  # 현재 샘플의 마스크 된 위치 개수
-            masked_positions[i, :length] = masked_pos
-            positive_pidxs[i, :length] = pos_idx
-            negative_pidxs[i, :length] = neg_idx
-
-        return input_seqs, padding_masks, masked_positions, positive_pidxs, negative_pidxs

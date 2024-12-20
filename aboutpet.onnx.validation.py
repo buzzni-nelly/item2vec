@@ -8,11 +8,13 @@ from tqdm import tqdm
 from carca.modules import CarcaDataModule
 from item2vec.volume import Volume
 
+
 def load_onnx(onnx_path: str):
     model = onnx.load(onnx_path)
     onnx.checker.check_model(model)
     print("ONNX 모델 로드 및 검증 완료")
     return model
+
 
 def run_inference(session: ort.InferenceSession, input_data: dict):
     input_names = [inp.name for inp in session.get_inputs()]
@@ -22,6 +24,7 @@ def run_inference(session: ort.InferenceSession, input_data: dict):
     outputs = session.run(output_names, input_feed)
     return outputs
 
+
 def ndcg_at_k(sorted_pidxs, label_pidx, k=10):
     sorted_pidxs = list(sorted_pidxs)
     label_pidx = label_pidx.item()
@@ -30,8 +33,9 @@ def ndcg_at_k(sorted_pidxs, label_pidx, k=10):
 
     rank = sorted_pidxs.index(label_pidx)
     if rank < k:
-        return 1 / math.log2(rank+2)
+        return 1 / math.log2(rank + 2)
     return 0.0
+
 
 if __name__ == "__main__":
     onnx_file_path = "/home/buzzni/item2vec/workspaces/aboutpet/carca/v1/aboutpet-carca-v1.onnx"
@@ -47,10 +51,12 @@ if __name__ == "__main__":
     val_loader = datamodule.val_dataloader()
     tqdm_iterator = tqdm(val_loader, desc="Evaluating", unit="batch")
     for batch in tqdm_iterator:
-        seq_pidxs, cat1_cidxs, cat2_cidxs, cat3_cidxs, src_key_padding_mask, masked_idxs, label_pidxs = batch
+        seq_pidxs, cat1_cidxs, cat2_cidxs, cat3_cidxs, src_key_padding_mask, src_mask_idxs, label_pidxs = batch
 
         label_pidxs = label_pidxs.unsqueeze(-1)
-        candidate_pidxs = torch.cat([torch.randint(0, 15000, (seq_pidxs.size(0), 100), dtype=torch.long), label_pidxs], dim=-1)
+        candidate_pidxs = torch.cat(
+            [torch.randint(0, 15000, (seq_pidxs.size(0), 100), dtype=torch.long), label_pidxs], dim=-1
+        )
 
         input_example = {
             "seq_pidxs": seq_pidxs.numpy(),
@@ -58,7 +64,7 @@ if __name__ == "__main__":
             "category2_cidxs": cat2_cidxs.numpy(),
             "category3_cidxs": cat3_cidxs.numpy(),
             "src_key_padding_mask": src_key_padding_mask.numpy(),
-            "masked_idxs": masked_idxs.numpy(),
+            "src_mask_idxs": src_mask_idxs.numpy(),
             "candidate_idxs": candidate_pidxs.numpy(),
         }
 
