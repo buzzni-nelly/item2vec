@@ -38,11 +38,7 @@ if __name__ == "__main__":
 
     volume_i = Volume(company_id="aboutpet", model="item2vec", version="v1")
 
-    datamodule = CarcaDataModule(
-        volume=volume_i,
-        batch_size=64,
-        num_workers=1,
-    )
+    datamodule = CarcaDataModule(volume=volume_i, batch_size=64, num_workers=1)
 
     model = load_onnx(onnx_file_path)
     session = ort.InferenceSession(onnx_file_path)
