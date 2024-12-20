@@ -51,7 +51,7 @@ if __name__ == "__main__":
     val_loader = datamodule.val_dataloader()
     tqdm_iterator = tqdm(val_loader, desc="Evaluating", unit="batch")
     for batch in tqdm_iterator:
-        seq_pidxs, cat1_cidxs, cat2_cidxs, cat3_cidxs, src_key_padding_mask, src_mask_idxs, label_pidxs = batch
+        seq_pidxs, cat1_cidxs, cat2_cidxs, cat3_cidxs, src_key_padding_mask, src_mask, label_pidxs = batch
 
         label_pidxs = label_pidxs.unsqueeze(-1)
         candidate_pidxs = torch.cat(
@@ -64,7 +64,7 @@ if __name__ == "__main__":
             "category2_cidxs": cat2_cidxs.numpy(),
             "category3_cidxs": cat3_cidxs.numpy(),
             "src_key_padding_mask": src_key_padding_mask.numpy(),
-            "src_mask_idxs": src_mask_idxs.numpy(),
+            "src_mask": src_mask.numpy(),
             "candidate_idxs": candidate_pidxs.numpy(),
         }
 
