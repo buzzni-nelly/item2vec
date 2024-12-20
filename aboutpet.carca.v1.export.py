@@ -49,7 +49,7 @@ def export_onnx():
     category2_cidxs = torch.randint(0, num_category2, (batch_size, max_len), dtype=torch.int64)
     category3_cidxs = torch.randint(0, num_category3, (batch_size, max_len), dtype=torch.int64)
     src_key_padding_mask = torch.randint(0, 2, (batch_size, max_len), dtype=torch.bool)
-    masked_idxs = torch.randint(0, max_len, (batch_size, 1), dtype=torch.int64)
+    src_mask_idxs = torch.randint(0, max_len, (batch_size, 1), dtype=torch.int64)
     candidate_idxs = torch.randint(0, num_items, (batch_size, num_candidates), dtype=torch.int64)
 
     torch.onnx.export(
@@ -60,7 +60,7 @@ def export_onnx():
             category2_cidxs,
             category3_cidxs,
             src_key_padding_mask,
-            masked_idxs,
+            src_mask_idxs,
             candidate_idxs,
         ),
         f=volume_c.onnx_path,
@@ -73,7 +73,7 @@ def export_onnx():
             "category2_cidxs",
             "category3_cidxs",
             "src_key_padding_mask",
-            "masked_idxs",
+            "src_mask_idxs",
             "candidate_idxs",
         ],
         output_names=["output"],
@@ -83,7 +83,7 @@ def export_onnx():
             "category2_cidxs": {0: "batch_size", 1: "sequence_length"},
             "category3_cidxs": {0: "batch_size", 1: "sequence_length"},
             "src_key_padding_mask": {0: "batch_size", 1: "sequence_length"},
-            "masked_idxs": {0: "batch_size", 1: "masked_idx_dim"},
+            "src_mask_idxs": {0: "batch_size", 1: "src_mask_idxs_dim"},
             "candidate_idxs": {0: "batch_size", 1: "num_candidates"},
             "output": {0: "batch_size", 1: "num_scores"},
         },
@@ -105,10 +105,7 @@ def compress():
     volume_c = Volume(company_id="aboutpet", model="carca", version="v1")
     filename = datetime.now().strftime("%Y%m%d%H%M%S")
     tools.compress(
-        file_paths=[
-            volume_c.onnx_path,
-            volume_c.sqlite3_path,
-        ],
+        file_paths=[volume_c.onnx_path, volume_c.sqlite3_path],
         tar_gz_path=volume_c.workspace_path.joinpath(f"{filename}.tar.gz"),
     )
     return volume_c.workspace_path.joinpath(f"{filename}.tar.gz")
