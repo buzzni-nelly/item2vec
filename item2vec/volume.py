@@ -482,12 +482,12 @@ class TestUserHistory(Base):
     @staticmethod
     def get_by_id(session, record_id):
         """Retrieve a record by its ID."""
-        return session.query(TrainingUserHistory).filter_by(id=record_id).first()
+        return session.query(TestUserHistory).filter_by(id=record_id).first()
 
     @staticmethod
     def count(session):
         """Count the total number of records."""
-        return session.query(TrainingUserHistory).count()
+        return session.query(TestUserHistory).count()
 
     @classmethod
     def reset_table(cls, session):
