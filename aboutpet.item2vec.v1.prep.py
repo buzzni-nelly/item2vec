@@ -11,4 +11,6 @@ if __name__ == "__main__":
     migrator.migrate_categories()
     migrator.migrate_skip_grams()
     migrator.migrate_click2purchase_sequences(begin_date=datetime.now() - timedelta(days=7))
+    migrator.migrate_training_user_histories()
+    migrator.migrate_test_user_histories()
     migrator.generate_edge_indices_csv()
