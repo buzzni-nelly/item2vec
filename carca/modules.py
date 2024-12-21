@@ -263,7 +263,7 @@ class CARCA(pl.LightningModule):
 
 class CarcaTrainDataset(Dataset):
     def __init__(self, volume: Volume, max_len: int = 50):
-        self.histories = volume.list_user_histories(condition="training")
+        self.volume = volume
         self.num_items = volume.vocab_size()
         self.mask_token_idx = self.num_items + 0
         self.pad_token_idx = self.num_items + 1
@@ -282,10 +282,10 @@ class CarcaTrainDataset(Dataset):
         self.num_masked = 10
 
     def __len__(self) -> int:
-        return len(self.histories)
+        return self.volume.get_user_history_count(condition="training")
 
     def __getitem__(self, idx: int):
-        seq_pidxs, cat1_cidxs, cat2_cidxs, cat3_cidxs = self.histories[idx]
+        seq_pidxs, cat1_cidxs, cat2_cidxs, cat3_cidxs = self.volume.get_user_history(idx, condition="training")
         seq_len = len(seq_pidxs)
         pad_len = self.max_len - seq_len
 
@@ -332,7 +332,7 @@ class CarcaTrainDataset(Dataset):
 
 class CarcaValidDataset(Dataset):
     def __init__(self, volume: Volume, max_len: int = 50):
-        self.histories = volume.list_user_histories(condition="test")
+        self.volume = volume
 
         self.num_items = volume.vocab_size()
         self.mask_token_idx = self.num_items + 0
@@ -351,10 +351,10 @@ class CarcaValidDataset(Dataset):
         self.max_len = max_len
 
     def __len__(self) -> int:
-        return len(self.histories)
+        return self.volume.get_user_history_count(condition="test")
 
     def __getitem__(self, idx: int) -> tuple:
-        seq_pidxs, cat1_cidxs, cat2_cidxs, cat3_cidxs = self.histories[idx]
+        seq_pidxs, cat1_cidxs, cat2_cidxs, cat3_cidxs = self.volume.get_user_history(idx, condition="test")
         seq_len = len(seq_pidxs)
         pad_len = self.max_len - len(seq_pidxs)
 

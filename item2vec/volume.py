@@ -234,7 +234,7 @@ class Trace(Base):
         return session.query(func.count(Trace.id)).scalar()
 
     @staticmethod
-    def list_traces(session: Session, chunk_size: int = 10_000_000, timestamp: float | None = None):
+    def list_traces(session: Session, chunk_size: int = 10_000_000, begin_timestamp: float | None = None):
         base_query = """
         SELECT 
             user.uidx AS uidx,
@@ -247,9 +247,9 @@ class Trace(Base):
         """
         query_args = {}
 
-        if timestamp:
+        if begin_timestamp:
             base_query += " WHERE trace.timestamp > :timestamp"
-            query_args["timestamp"] = timestamp
+            query_args["timestamp"] = begin_timestamp
 
         raw_query = text(base_query)
         result = session.execute(raw_query, query_args).yield_per(chunk_size)
@@ -429,6 +429,84 @@ class Click2PurchaseSequence(Base):
     def reset_table(session: Session):
         Click2PurchaseSequence.__table__.drop(session.bind, checkfirst=True)
         Click2PurchaseSequence.__table__.create(session.bind, checkfirst=True)
+
+
+class TrainingUserHistory(Base):
+    __tablename__ = "training_user_history"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    pidxs = Column(String)
+    category1s = Column(String)
+    category2s = Column(String)
+    category3s = Column(String)
+
+    @staticmethod
+    def get_by_id(session, record_id):
+        """Retrieve a record by its ID."""
+        return session.query(TrainingUserHistory).filter_by(id=record_id).first()
+
+    @staticmethod
+    def count(session):
+        """Count the total number of records."""
+        return session.query(TrainingUserHistory).count()
+
+    @classmethod
+    def reset_table(cls, session):
+        session.execute(text("DROP TABLE IF EXISTS user_history"))
+        session.commit()
+        session.execute(
+            text(
+                """
+            CREATE TABLE user_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                pidxs TEXT,
+                category1s TEXT,
+                category2s TEXT,
+                category3s TEXT
+            )
+        """
+            )
+        )
+        session.commit()
+
+
+class TestUserHistory(Base):
+    __tablename__ = "test_user_history"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    pidxs = Column(String)
+    category1s = Column(String)
+    category2s = Column(String)
+    category3s = Column(String)
+
+    @staticmethod
+    def get_by_id(session, record_id):
+        """Retrieve a record by its ID."""
+        return session.query(TrainingUserHistory).filter_by(id=record_id).first()
+
+    @staticmethod
+    def count(session):
+        """Count the total number of records."""
+        return session.query(TrainingUserHistory).count()
+
+    @classmethod
+    def reset_table(cls, session):
+        session.execute(text("DROP TABLE IF EXISTS user_history"))
+        session.commit()
+        session.execute(
+            text(
+                """
+            CREATE TABLE user_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                pidxs TEXT,
+                category1s TEXT,
+                category2s TEXT,
+                category3s TEXT
+            )
+        """
+            )
+        )
+        session.commit()
 
 
 class Migrator:
@@ -614,7 +692,7 @@ class Migrator:
     def migrate_click2purchase_sequences(self, begin_date: datetime, maxlen: int = 50):
         print("Extracting click2purchase item sequences.")
         Click2PurchaseSequence.reset_table(self.session)
-        traces = Trace.list_traces(self.session, timestamp=begin_date.timestamp())
+        traces = Trace.list_traces(self.session, begin_timestamp=begin_date.timestamp())
         queue = collections.deque(maxlen=maxlen)
         rows = []
         for current in traces:
@@ -640,13 +718,107 @@ class Migrator:
 
         print(f"Migration completed: {len(rows):,} rows inserted.")
 
-    def generate_edge_indices_csv(self):
-        sequences = Click2PurchaseSequence.list_click2purchase_sequences(self.session)
-        # swap source & target
-        sequences = [(x.target_pidx, x.source_pidx) for x in sequences]
-        purchase_edges_df = pd.DataFrame(sequences, columns=["source_pidx", "target_pidx"], dtype=int)
-        purchase_csv_path = self.workspace_path.joinpath(f"edge.purchase.indices.csv")
-        purchase_edges_df.to_csv(purchase_csv_path, index=False)
+    def migrate_training_user_histories(self, chunk_size=100_000):
+        TrainingUserHistory.reset_table(self.session)
+        user_histories = self.list_user_histories(condition="training")
+
+        rows = []
+        insert_query = text(
+            """
+            INSERT INTO training_user_history (pidxs, category1s, category2s, category3s)
+            VALUES (:pidxs, :category1s, :category2s, :category3s)
+            """
+        )
+
+        progress_bar = tqdm(user_histories, desc="Inserting user histories into sqlite3..")
+        for s_pidxs, s_category1s, s_category2s, s_category3s in progress_bar:
+            rows.append(
+                {
+                    "pidxs": ",".join(map(str, s_pidxs)),
+                    "category1s": ",".join(map(str, s_category1s)),
+                    "category2s": ",".join(map(str, s_category2s)),
+                    "category3s": ",".join(map(str, s_category3s)),
+                }
+            )
+
+            if len(rows) >= chunk_size:
+                self.session.execute(insert_query, rows)
+                self.session.commit()
+                rows.clear()
+
+        if rows:
+            self.session.execute(insert_query, rows)
+            self.session.commit()
+
+        print(f"Migration completed: {len(user_histories)} rows inserted.")
+
+    def migrate_test_user_histories(self, chunk_size=100_000):
+        TestUserHistory.reset_table(self.session)
+        user_histories = self.list_user_histories(condition="test")
+
+        rows = []
+        insert_query = text(
+            """
+            INSERT INTO test_user_history (pidxs, category1s, category2s, category3s)
+            VALUES (:pidxs, :category1s, :category2s, :category3s)
+            """
+        )
+
+        progress_bar = tqdm(user_histories, desc="Inserting user histories into sqlite3..")
+        for s_pidxs, s_category1s, s_category2s, s_category3s in progress_bar:
+            rows.append(
+                {
+                    "pidxs": ",".join(map(str, s_pidxs)),
+                    "category1s": ",".join(map(str, s_category1s)),
+                    "category2s": ",".join(map(str, s_category2s)),
+                    "category3s": ",".join(map(str, s_category3s)),
+                }
+            )
+
+            if len(rows) >= chunk_size:
+                self.session.execute(insert_query, rows)
+                self.session.commit()
+                rows.clear()
+
+        if rows:
+            self.session.execute(insert_query, rows)
+            self.session.commit()
+
+        print(f"Migration completed: {len(user_histories)} rows inserted.")
+
+    def list_user_histories(
+        self,
+        condition: Literal["full", "training", "test"] = "training",
+        min_purchase_count: int = 1,
+    ):
+        histories = Trace.aggregate_user_histories(
+            self.session,
+            condition=condition,
+            min_purchase_count=min_purchase_count,
+        )
+        pidxs_list = [list(map(int, x["pidxs"].split(","))) for x in histories]
+        category1s_list = [list(map(int, x["category1s"].split(","))) for x in histories]
+        category2s_list = [list(map(int, x["category2s"].split(","))) for x in histories]
+        category3s_list = [list(map(int, x["category3s"].split(","))) for x in histories]
+
+        assert len(pidxs_list) == len(category1s_list) == len(category2s_list) == len(category3s_list)
+
+        result = []
+        zipped = zip(pidxs_list, category1s_list, category2s_list, category3s_list)
+        iteration = tqdm(zipped, total=len(pidxs_list), desc=f"Partitioning user histories into 50-sequence windows")
+        for pidxs, category1s, category2s, category3s in iteration:
+            assert len(pidxs) == len(category1s) == len(category2s) == len(category3s)
+            for i in range(2, len(pidxs)):
+                s = max(0, i - 50)
+                s_pidxs = pidxs[s:i]
+                s_category1s = category1s[s:i]
+                s_category2s = category2s[s:i]
+                s_category3s = category3s[s:i]
+                result.append((s_pidxs, s_category1s, s_category2s, s_category3s))
+
+        print(f">>> List user histories completed.")
+        print(f">>> Aggregated total {len(result):,} rows")
+        return result
 
     def list_skip_grams(self, window_size: int = 5, time_delta: int = 60 * 3):
         traces = Trace.list_traces(self.session)
@@ -686,6 +858,14 @@ class Migrator:
     def pdid2pidx(self, pdid: str) -> int | None:
         item = Item.get_item_by_pdid(self.session, pdid)
         return item.pidx if item else None
+
+    def generate_edge_indices_csv(self):
+        sequences = Click2PurchaseSequence.list_click2purchase_sequences(self.session)
+        # swap source & target
+        sequences = [(x.target_pidx, x.source_pidx) for x in sequences]
+        purchase_edges_df = pd.DataFrame(sequences, columns=["source_pidx", "target_pidx"], dtype=int)
+        purchase_csv_path = self.workspace_path.joinpath(f"edge.purchase.indices.csv")
+        purchase_edges_df.to_csv(purchase_csv_path, index=False)
 
 
 class Volume:
@@ -828,18 +1008,39 @@ class Volume:
         print(f">>> Aggregated total {len(result):,} rows")
         return result
 
+    def get_user_history_count(self, condition: Literal["training", "test"] = "training") -> int:
+        if condition == "training":
+            return TrainingUserHistory.count(self.session)
+        else:
+            return TestUserHistory.count(self.session)
+
+    def get_user_history(self, record_id, condition: Literal["training", "test"] = "training") -> tuple[list[int], ...]:
+        if condition == "training":
+            hist = TrainingUserHistory.get_by_id(self.session, record_id)
+        else:
+            hist = TestUserHistory.get_by_id(self.session, record_id)
+
+        pidxs = hist.pidxs.split(",")
+        cat1_cidxs = hist.category1s.split(",")
+        cat2_cidxs = hist.category2s.split(",")
+        cat3_cidxs = hist.category3s.split(",")
+        return pidxs, cat1_cidxs, cat2_cidxs, cat3_cidxs
+
     def list_click2purchase_sequences(self) -> list[Click2PurchaseSequence]:
         return Click2PurchaseSequence.list_click2purchase_sequences(self.session)
 
 
 if __name__ == "__main__":
-    # migrator = Migrator(company_id="aboutpet", model="item2vec", version="v1")
-    # migrator.migrate_traces(begin_date=datetime(2024, 8, 1))
-    # migrator.migrate_items()
-    # migrator.migrate_users()
-    # migrator.migrate_categories()
-    # migrator.migrate_skip_grams()
-    # migrator.migrate_click2purchase_sequences(begin_date=datetime.now() - timedelta(days=7))
-    # migrator.generate_edge_indices_csv()
+    migrator = Migrator(company_id="aboutpet", model="item2vec", version="v1")
+    migrator.migrate_traces(begin_date=datetime(2024, 8, 1))
+    migrator.migrate_items()
+    migrator.migrate_users()
+    migrator.migrate_categories()
+    migrator.migrate_skip_grams()
+    migrator.migrate_click2purchase_sequences(begin_date=datetime.now() - timedelta(days=7))
+    migrator.migrate_training_user_histories()
+    migrator.migrate_test_user_histories()
+    migrator.generate_edge_indices_csv()
+
     volume = Volume(company_id="aboutpet", model="item2vec", version="v1")
     volume.list_user_histories(condition="training")
