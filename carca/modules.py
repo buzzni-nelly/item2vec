@@ -285,7 +285,7 @@ class CarcaTrainDataset(Dataset):
         return self.volume.get_user_history_count(condition="training")
 
     def __getitem__(self, idx: int):
-        seq_pidxs, cat1_cidxs, cat2_cidxs, cat3_cidxs = self.volume.get_user_history(idx, condition="training")
+        seq_pidxs, cat1_cidxs, cat2_cidxs, cat3_cidxs = self.volume.get_user_history(idx + 1, condition="training")
         seq_len = len(seq_pidxs)
         pad_len = self.max_len - seq_len
 
@@ -354,7 +354,7 @@ class CarcaValidDataset(Dataset):
         return self.volume.get_user_history_count(condition="test")
 
     def __getitem__(self, idx: int) -> tuple:
-        seq_pidxs, cat1_cidxs, cat2_cidxs, cat3_cidxs = self.volume.get_user_history(idx, condition="test")
+        seq_pidxs, cat1_cidxs, cat2_cidxs, cat3_cidxs = self.volume.get_user_history(idx + 1, condition="test")
         seq_len = len(seq_pidxs)
         pad_len = self.max_len - len(seq_pidxs)
 

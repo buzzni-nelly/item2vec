@@ -1020,10 +1020,10 @@ class Volume:
         else:
             hist = TestUserHistory.get_by_id(self.session, record_id)
 
-        pidxs = hist.pidxs.split(",")
-        cat1_cidxs = hist.category1s.split(",")
-        cat2_cidxs = hist.category2s.split(",")
-        cat3_cidxs = hist.category3s.split(",")
+        pidxs = list(map(int, hist.pidxs.split(",")))
+        cat1_cidxs = list(map(int, hist.category1s.split(",")))
+        cat2_cidxs = list(map(int, hist.category2s.split(",")))
+        cat3_cidxs = list(map(int, hist.category3s.split(",")))
         return pidxs, cat1_cidxs, cat2_cidxs, cat3_cidxs
 
     def list_click2purchase_sequences(self) -> list[Click2PurchaseSequence]:
