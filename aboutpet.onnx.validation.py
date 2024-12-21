@@ -54,18 +54,16 @@ if __name__ == "__main__":
         seq_pidxs, cat1_cidxs, cat2_cidxs, cat3_cidxs, src_key_padding_mask, src_mask, label_pidxs = batch
 
         label_pidxs = label_pidxs.unsqueeze(-1)
-        candidate_pidxs = torch.cat(
-            [torch.randint(0, 15000, (seq_pidxs.size(0), 100), dtype=torch.long), label_pidxs], dim=-1
-        )
+        candidate_pidxs = torch.cat([torch.randint(0, 15000, (seq_pidxs.size(0), 1000)), label_pidxs], dim=-1)
 
         input_example = {
             "seq_pidxs": seq_pidxs.numpy(),
-            "category1_cidxs": cat1_cidxs.numpy(),
-            "category2_cidxs": cat2_cidxs.numpy(),
-            "category3_cidxs": cat3_cidxs.numpy(),
+            "seq_cat1_cidxs": cat1_cidxs.numpy(),
+            "seq_cat2_cidxs": cat2_cidxs.numpy(),
+            "seq_cat3_cidxs": cat3_cidxs.numpy(),
             "src_key_padding_mask": src_key_padding_mask.numpy(),
             "src_mask": src_mask.numpy(),
-            "candidate_idxs": candidate_pidxs.numpy(),
+            "candidate_pidxs": candidate_pidxs.numpy(),
         }
 
         topk_scores, topk_indices = run_inference(session, input_example)

@@ -2,6 +2,7 @@ import torch
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from pytorch_lightning.loggers import WandbLogger
+from pytorch_lightning.strategies import DDPStrategy
 
 import directories
 from carca.configs import Settings as CarcaSettings
@@ -67,6 +68,7 @@ def main():
         logger=logger,
         profiler=carca_settings.trainer_profiler,
         precision=carca_settings.trainer_precision,
+        strategy=DDPStrategy(find_unused_parameters=True),
         callbacks=[
             ModelCheckpoint(
                 dirpath=carca_checkpoint_dir_path,
