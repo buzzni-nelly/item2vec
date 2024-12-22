@@ -450,24 +450,10 @@ class TrainingUserHistory(Base):
         """Count the total number of records."""
         return session.query(TrainingUserHistory).count()
 
-    @classmethod
-    def reset_table(cls, session):
-        session.execute(text("DROP TABLE IF EXISTS user_history"))
-        session.commit()
-        session.execute(
-            text(
-                """
-            CREATE TABLE user_history (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                pidxs TEXT,
-                category1s TEXT,
-                category2s TEXT,
-                category3s TEXT
-            )
-        """
-            )
-        )
-        session.commit()
+    @staticmethod
+    def reset_table(session: Session):
+        TrainingUserHistory.__table__.drop(session.bind, checkfirst=True)
+        TrainingUserHistory.__table__.create(session.bind, checkfirst=True)
 
 
 class TestUserHistory(Base):
@@ -489,24 +475,10 @@ class TestUserHistory(Base):
         """Count the total number of records."""
         return session.query(TestUserHistory).count()
 
-    @classmethod
-    def reset_table(cls, session):
-        session.execute(text("DROP TABLE IF EXISTS user_history"))
-        session.commit()
-        session.execute(
-            text(
-                """
-            CREATE TABLE user_history (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                pidxs TEXT,
-                category1s TEXT,
-                category2s TEXT,
-                category3s TEXT
-            )
-        """
-            )
-        )
-        session.commit()
+    @staticmethod
+    def reset_table(session: Session):
+        TestUserHistory.__table__.drop(session.bind, checkfirst=True)
+        TestUserHistory.__table__.create(session.bind, checkfirst=True)
 
 
 class Migrator:
@@ -718,9 +690,11 @@ class Migrator:
 
         print(f"Migration completed: {len(rows):,} rows inserted.")
 
-    def migrate_training_user_histories(self, chunk_size=100_000):
+    def migrate_training_user_histories(self, offset_seconds:int = 2 * 60 * 60, chunk_size=100_000):
         TrainingUserHistory.reset_table(self.session)
-        user_histories = self.list_user_histories(condition="training")
+        user_histories = self.list_user_histories(
+            condition="training", offset_seconds=offset_seconds
+        )
 
         rows = []
         insert_query = text(
@@ -752,9 +726,11 @@ class Migrator:
 
         print(f"Migration completed: {len(user_histories)} rows inserted.")
 
-    def migrate_test_user_histories(self, chunk_size=100_000):
+    def migrate_test_user_histories(self, offset_seconds:int = 2 * 60 * 60, chunk_size=100_000):
         TestUserHistory.reset_table(self.session)
-        user_histories = self.list_user_histories(condition="test")
+        user_histories = self.list_user_histories(
+            condition="test", offset_seconds=offset_seconds
+        )
 
         rows = []
         insert_query = text(
@@ -790,11 +766,13 @@ class Migrator:
         self,
         condition: Literal["full", "training", "test"] = "training",
         min_purchase_count: int = 1,
+        offset_seconds: int = 2 * 60 * 60,
     ):
         histories = Trace.aggregate_user_histories(
             self.session,
             condition=condition,
             min_purchase_count=min_purchase_count,
+            offset_seconds=offset_seconds
         )
         pidxs_list = [list(map(int, x["pidxs"].split(","))) for x in histories]
         category1s_list = [list(map(int, x["category1s"].split(","))) for x in histories]
