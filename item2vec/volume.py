@@ -663,9 +663,9 @@ class Migrator:
         self.session.bulk_save_objects(category3_objects)
         self.session.commit()
 
-    def migrate_skip_grams(self, chunk_size=10_000_000):
+    def migrate_skip_grams(self, window_size: int = 5, chunk_size=10_000_000):
         SkipGram.reset_table(self.session)
-        skip_grams = self.list_skip_grams()
+        skip_grams = self.list_skip_grams(window_size=window_size)
 
         rows = []
         insert_query = text(
