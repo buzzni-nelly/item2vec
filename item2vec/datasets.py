@@ -86,7 +86,7 @@ class SkipGramBPRDataModule(LightningDataModule):
     def val_dataloader(self) -> EVAL_DATALOADERS:
         return DataLoader(
             SkipGramBPRValidDataset(volume=self.volume),
-            batch_size=self.batch_size // 2,
+            batch_size=1,
             num_workers=self.num_workers,
             persistent_workers=bool(self.num_workers > 0),
             pin_memory=True,
