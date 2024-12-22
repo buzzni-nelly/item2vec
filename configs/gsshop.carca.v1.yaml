@@ -18,7 +18,7 @@ trainer_limit_val_batches: 1.0
 trainer_limit_train_batches: 1.0
 trainer_limit_test_batches: 1.0
 trainer_strategy: "auto"  # deepspeed_stage_1
-trainer_precision: "16"
+trainer_precision: "16-mixed"
 trainer_profiler: "simple"
 
 checkpoint_dirpath: "/tmp/gsshop/carca/v1/checkpoints"
