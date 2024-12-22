@@ -8,6 +8,10 @@ class Settings(BaseSettings):
 
     version: str = "v1"
 
+    # dataset
+    skipgram_window_size: int = 5
+
+    # train
     embed_dim: int = 128  # 32
     num_layers: int = 2
 

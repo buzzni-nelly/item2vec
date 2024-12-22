@@ -137,20 +137,13 @@ class GraphBPRItem2Vec(pl.LightningModule):
 
     def validation_step(self, batch: torch.Tensor, batch_idx: int) -> None:
         sources, labels = batch
-        vanilla_embeddings = self.item2vec()
         graph_embeddings = self.get_graph_embeddings(num_layers=self.num_layers)
 
-        cos_ndcg = self.calc_cosine_ndcg(vanilla_embeddings, sources, labels, k=20)
-        dot_ndcg = self.calc_dot_product_ndcg(vanilla_embeddings, sources, labels, k=20)
         graph_dot_ndcg = self.calc_dot_product_ndcg(graph_embeddings, sources, labels, k=20)
         graph_cos_ndcg = self.calc_cosine_ndcg(graph_embeddings, sources, labels, k=20)
-        graph_dot_recall = self.calc_dot_product_ndcg(graph_embeddings, sources, labels, k=20)
 
-        self.log("val_cos_ndcg@20", cos_ndcg.mean(), prog_bar=True, logger=True, sync_dist=True)
-        self.log("val_dot_ndcg@20", dot_ndcg.mean(), prog_bar=True, logger=True, sync_dist=True)
-        self.log("val_graph_dot_ndcg@20", graph_dot_ndcg.mean(), prog_bar=True, logger=True, sync_dist=True)
-        self.log("val_graph_cos_ndcg@20", graph_cos_ndcg.mean(), prog_bar=True, logger=True, sync_dist=True)
-        self.log("val_graph_dot_recall@20", graph_dot_recall.mean(), prog_bar=True, logger=True, sync_dist=True)
+        self.log("val_graph_dot_ndcg@20", graph_dot_ndcg, prog_bar=True, logger=True, sync_dist=True)
+        self.log("val_graph_cos_ndcg@20", graph_cos_ndcg, prog_bar=True, logger=True, sync_dist=True)
 
     def calc_cosine_ndcg(self, embeddings: torch.Tensor, sources: torch.Tensor, labels: torch.Tensor, k: int = 20):
         source_embeddings = embeddings[sources]
@@ -160,7 +153,7 @@ class GraphBPRItem2Vec(pl.LightningModule):
         relevance = (top_indices == labels).float()
         gains = 1 / torch.log2(torch.arange(2, k + 2).float()).to(relevance.device)
         ndcg = (relevance * gains).sum(dim=-1)
-        return ndcg
+        return ndcg.mean()
 
     def calc_dot_product_ndcg(self, embeddings: torch.Tensor, sources: torch.Tensor, labels: torch.Tensor, k: int = 20):
         source_embeddings = embeddings[sources]
@@ -170,7 +163,7 @@ class GraphBPRItem2Vec(pl.LightningModule):
         relevance = (top_indices == labels).float()
         gains = 1 / torch.log2(torch.arange(2, k + 2).float()).to(relevance.device)
         ndcg = (relevance * gains).sum(dim=-1)
-        return ndcg
+        return ndcg.mean()
 
     def configure_optimizers(self) -> Optimizer:
         return optim.AdamW(self.parameters(), lr=self.lr, weight_decay=self.weight_decay)

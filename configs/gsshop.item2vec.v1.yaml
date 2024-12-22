@@ -1,12 +1,16 @@
 version: v1
 
+# dataset
+skipgram_window_size: 3
+
+# train
 embed_dim: 128  # 32
 num_layers: 0
 
 lr: 0.001
 weight_decay: 0.01
 
-datamodule_batch_size: 4096  # 2048
+datamodule_batch_size: 2048  # 2048
 datamodule_num_workers: 10
 datamodule_negative_k: 10
 

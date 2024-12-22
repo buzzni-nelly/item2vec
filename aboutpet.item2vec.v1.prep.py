@@ -1,9 +1,14 @@
 from datetime import datetime, timedelta
 
+import directories
+from item2vec.configs import Settings as Item2VecSettings
 from item2vec.volume import Migrator
 
 
 if __name__ == "__main__":
+    config_path = directories.config(company_id="aboutpet", model="item2vec", version="v1")
+    settings = Item2VecSettings.load(config_path)
+
     migrator = Migrator(company_id="aboutpet", model="item2vec", version="v1")
     migrator.migrate_traces(begin_date=datetime(2024, 8, 1))
     migrator.migrate_items()
