@@ -45,6 +45,22 @@ class CrossAttentionEncoderLayer(nn.Module):
         self.dropout = Dropout(dropout)
         self.activation = activation
 
+        self._reset_parameters()
+
+    def _reset_parameters(self):
+        # Initialize self attention
+        torch.nn.init.xavier_uniform_(self.self_attn.in_proj_weight)
+        torch.nn.init.constant_(self.self_attn.in_proj_bias, 0)
+        torch.nn.init.xavier_uniform_(self.self_attn.out_proj.weight)
+        torch.nn.init.constant_(self.self_attn.out_proj.bias, 0)
+
+        # Initialize linear layers
+        torch.nn.init.xavier_uniform_(self.linear1.weight)
+        torch.nn.init.constant_(self.linear1.bias, 0)
+        torch.nn.init.xavier_uniform_(self.linear2.weight)
+        torch.nn.init.constant_(self.linear2.bias, 0)
+
+
     def __setstate__(self, state):
         super().__setstate__(state)
         if not hasattr(self, "activation"):
@@ -155,6 +171,21 @@ class CrossAttentionDecoderLayer(nn.Module):
 
         self.dropout = Dropout(dropout)
         self.activation = activation
+
+        self._reset_parameters()
+
+    def _reset_parameters(self):
+        # Initialize self attention
+        torch.nn.init.xavier_uniform_(self.self_attn.in_proj_weight)
+        torch.nn.init.constant_(self.self_attn.in_proj_bias, 0)
+        torch.nn.init.xavier_uniform_(self.self_attn.out_proj.weight)
+        torch.nn.init.constant_(self.self_attn.out_proj.bias, 0)
+
+        # Initialize linear layers
+        torch.nn.init.xavier_uniform_(self.linear1.weight)
+        torch.nn.init.constant_(self.linear1.bias, 0)
+        torch.nn.init.xavier_uniform_(self.linear2.weight)
+        torch.nn.init.constant_(self.linear2.bias, 0)
 
     def __setstate__(self, state):
         super().__setstate__(state)
