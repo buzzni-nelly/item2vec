@@ -692,9 +692,7 @@ class Migrator:
 
     def migrate_training_user_histories(self, offset_seconds:int = 2 * 60 * 60, chunk_size=100_000):
         TrainingUserHistory.reset_table(self.session)
-        user_histories = self.list_user_histories(
-            condition="training", offset_seconds=offset_seconds
-        )
+        user_histories = self.list_user_histories(condition="training", offset_seconds=offset_seconds)
 
         rows = []
         insert_query = text(
@@ -728,9 +726,7 @@ class Migrator:
 
     def migrate_test_user_histories(self, offset_seconds:int = 2 * 60 * 60, chunk_size=100_000):
         TestUserHistory.reset_table(self.session)
-        user_histories = self.list_user_histories(
-            condition="test", offset_seconds=offset_seconds
-        )
+        user_histories = self.list_user_histories(condition="test", offset_seconds=offset_seconds)
 
         rows = []
         insert_query = text(
@@ -826,6 +822,7 @@ class Migrator:
 
                 if pidx_1 and pidx_2:
                     item_pairs.append((pidx_1, pidx_2, weight))
+
         return item_pairs
 
     def pidx2pdid(self, pidx: int) -> str | None:
