@@ -74,7 +74,7 @@ def load_embeddings(volume: Volume, embed_dim: int = 256, num_layers: int = 2):
 def upload(aggregated_scores: dict):
     pipeline = clients.redis.aiaas_6.pipeline()
     for pdid, scores in aggregated_scores.items():
-        key = f"{RELEASE}:{COMPANY_ID}:i2v:{VERSION}:{pdid}"
+        key = f"{RELEASE}:{COMPANY_ID}:{MODEL_NAME}:{VERSION}:{pdid}"
         pipeline.set(key, json.dumps(scores))
         pipeline.expire(key, 30 * 24 * 60 * 60)
     pipeline.execute()
