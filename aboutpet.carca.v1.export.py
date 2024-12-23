@@ -181,12 +181,12 @@ def redeploy():
 
 
 def main():
-    # export_onnx()
-    # export_sqlite3()
-    # tarfile_path = compress()
-    # upload_s3(tarfile_path)
-    # clear_workspace()
-    # clear_s3_retaining_k(k=20)
+    export_onnx()
+    export_sqlite3()
+    tarfile_path = compress()
+    upload_s3(tarfile_path)
+    clear_workspace()
+    clear_s3_retaining_k(k=20)
     redeploy()
 
 
