@@ -25,12 +25,9 @@ def main():
     volume_i = Volume(company_id="aboutpet", model="item2vec", version="v1")
     volume_c = Volume(company_id="aboutpet", model="carca", version="v1")
 
-    item2vec_checkpoint_path = volume_i.checkpoints_dirpath.joinpath("last.ckpt")
-    carca_checkpoint_dir_path = volume_c.checkpoints_dirpath
-
     purchase_edge_index_path = volume_i.workspace_path.joinpath("edge.purchase.indices.csv")
     item2vec_module = GraphBPRItem2Vec.load_from_checkpoint(
-        checkpoint_path=item2vec_checkpoint_path,
+        checkpoint_path=volume_i.checkpoints_dirpath / "last.ckpt",
         vocab_size=volume_i.vocab_size(),
         purchase_edge_index_path=purchase_edge_index_path,
         embed_dim=item2vec_settings.embed_dim,
@@ -71,7 +68,7 @@ def main():
         strategy=DDPStrategy(find_unused_parameters=True),
         callbacks=[
             ModelCheckpoint(
-                dirpath=carca_checkpoint_dir_path,
+                dirpath=volume_c.checkpoints_dirpath,
                 monitor=carca_settings.checkpoint_monitor,
                 mode=carca_settings.checkpoint_mode,
                 every_n_train_steps=carca_settings.checkpoint_every_n_train_steps,
