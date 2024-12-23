@@ -36,7 +36,7 @@ def main():
         num_layers=item2vec_settings.num_layers,
     )
 
-    item2vec_checkpoint_dir_path = volume.workspace_path.joinpath("checkpoints")
+    item2vec_checkpoint_dir_path = volume.checkpoints_dirpath
     trainer = Trainer(
         limit_train_batches=item2vec_settings.trainer_limit_train_batches,
         max_epochs=item2vec_settings.trainer_max_epochs,

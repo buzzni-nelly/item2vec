@@ -19,7 +19,7 @@ def main():
 
     volume = Volume(company_id="gsshop", model="item2vec", version="v1")
 
-    item2vec_checkpoint_dir_path = volume.workspace_path.joinpath("checkpoints")
+    item2vec_checkpoint_dir_path = volume.checkpoints_dirpath
 
     data_module = SkipGramBPRDataModule(
         volume=volume,

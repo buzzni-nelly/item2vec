@@ -54,7 +54,7 @@ def debug(
 
 
 def load_embeddings(volume: Volume, embed_dim: int = 256, num_layers: int = 2):
-    checkpoint_path = volume.workspace_path.joinpath("checkpoints", "last.ckpt")
+    checkpoint_path = volume.checkpoints_dirpath
     purchase_edge_index_path = volume.workspace_path.joinpath("edge.purchase.indices.csv")
     vocab_size = volume.vocab_size()
     item2vec_module = GraphBPRItem2Vec.load_from_checkpoint(

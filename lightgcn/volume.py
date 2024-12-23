@@ -220,7 +220,7 @@ class Volume:
         self.model = model
         self.version = version
         self.workspace_path = directories.workspaces.joinpath(site, model, version)
-        self.sqlite3_path = self.workspace_path.joinpath(f"{site}-{model}-{version}.sqlite3")
+        self.sqlite3_path = self.workspace_path.joinpath(f"{site}-{model}.sqlite3")
 
         if not self.workspace_path.exists():
             self.workspace_path.mkdir(parents=True)

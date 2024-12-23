@@ -24,8 +24,8 @@ def main():
     volume_i = Volume(company_id="gsshop", model="item2vec", version="v1")
     volume_c = Volume(company_id="gsshop", model="carca", version="v1")
 
-    item2vec_checkpoint_path = volume_i.workspace_path.joinpath("checkpoints", "last.ckpt")
-    carca_checkpoint_dir_path = volume_c.workspace_path.joinpath("checkpoints")
+    item2vec_checkpoint_path = volume_i.checkpoints_dirpath("last.ckpt")
+    carca_checkpoint_dir_path = volume_c.checkpoints_dirpath
 
     purchase_edge_index_path = volume_i.workspace_path.joinpath("edge.purchase.indices.csv")
     item2vec_module = GraphBPRItem2Vec.load_from_checkpoint(
