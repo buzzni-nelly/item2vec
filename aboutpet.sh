@@ -9,5 +9,8 @@ while true; do
     sleep 3
     python aboutpet.item2vec.v1.upsert.py
     sleep 3
-    python aboutpet.item2vec.v1.pastbias.py
+    python aboutpet.carca.v1.train.py
+    sleep 3
+    python aboutpet.carca.v1.export.py
+    sleep 3
 done
