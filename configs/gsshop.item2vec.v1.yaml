@@ -2,6 +2,7 @@ version: v1
 
 # dataset
 skipgram_window_size: 3
+blacklist: []
 
 # train
 embed_dim: 128  # 32

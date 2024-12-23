@@ -10,6 +10,7 @@ class Settings(BaseSettings):
 
     # dataset
     skipgram_window_size: int = 5
+    blacklist: list[str] = []
 
     # train
     embed_dim: int = 128  # 32
