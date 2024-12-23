@@ -690,7 +690,7 @@ class Migrator:
 
         print(f"Migration completed: {len(rows):,} rows inserted.")
 
-    def migrate_training_user_histories(self, offset_seconds:int = 2 * 60 * 60, chunk_size=100_000):
+    def migrate_training_user_histories(self, offset_seconds: int = 2 * 60 * 60, chunk_size=100_000):
         TrainingUserHistory.reset_table(self.session)
         user_histories = self.list_user_histories(condition="training", offset_seconds=offset_seconds)
 
@@ -724,7 +724,7 @@ class Migrator:
 
         print(f"Migration completed: {len(user_histories)} rows inserted.")
 
-    def migrate_test_user_histories(self, offset_seconds:int = 2 * 60 * 60, chunk_size=100_000):
+    def migrate_test_user_histories(self, offset_seconds: int = 2 * 60 * 60, chunk_size=100_000):
         TestUserHistory.reset_table(self.session)
         user_histories = self.list_user_histories(condition="test", offset_seconds=offset_seconds)
 
@@ -765,10 +765,7 @@ class Migrator:
         offset_seconds: int = 2 * 60 * 60,
     ):
         histories = Trace.aggregate_user_histories(
-            self.session,
-            condition=condition,
-            min_purchase_count=min_purchase_count,
-            offset_seconds=offset_seconds
+            self.session, condition=condition, min_purchase_count=min_purchase_count, offset_seconds=offset_seconds
         )
         pidxs_list = [list(map(int, x["pidxs"].split(","))) for x in histories]
         category1s_list = [list(map(int, x["category1s"].split(","))) for x in histories]

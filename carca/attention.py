@@ -60,7 +60,6 @@ class CrossAttentionEncoderLayer(nn.Module):
         torch.nn.init.xavier_uniform_(self.linear2.weight)
         torch.nn.init.constant_(self.linear2.bias, 0)
 
-
     def __setstate__(self, state):
         super().__setstate__(state)
         if not hasattr(self, "activation"):
