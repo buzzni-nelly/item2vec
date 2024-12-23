@@ -127,7 +127,6 @@ def clear_workspace():
                 clear_directory(item)
 
 
-
 def compress():
     volume_c = Volume(company_id="aboutpet", model="carca", version="v1")
     filename = datetime.now().strftime("%Y%m%d%H%M%S")

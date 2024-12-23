@@ -19,8 +19,6 @@ def main():
 
     volume = Volume(company_id="gsshop", model="item2vec", version="v1")
 
-    item2vec_checkpoint_dir_path = volume.checkpoints_dirpath
-
     data_module = SkipGramBPRDataModule(
         volume=volume,
         batch_size=item2vec_settings.datamodule_batch_size,
@@ -46,7 +44,7 @@ def main():
         precision=item2vec_settings.trainer_precision,
         callbacks=[
             ModelCheckpoint(
-                dirpath=item2vec_checkpoint_dir_path,
+                dirpath=volume.checkpoints_dirpath,
                 monitor=item2vec_settings.checkpoint_monitor,
                 mode=item2vec_settings.checkpoint_mode,
                 every_n_train_steps=item2vec_settings.checkpoint_every_n_train_steps,

@@ -36,7 +36,6 @@ def main():
         num_layers=item2vec_settings.num_layers,
     )
 
-    item2vec_checkpoint_dir_path = volume.checkpoints_dirpath
     trainer = Trainer(
         limit_train_batches=item2vec_settings.trainer_limit_train_batches,
         max_epochs=item2vec_settings.trainer_max_epochs,
@@ -45,7 +44,7 @@ def main():
         precision=item2vec_settings.trainer_precision,
         callbacks=[
             ModelCheckpoint(
-                dirpath=item2vec_checkpoint_dir_path,
+                dirpath=volume.checkpoints_dirpath,
                 monitor=item2vec_settings.checkpoint_monitor,
                 mode=item2vec_settings.checkpoint_mode,
                 every_n_train_steps=item2vec_settings.checkpoint_every_n_train_steps,
