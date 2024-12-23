@@ -489,7 +489,7 @@ class Migrator:
 
         workspaces_path = workspaces_path or directories.workspaces
         self.workspace_path = workspaces_path.joinpath(company_id, model, version)
-        self.sqlite3_path = self.workspace_path.joinpath(f"{company_id}-{model}-{version}.sqlite3")
+        self.sqlite3_path = self.workspace_path.joinpath(f"{company_id}-{model}.sqlite3")
 
         if not self.workspace_path.exists():
             self.workspace_path.mkdir(parents=True)
@@ -822,6 +822,7 @@ class Migrator:
 
                 if pidx_1 and pidx_2:
                     item_pairs.append((pidx_1, pidx_2, weight))
+                    item_pairs.append((pidx_2, pidx_1, weight))
 
         return item_pairs
 
@@ -852,8 +853,9 @@ class Volume:
         workspaces_path = workspaces_path or directories.workspaces
         self.workspaces_path = workspaces_path
         self.workspace_path = workspaces_path.joinpath(company_id, model, version)
-        self.sqlite3_path = self.workspace_path.joinpath(f"{company_id}-{model}-{version}.sqlite3")
-        self.onnx_path = self.workspace_path.joinpath(f"{company_id}-{model}-{version}.onnx")
+        self.sqlite3_path = self.workspace_path.joinpath(f"{company_id}-{model}.sqlite3")
+        self.onnx_path = self.workspace_path.joinpath(f"{company_id}-{model}.onnx")
+        self.checkpoints_dirpath = self.workspace_path.joinpath("checkpoints")
 
         if not self.workspace_path.exists():
             self.workspace_path.mkdir(parents=True)
