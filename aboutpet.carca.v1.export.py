@@ -104,27 +104,6 @@ def export_sqlite3():
     return volume_c.sqlite3_path
 
 
-def clear_workspace():
-
-    def clear_directory(directory_path: pathlib.Path):
-        """재귀적으로 디렉토리 내 모든 파일 및 하위 디렉토리를 삭제합니다."""
-        for x in directory_path.iterdir():
-            if x.is_file():
-                x.unlink()
-            elif x.is_dir():
-                clear_directory(x)
-        directory_path.rmdir()
-
-    volume_c = Volume(company_id="aboutpet", model="carca", version="v1")
-
-    workspace_path = volume_c.workspace_path
-
-    if workspace_path.exists() and workspace_path.is_dir():
-        for item in workspace_path.iterdir():
-            if item.is_file():
-                item.unlink()
-            elif item.is_dir():
-                clear_directory(item)
 
 
 def compress():
@@ -185,7 +164,6 @@ def main():
     export_sqlite3()
     tarfile_path = compress()
     upload_s3(tarfile_path)
-    clear_workspace()
     clear_s3_retaining_k(k=20)
     redeploy()
 

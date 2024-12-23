@@ -2,14 +2,14 @@ version: v1
 
 embed_dim: 128
 num_heads: 1
-num_layers: 1
+num_layers: 3
 max_len: 50
 dropout: 0.1
 
 lr: 0.0001
 weight_decay: 0.01
 
-datamodule_batch_size: 256
+datamodule_batch_size: 512
 datamodule_num_workers: 10
 datamodule_negative_k: 10
 
