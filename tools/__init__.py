@@ -1,3 +1,4 @@
+import subprocess
 import tarfile
 import sqlite3
 from pathlib import Path
@@ -82,3 +83,22 @@ def extract(tar_gz_path: Path, extract_dir: Path) -> None:
 
     with tarfile.open(tar_gz_path, "r:gz") as tar:
         tar.extractall(path=extract_dir)
+
+
+def redeploy(deployment: str, namespace: str, context: str = "service-eks"):
+    command = [
+        "kubectl",
+        "--context",
+        context,
+        "rollout",
+        "restart",
+        "deployment",
+        deployment,
+        "-n",
+        namespace,
+    ]
+    try:
+        subprocess.run(command, check=True)
+        print(f"Successfully restarted deployment in {deployment} environment.")
+    except subprocess.CalledProcessError as e:
+        print(f"Failed to restart deployment in {deployment} environment: {e}")

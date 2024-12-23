@@ -167,13 +167,27 @@ def clear_s3_retaining_k(k: int = 20):
     return retained_keys
 
 
+def redeploy():
+    tools.redeploy(
+        deployment="aiaas-aboutpet-carca-v1-inference-deployment",
+        namespace="aiaas-inference-dev",
+        context="service-eks",
+    )
+    tools.redeploy(
+        deployment="aiaas-aboutpet-carca-v1-inference-deployment",
+        namespace="aiaas-inference-prod",
+        context="service-eks",
+    )
+
+
 def main():
-    export_onnx()
-    export_sqlite3()
-    tarfile_path = compress()
-    upload_s3(tarfile_path)
-    clear_workspace()
-    clear_s3_retaining_k(k=20)
+    # export_onnx()
+    # export_sqlite3()
+    # tarfile_path = compress()
+    # upload_s3(tarfile_path)
+    # clear_workspace()
+    # clear_s3_retaining_k(k=20)
+    redeploy()
 
 
 if __name__ == "__main__":
