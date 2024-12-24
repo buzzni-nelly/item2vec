@@ -696,7 +696,7 @@ class Migrator:
         TrainingUserHistory.reset_table(self.session)
 
         histories = Trace.aggregate_user_histories(
-            self.session, condition="training", min_purchase_count=1, offset_seconds=offset_seconds
+            self.session, condition="full", min_purchase_count=1, offset_seconds=offset_seconds
         )
 
         pidxs_list = [list(map(int, x["pidxs"].split(","))) for x in histories]
@@ -1107,12 +1107,12 @@ class Volume:
 
 if __name__ == "__main__":
     migrator = Migrator(company_id="aboutpet", model="item2vec", version="v1")
-    migrator.migrate_traces(begin_date=datetime(2024, 8, 1))
-    migrator.migrate_items()
-    migrator.migrate_users()
-    migrator.migrate_categories()
-    migrator.migrate_skip_grams()
-    migrator.migrate_click2purchase_sequences(begin_date=datetime.now() - timedelta(days=7))
+    # migrator.migrate_traces(begin_date=datetime(2024, 8, 1))
+    # migrator.migrate_items()
+    # migrator.migrate_users()
+    # migrator.migrate_categories()
+    # migrator.migrate_skip_grams()
+    # migrator.migrate_click2purchase_sequences(begin_date=datetime.now() - timedelta(days=7))
     migrator.migrate_training_user_histories()
     migrator.migrate_test_user_histories()
     migrator.generate_edge_indices_csv()
