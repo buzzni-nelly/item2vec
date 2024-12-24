@@ -19,7 +19,7 @@ def export_onnx():
     carca_config_path = directories.config("aboutpet", "carca", "v1")
     carca_settings = carca.configs.Settings.load(carca_config_path)
 
-    checkpoint_path = volume_c.checkpoints_dirpath.joinpath("ndcg@10.max.ckpt")
+    checkpoint_path = volume_c.checkpoints_dirpath / "ndcg@10.max.ckpt"
     num_items = volume_i.vocab_size()
     num_category1, num_category2, num_category3 = volume_i.count_categories()
     model = CARCA.load_from_checkpoint(
@@ -102,8 +102,6 @@ def export_sqlite3():
         tables=["item", "category1", "category2", "category3"],
     )
     return volume_c.sqlite3_path
-
-
 
 
 def compress():
