@@ -23,7 +23,7 @@ trainer_profiler: "simple"
 
 #checkpoint_dirpath: "/tmp/gsshop/carca/v1/checkpoints"
 checkpoint_monitor: "val_ndcg@10"
-checkpoint_filename: "{epoch}-{step}-{train_loss:.2f}"
+checkpoint_filename: "ndcg@10.max"
 checkpoint_mode: "max"
 checkpoint_every_n_train_steps: 10000
 ckpt_path: "last"
