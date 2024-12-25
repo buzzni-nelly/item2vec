@@ -692,12 +692,18 @@ class Migrator:
 
         print(f"Migration completed: {len(rows):,} rows inserted.")
 
-    def migrate_training_user_histories(self, offset_seconds: int = 2 * 60 * 60, chunk_size=100_000, max_size: int = 50):
+    def migrate_training_user_histories(
+        self,
+        offset_seconds: int = 2 * 60 * 60,
+        chunk_size=100_000,
+        max_size: int = 50,
+        condition: Literal["full", "training"] = "training",
+    ):
         TrainingUserHistory.reset_table(self.session)
 
         histories = Trace.aggregate_user_histories(
             self.session,
-            condition="training",
+            condition=condition,
             min_purchase_count=1,
             offset_seconds=offset_seconds,
         )
@@ -1116,6 +1122,6 @@ if __name__ == "__main__":
     # migrator.migrate_categories()
     # migrator.migrate_skip_grams()
     # migrator.migrate_click2purchase_sequences(begin_date=datetime.now() - timedelta(days=7))
-    migrator.migrate_training_user_histories()
+    migrator.migrate_training_user_histories(condition="training")
     migrator.migrate_test_user_histories()
     migrator.generate_edge_indices_csv()
