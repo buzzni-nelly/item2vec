@@ -696,7 +696,10 @@ class Migrator:
         TrainingUserHistory.reset_table(self.session)
 
         histories = Trace.aggregate_user_histories(
-            self.session, condition="full", min_purchase_count=1, offset_seconds=offset_seconds
+            self.session,
+            condition="training",
+            min_purchase_count=1,
+            offset_seconds=offset_seconds,
         )
 
         pidxs_list = [list(map(int, x["pidxs"].split(","))) for x in histories]
@@ -1116,6 +1119,3 @@ if __name__ == "__main__":
     migrator.migrate_training_user_histories()
     migrator.migrate_test_user_histories()
     migrator.generate_edge_indices_csv()
-
-    volume = Volume(company_id="aboutpet", model="item2vec", version="v1")
-    volume.list_user_histories(condition="training")
