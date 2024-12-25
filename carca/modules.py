@@ -27,6 +27,10 @@ class CARCA(pl.LightningModule):
         dropout: float = 0.1,
         lr: float = 0.001,
         weight_decay: float = 0.001,
+        encoder_residual_strategy_1: str = "none",
+        encoder_residual_strategy_2: str = "none",
+        decoder_residual_strategy_1: str = "none",
+        decoder_residual_strategy_2: str = "none",
     ):
         super(CARCA, self).__init__()
         self.num_items = num_items
@@ -71,6 +75,10 @@ class CARCA(pl.LightningModule):
             num_layers=num_layers,
             max_len=max_len,
             dropout=dropout,
+            encoder_residual_strategy_1=encoder_residual_strategy_1,
+            encoder_residual_strategy_2=encoder_residual_strategy_2,
+            decoder_residual_strategy_1=decoder_residual_strategy_1,
+            decoder_residual_strategy_2=decoder_residual_strategy_2,
         )
 
     def forward(

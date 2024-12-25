@@ -198,7 +198,8 @@ class CrossAttentionDecoderLayer(nn.Module):
         v: Tensor,
         src_key_padding_mask: Optional[Tensor] = None,
         need_weights: bool = False,
-        residual_strategy_1: Literal["sum", "multiply", "none"] = "sum",
+        residual_strategy_1: Literal["sum", "multiply", "none"] = "none",
+        residual_strategy_2: Literal["sum", "multiply", "none"] = "none",
     ) -> tuple[Tensor, Tensor]:
 
         assert q.dtype == k.dtype == v.dtype, "k, q, v must have the same dtype"
@@ -279,6 +280,8 @@ class CrossAttentionEncoder(nn.Module):
         k: Tensor,  # key: item embeddings
         v: Tensor,  # value: item embeddings
         src_key_padding_mask: Optional[Tensor] = None,
+        residual_strategy_1: Literal["sum", "multiply", "none"] = "none",
+        residual_strategy_2: Literal["sum", "multiply", "none"] = "none",
     ) -> tuple[Tensor, list[Tensor]]:
 
         assert q.dtype == k.dtype == v.dtype, "k, q, v must have the same dtype"
@@ -299,8 +302,8 @@ class CrossAttentionEncoder(nn.Module):
                 k,
                 v,
                 src_key_padding_mask=src_key_padding_mask,
-                residual_strategy_1="sum",
-                residual_strategy_2="sum",
+                residual_strategy_1=residual_strategy_1,
+                residual_strategy_2=residual_strategy_2,
             )
             q, k, v = output, output, output
             weights.append(weight)
@@ -329,6 +332,8 @@ class CrossAttentionDecoder(nn.Module):
         k: Tensor,
         v: Tensor,
         src_key_padding_mask: Optional[Tensor] = None,
+        residual_strategy_1: Literal["sum", "multiply", "none"] = "none",
+        residual_strategy_2: Literal["sum", "multiply", "none"] = "none",
     ) -> tuple[Tensor, list[Tensor]]:
 
         assert q.dtype == k.dtype == v.dtype, "k, q, v must have the same dtype"
@@ -349,6 +354,8 @@ class CrossAttentionDecoder(nn.Module):
                 k,
                 v,
                 src_key_padding_mask=src_key_padding_mask,
+                residual_strategy_1=residual_strategy_1,
+                residual_strategy_2=residual_strategy_2,
             )
             q = output
             weights.append(weight)
@@ -364,8 +371,17 @@ class CrossAttention(nn.Module):
         num_layers: int,
         max_len: int = 50,
         dropout=0.1,
+        encoder_residual_strategy_1: str="none",
+        encoder_residual_strategy_2: str="none",
+        decoder_residual_strategy_1: str="none",
+        decoder_residual_strategy_2: str="none",
     ):
         super(CrossAttention, self).__init__()
+
+        self.encoder_residual_strategy_1 = encoder_residual_strategy_1
+        self.encoder_residual_strategy_2 = encoder_residual_strategy_2
+        self.decoder_residual_strategy_1 = decoder_residual_strategy_1
+        self.decoder_residual_strategy_2 = decoder_residual_strategy_2
 
         self.Hd = embed_dim // num_heads
         # self.rotary_encoding_kv = RotaryEncoding(embed_dim, max_len)
@@ -394,6 +410,8 @@ class CrossAttention(nn.Module):
             k=x,  # key
             v=x,  # value
             src_key_padding_mask=src_key_padding_mask,
+            residual_strategy_1=self.encoder_residual_strategy_1,
+            residual_strategy_2=self.encoder_residual_strategy_2,
         )
         kv = self.norm(encoder_output)
         decoder_output, decoder_weights = self.transformer_decoder(
@@ -401,6 +419,8 @@ class CrossAttention(nn.Module):
             k=kv,
             v=kv,
             src_key_padding_mask=src_key_padding_mask,
+            residual_strategy_1=self.decoder_residual_strategy_1,
+            residual_strategy_2=self.decoder_residual_strategy_2,
         )
         return decoder_output, decoder_weights
 

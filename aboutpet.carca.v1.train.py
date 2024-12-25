@@ -48,6 +48,10 @@ def main():
         dropout=carca_settings.dropout,
         lr=carca_settings.lr,
         weight_decay=carca_settings.weight_decay,
+        encoder_residual_strategy_1=carca_settings.encoder_residual_strategy_1,
+        encoder_residual_strategy_2=carca_settings.encoder_residual_strategy_2,
+        decoder_residual_strategy_1=carca_settings.decoder_residual_strategy_1,
+        decoder_residual_strategy_2=carca_settings.decoder_residual_strategy_2,
     )
 
     item_embeddings = item2vec_module.get_graph_embeddings(num_layers=item2vec_settings.num_layers)

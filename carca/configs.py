@@ -11,8 +11,12 @@ class Settings(BaseSettings):
     num_heads: int = 1
     num_layers: int = 1
     max_len: int = 50
-    dropout: float = 0.1
+    encoder_residual_strategy_1: str = "none"
+    encoder_residual_strategy_2: str = "none"
+    decoder_residual_strategy_1: str = "none"
+    decoder_residual_strategy_2: str = "none"
 
+    dropout: float = 0.1
     lr: float = 1e-4
     weight_decay: float = 1e-2
 
