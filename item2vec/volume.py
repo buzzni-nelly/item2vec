@@ -327,7 +327,8 @@ class Trace(Base):
             GROUP_CONCAT(event, ',') AS events,
             GROUP_CONCAT(cidx_1, ',') AS category1s,
             GROUP_CONCAT(cidx_2, ',') AS category2s,
-            GROUP_CONCAT(cidx_3, ',') AS category3s
+            GROUP_CONCAT(cidx_3, ',') AS category3s,
+            GROUP_CONCAT(unix_timestamp, ',') AS unix_timestamps
         FROM (
             SELECT
                 t.user_id AS user_id,
@@ -336,7 +337,7 @@ class Trace(Base):
                 COALESCE(c1.cidx, 0) AS cidx_1,
                 COALESCE(c2.cidx, 0) AS cidx_2,
                 COALESCE(c3.cidx, 0) AS cidx_3,
-                t.timestamp AS event_timestamp
+                t.timestamp AS unix_timestamp
             FROM
                 trace AS t
             INNER JOIN item AS i ON t.pdid = i.pdid
@@ -351,9 +352,9 @@ class Trace(Base):
         """
 
         if condition == "training":
-            query += f"HAVING MAX(event_timestamp) < {threshold}"
+            query += f"HAVING MAX(unix_timestamp) < {threshold}"
         elif condition == "test":
-            query += f"HAVING MAX(event_timestamp) >= {threshold}"
+            query += f"HAVING MAX(unix_timestamp) >= {threshold}"
 
         query = text(query)
         results = session.execute(query).fetchall()
@@ -365,6 +366,7 @@ class Trace(Base):
                 "category1s": row.category1s,
                 "category2s": row.category2s,
                 "category3s": row.category3s,
+                "unix_timestamps": row.unix_timestamps,
             }
             for row in tqdm(results, desc="Aggregating user histories..")
         ]
@@ -690,9 +692,56 @@ class Migrator:
 
         print(f"Migration completed: {len(rows):,} rows inserted.")
 
-    def migrate_training_user_histories(self, offset_seconds: int = 2 * 60 * 60, chunk_size=100_000):
+    def migrate_training_user_histories(self, offset_seconds: int = 2 * 60 * 60, chunk_size=100_000, max_size: int = 50):
         TrainingUserHistory.reset_table(self.session)
-        user_histories = self.list_user_histories(condition="training", offset_seconds=offset_seconds)
+
+        histories = Trace.aggregate_user_histories(
+            self.session,
+            condition="training",
+            min_purchase_count=1,
+            offset_seconds=offset_seconds,
+        )
+
+        pidxs_list = [list(map(int, x["pidxs"].split(","))) for x in histories]
+        category1s_list = [list(map(int, x["category1s"].split(","))) for x in histories]
+        category2s_list = [list(map(int, x["category2s"].split(","))) for x in histories]
+        category3s_list = [list(map(int, x["category3s"].split(","))) for x in histories]
+        events_list = [list(map(str, x["events"].split(","))) for x in histories]
+        timestamps_list = [list(map(float, x["unix_timestamps"].split(","))) for x in histories]
+
+        assert len(pidxs_list) == len(category1s_list) == len(category2s_list) == len(category3s_list) == len(timestamps_list) == len(events_list)
+
+        user_histories = []
+        zipped = zip(pidxs_list, category1s_list, category2s_list, category3s_list, events_list, timestamps_list)
+        iteration = tqdm(zipped, total=len(pidxs_list), desc=f"Partitioning user histories into 50-sequence windows")
+        for pidxs, category1s, category2s, category3s, events, timestamps in iteration:
+
+            assert len(pidxs) == len(category1s) == len(category2s) == len(category3s) == len(events) == len(timestamps)
+
+            for i in range(2, len(pidxs)):
+
+                assert timestamps[-2] < timestamps[-1]
+
+                s = max(0, i - max_size)
+                s_pidxs = pidxs[s:i]
+                s_category1s = category1s[s:i]
+                s_category2s = category2s[s:i]
+                s_category3s = category3s[s:i]
+                s_events = events[s:i]
+
+                user_histories.append((s_pidxs, s_category1s, s_category2s, s_category3s))
+
+                if s_events[-1] == "purchase":
+                    pidx = s_pidxs[-1]
+                    category1 = s_category1s[-1]
+                    category2 = s_category2s[-1]
+                    category3 = s_category3s[-1]
+                    for j in range(2, len(s_pidxs)):
+                        g_pidxs = s_pidxs[-max_size:j] + [pidx]
+                        g_category1 = s_category1s[-max_size:j] + [category1]
+                        g_category2 = s_category2s[-max_size:j] + [category2]
+                        g_category3 = s_category3s[-max_size:j] + [category3]
+                        user_histories.append((g_pidxs, g_category1, g_category2, g_category3))
 
         rows = []
         insert_query = text(
@@ -724,9 +773,42 @@ class Migrator:
 
         print(f"Migration completed: {len(user_histories)} rows inserted.")
 
-    def migrate_test_user_histories(self, offset_seconds: int = 2 * 60 * 60, chunk_size=100_000):
+    def migrate_test_user_histories(self, offset_seconds: int = 2 * 60 * 60, chunk_size=100_000, max_size: int = 50):
         TestUserHistory.reset_table(self.session)
-        user_histories = self.list_user_histories(condition="test", offset_seconds=offset_seconds)
+
+        histories = Trace.aggregate_user_histories(
+            self.session, condition="training", min_purchase_count=1, offset_seconds=offset_seconds
+        )
+
+        pidxs_list = [list(map(int, x["pidxs"].split(","))) for x in histories]
+        category1s_list = [list(map(int, x["category1s"].split(","))) for x in histories]
+        category2s_list = [list(map(int, x["category2s"].split(","))) for x in histories]
+        category3s_list = [list(map(int, x["category3s"].split(","))) for x in histories]
+        events_list = [list(map(str, x["events"].split(","))) for x in histories]
+        timestamps_list = [list(map(float, x["unix_timestamps"].split(","))) for x in histories]
+
+        assert len(pidxs_list) == len(category1s_list) == len(category2s_list) == len(category3s_list) == len(timestamps_list) == len(events_list)
+
+        user_histories = []
+        zipped = zip(pidxs_list, category1s_list, category2s_list, category3s_list, events_list, timestamps_list)
+        iteration = tqdm(zipped, total=len(pidxs_list), desc=f"Partitioning user histories into 50-sequence windows")
+        for pidxs, category1s, category2s, category3s, events, timestamps in iteration:
+
+            assert len(pidxs) == len(category1s) == len(category2s) == len(category3s) == len(events) == len(timestamps)
+
+            for i in range(2, len(pidxs)):
+
+                assert timestamps[-2] < timestamps[-1]
+
+                s = max(0, i - max_size)
+                s_pidxs = pidxs[s:i]
+                s_category1s = category1s[s:i]
+                s_category2s = category2s[s:i]
+                s_category3s = category3s[s:i]
+                s_events = events[s:i]
+
+                if s_events[-1] == "purchase":
+                    user_histories.append((s_pidxs, s_category1s, s_category2s, s_category3s))
 
         rows = []
         insert_query = text(
@@ -763,6 +845,7 @@ class Migrator:
         condition: Literal["full", "training", "test"] = "training",
         min_purchase_count: int = 1,
         offset_seconds: int = 2 * 60 * 60,
+        max_size: int = 50,
     ):
         histories = Trace.aggregate_user_histories(
             self.session, condition=condition, min_purchase_count=min_purchase_count, offset_seconds=offset_seconds
@@ -771,25 +854,47 @@ class Migrator:
         category1s_list = [list(map(int, x["category1s"].split(","))) for x in histories]
         category2s_list = [list(map(int, x["category2s"].split(","))) for x in histories]
         category3s_list = [list(map(int, x["category3s"].split(","))) for x in histories]
+        events_list = [list(map(str, x["events"].split(","))) for x in histories]
+        timestamps_list = [list(map(float, x["unix_timestamps"].split(","))) for x in histories]
 
-        assert len(pidxs_list) == len(category1s_list) == len(category2s_list) == len(category3s_list)
+        assert len(pidxs_list) == len(category1s_list) == len(category2s_list) == len(category3s_list) == len(timestamps_list) == len(events_list)
 
-        result = []
-        zipped = zip(pidxs_list, category1s_list, category2s_list, category3s_list)
+        results = []
+        zipped = zip(pidxs_list, category1s_list, category2s_list, category3s_list, events_list, timestamps_list)
         iteration = tqdm(zipped, total=len(pidxs_list), desc=f"Partitioning user histories into 50-sequence windows")
-        for pidxs, category1s, category2s, category3s in iteration:
-            assert len(pidxs) == len(category1s) == len(category2s) == len(category3s)
+        for pidxs, category1s, category2s, category3s, events, timestamps in iteration:
+
+            assert len(pidxs) == len(category1s) == len(category2s) == len(category3s) == len(events) == len(timestamps)
+
             for i in range(2, len(pidxs)):
-                s = max(0, i - 50)
+
+                assert timestamps[-2] < timestamps[-1]
+
+                s = max(0, i - max_size)
                 s_pidxs = pidxs[s:i]
                 s_category1s = category1s[s:i]
                 s_category2s = category2s[s:i]
                 s_category3s = category3s[s:i]
-                result.append((s_pidxs, s_category1s, s_category2s, s_category3s))
+                s_events = events[s:i]
+
+                if condition != "test":
+                    results.append((s_pidxs, s_category1s, s_category2s, s_category3s))
+
+                if s_events[-1] == "purchase":
+                    pidx = s_pidxs[-1]
+                    category1 = s_category1s[-1]
+                    category2 = s_category2s[-1]
+                    category3 = s_category3s[-1]
+                    for j in range(2, len(s_pidxs)):
+                        g_pidxs = s_pidxs[-max_size:j] + [pidx]
+                        g_category1 = s_category1s[-max_size:j] + [category1]
+                        g_category2 = s_category2s[-max_size:j] + [category2]
+                        g_category3 = s_category3s[-max_size:j] + [category3]
+                        results.append((g_pidxs, g_category1, g_category2, g_category3))
 
         print(f">>> List user histories completed.")
-        print(f">>> Aggregated total {len(result):,} rows")
-        return result
+        print(f">>> Aggregated total {len(results):,} rows")
+        return results
 
     def list_skip_grams(self, window_size: int = 5, time_delta: int = 60 * 3):
         traces = Trace.list_traces(self.session)
@@ -1005,15 +1110,12 @@ class Volume:
 
 if __name__ == "__main__":
     migrator = Migrator(company_id="aboutpet", model="item2vec", version="v1")
-    migrator.migrate_traces(begin_date=datetime(2024, 8, 1))
-    migrator.migrate_items()
-    migrator.migrate_users()
-    migrator.migrate_categories()
-    migrator.migrate_skip_grams()
-    migrator.migrate_click2purchase_sequences(begin_date=datetime.now() - timedelta(days=7))
+    # migrator.migrate_traces(begin_date=datetime(2024, 8, 1))
+    # migrator.migrate_items()
+    # migrator.migrate_users()
+    # migrator.migrate_categories()
+    # migrator.migrate_skip_grams()
+    # migrator.migrate_click2purchase_sequences(begin_date=datetime.now() - timedelta(days=7))
     migrator.migrate_training_user_histories()
     migrator.migrate_test_user_histories()
     migrator.generate_edge_indices_csv()
-
-    volume = Volume(company_id="aboutpet", model="item2vec", version="v1")
-    volume.list_user_histories(condition="training")

@@ -9,10 +9,10 @@ from carca.modules import CarcaDataModule
 from item2vec.volume import Volume
 
 
-def load_onnx(onnx_path: str):
+def check_onnx(onnx_path: str):
     model = onnx.load(onnx_path)
     onnx.checker.check_model(model)
-    print("ONNX 모델 로드 및 검증 완료")
+    print("Completed loading onnx model & validation.")
     return model
 
 
@@ -38,14 +38,14 @@ def ndcg_at_k(sorted_pidxs, label_pidx, k=10):
 
 
 if __name__ == "__main__":
-    onnx_file_path = "/home/buzzni/item2vec/workspaces/aboutpet/carca/v1/aboutpet-carca-v1.onnx"
 
     volume_i = Volume(company_id="aboutpet", model="item2vec", version="v1")
+    volume_c = Volume(company_id="aboutpet", model="carca", version="v1")
 
     datamodule = CarcaDataModule(volume=volume_i, batch_size=64, num_workers=1)
 
-    model = load_onnx(onnx_file_path)
-    session = ort.InferenceSession(onnx_file_path)
+    check_onnx(volume_c.onnx_path)
+    session = ort.InferenceSession(volume_c.onnx_path)
 
     ndcg_scores = []
     val_loader = datamodule.val_dataloader()
@@ -54,7 +54,7 @@ if __name__ == "__main__":
         seq_pidxs, cat1_cidxs, cat2_cidxs, cat3_cidxs, src_key_padding_mask, src_mask, label_pidxs = batch
 
         label_pidxs = label_pidxs.unsqueeze(-1)
-        candidate_pidxs = torch.cat([torch.randint(0, 15000, (seq_pidxs.size(0), 1000)), label_pidxs], dim=-1)
+        candidate_pidxs = torch.cat([torch.randint(0, 15000, (seq_pidxs.size(0), 100)), label_pidxs], dim=-1)
 
         input_example = {
             "seq_pidxs": seq_pidxs.numpy(),

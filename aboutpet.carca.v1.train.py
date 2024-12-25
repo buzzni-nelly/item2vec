@@ -20,7 +20,7 @@ def main():
     carca_settings.print()
 
     logger = WandbLogger(project="aboutpet.carca")
-    logger.log_hyperparams(item2vec_settings.to_dict())
+    logger.log_hyperparams(carca_settings.to_dict())
 
     volume_i = Volume(company_id="aboutpet", model="item2vec", version="v1")
     volume_c = Volume(company_id="aboutpet", model="carca", version="v1")
