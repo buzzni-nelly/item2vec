@@ -35,5 +35,5 @@ def list_products(pdids: List[str], projection: Optional[Dict] = None, company_i
     collection = db[f"search-product-{company_id}"]
 
     projection = projection or DEFAULT_PROJECTION
-    items = collection.find({"_id": {"$in": pdids}}, projection)
+    items = collection.find({"_id": {"$in": pdids}, "class": {"$ne": "D"}}, projection)
     return list(items)
