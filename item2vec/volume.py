@@ -779,11 +779,11 @@ class Migrator:
 
         print(f"Migration completed: {len(user_histories)} rows inserted.")
 
-    def migrate_test_user_histories(self, offset_seconds: int = 2 * 60 * 60, chunk_size=100_000, max_size: int = 50):
+    def migrate_test_user_histories(self, offset_seconds: int = 6 * 60 * 60, chunk_size=100_000, max_size: int = 50):
         TestUserHistory.reset_table(self.session)
 
         histories = Trace.aggregate_user_histories(
-            self.session, condition="training", min_purchase_count=1, offset_seconds=offset_seconds
+            self.session, condition="test", min_purchase_count=1, offset_seconds=offset_seconds
         )
 
         pidxs_list = [list(map(int, x["pidxs"].split(","))) for x in histories]
