@@ -1,3 +1,5 @@
+import argparse
+
 import numpy as np
 import onnx
 import onnxruntime as ort
@@ -37,10 +39,9 @@ def ndcg_at_k(sorted_pidxs, label_pidx, k=10):
     return 0.0
 
 
-if __name__ == "__main__":
-
-    volume_i = Volume(company_id="aboutpet", model="item2vec", version="v1")
-    volume_c = Volume(company_id="aboutpet", model="carca", version="v1")
+def main(company_id: str, version: str):
+    volume_i = Volume(company_id=company_id, model="item2vec", version=version)
+    volume_c = Volume(company_id=company_id, model="carca", version=version)
 
     datamodule = CarcaDataModule(volume=volume_i, batch_size=64, num_workers=1)
 
@@ -79,3 +80,22 @@ if __name__ == "__main__":
 
     mean_ndcg = np.mean(ndcg_scores)
     print("Final Mean NDCG@10:", mean_ndcg)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Evaluate ONNX model with NDCG@10")
+    parser.add_argument(
+        "--company-id",
+        type=str,
+        required=True,
+        help="처리할 회사 ID를 입력하세요."
+    )
+    parser.add_argument(
+        "--version",
+        type=str,
+        required=True,
+        help="모델 버전을 입력하세요."
+    )
+    args = parser.parse_args()
+
+    main(args.company_id, args.version)

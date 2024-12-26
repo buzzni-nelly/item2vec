@@ -1,3 +1,4 @@
+import argparse
 import pathlib
 import re
 from datetime import datetime
@@ -12,11 +13,11 @@ from carca.modules import CARCA
 from item2vec.volume import Volume
 
 
-def export_onnx():
-    volume_i = Volume(company_id="aboutpet", model="item2vec", version="v1")
-    volume_c = Volume(company_id="aboutpet", model="carca", version="v1")
+def export_onnx(company_id: str, version: str):
+    volume_i = Volume(company_id=company_id, model="item2vec", version=version)
+    volume_c = Volume(company_id=company_id, model="carca", version=version)
 
-    carca_config_path = directories.config("aboutpet", "carca", "v1")
+    carca_config_path = directories.config(company_id, "carca", version)
     carca_settings = carca.configs.Settings.load(carca_config_path)
 
     checkpoint_path = volume_c.checkpoints_dirpath / "ndcg@10.max.ckpt"
@@ -92,9 +93,9 @@ def export_onnx():
     return volume_c.onnx_path
 
 
-def export_sqlite3():
-    volume_i = Volume(company_id="aboutpet", model="item2vec", version="v1")
-    volume_c = Volume(company_id="aboutpet", model="carca", version="v1")
+def export_sqlite3(company_id: str, version: str):
+    volume_i = Volume(company_id=company_id, model="item2vec", version=version)
+    volume_c = Volume(company_id=company_id, model="carca", version=version)
 
     tools.migrate_tables(
         old_sqlite3_path=volume_i.sqlite3_path,
@@ -104,8 +105,8 @@ def export_sqlite3():
     return volume_c.sqlite3_path
 
 
-def compress():
-    volume_c = Volume(company_id="aboutpet", model="carca", version="v1")
+def compress(company_id: str, version: str):
+    volume_c = Volume(company_id=company_id, model="carca", version=version)
     filename = datetime.now().strftime("%Y%m%d%H%M%S")
     tools.compress(
         file_paths=[volume_c.onnx_path, volume_c.sqlite3_path],
@@ -114,22 +115,22 @@ def compress():
     return volume_c.workspace_path.joinpath(f"{filename}.tar.gz")
 
 
-def upload_s3(filepath: pathlib.Path = None):
+def upload_s3(filepath: pathlib.Path, company_id: str, version: str):
     z3.put_object(
         bucket_name="ailab-recommenders",
-        object_key=f"aboutpet/carca/v1/{filepath.name}",
+        object_key=f"{company_id}/carca/{version}/{filepath.name}",
         local_path=filepath,
     )
 
 
-def clear_s3_retaining_k(k: int = 20):
+def clear_s3_retaining_k(company_id: str, version: str, k: int = 20):
     keys = z3.list_object_keys(
         bucket_name="ailab-recommenders",
-        prefix="aboutpet/carca/v1/",
+        prefix=f"{company_id}/carca/{version}/",
     )
     print("Original keys:", keys)
 
-    pattern = r"^aboutpet/carca/v1/\d{14}\.tar\.gz$"
+    pattern = fr"^{company_id}/carca/{version}/\d+\.tar\.gz$"
     filtered_keys = [key for key in keys if re.match(pattern, key)]
     filtered_keys.sort(key=lambda x: int(x.split("/")[-1].split(".")[0]), reverse=True)
     retained_keys = filtered_keys[:k]
@@ -158,11 +159,29 @@ def redeploy():
 
 
 def main():
-    export_onnx()
-    export_sqlite3()
-    tarfile_path = compress()
-    upload_s3(tarfile_path)
-    clear_s3_retaining_k(k=20)
+    parser = argparse.ArgumentParser(description="Volume 작업을 실행합니다.")
+    parser.add_argument(
+        "--company-id",
+        type=str,
+        required=True,
+        help="회사 ID를 입력하세요."
+    )
+    parser.add_argument(
+        "--version",
+        type=str,
+        required=True,
+        help="버전 정보를 입력하세요."
+    )
+    args = parser.parse_args()
+
+    company_id = args.company_id
+    version = args.version
+
+    _ = export_onnx(company_id, version)
+    __ = export_sqlite3(company_id, version)
+    tarfile_path = compress(company_id, version)
+    upload_s3(tarfile_path, company_id, version)
+    clear_s3_retaining_k(company_id, version, k=20)
     redeploy()
 
 

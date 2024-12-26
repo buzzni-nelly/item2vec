@@ -1,3 +1,5 @@
+import argparse
+
 import torch
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
@@ -12,18 +14,18 @@ from item2vec.modules import GraphBPRItem2Vec
 from item2vec.volume import Volume
 
 
-def main():
-    item2vec_config_path = directories.config("aboutpet", "item2vec", "v1")
-    carca_config_path = directories.config("aboutpet", "carca", "v1")
+def main(company_id: str, version: str):
+    item2vec_config_path = directories.config(company_id, "item2vec", version)
+    carca_config_path = directories.config(company_id, "carca", version)
     item2vec_settings = Item2vecSettings.load(item2vec_config_path)
     carca_settings = CarcaSettings.load(carca_config_path)
     carca_settings.print()
 
-    logger = WandbLogger(project="aboutpet.carca")
+    logger = WandbLogger(project=f"{company_id}.carca")
     logger.log_hyperparams(carca_settings.to_dict())
 
-    volume_i = Volume(company_id="aboutpet", model="item2vec", version="v1")
-    volume_c = Volume(company_id="aboutpet", model="carca", version="v1")
+    volume_i = Volume(company_id=company_id, model="item2vec", version=version)
+    volume_c = Volume(company_id=company_id, model="carca", version=version)
 
     purchase_edge_index_path = volume_i.workspace_path.joinpath("edge.purchase.indices.csv")
     item2vec_module = GraphBPRItem2Vec.load_from_checkpoint(
@@ -93,4 +95,20 @@ def main():
 
 if __name__ == "__main__":
     torch.manual_seed(42)
-    main()
+
+    parser = argparse.ArgumentParser(description="Volume 작업을 실행합니다.")
+    parser.add_argument(
+        "--company-id",
+        type=str,
+        required=True,
+        help="회사 ID를 입력하세요."
+    )
+    parser.add_argument(
+        "--version",
+        type=str,
+        required=True,
+        help="버전 정보를 입력하세요."
+    )
+    args = parser.parse_args()
+
+    main(company_id=args.company_id, version=args.version)

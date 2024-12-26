@@ -1,20 +1,20 @@
 while true; do
-    python aboutpet.item2vec.v1.prep.py
+    python exec.item2vec.prep.py --company-id aboutpet --version v1
     sleep 3
     python aboutpet.popular.export.py
     sleep 3
-    python aboutpet.item2vec.v1.delete.py
+    python exec.item2vec.delete.py --company-id aboutpet --version v1
     sleep 3
-    python aboutpet.item2vec.v1.train.py
+    python exec.item2vec.train.py --company-id aboutpet --version v1
     sleep 3
-    python aboutpet.item2vec.v1.export.py
+    python exec.item2vec.export.py --company-id aboutpet --version v1
     sleep 3
-    python aboutpet.carca.v1.delete.py
+    python exec.carca.delete.py --company-id aboutpet --version v1
     sleep 3
-    python aboutpet.carca.v1.train.py
+    python exec.carca.train.py --company-id aboutpet --version v1
     sleep 3
-    python aboutpet.carca.v1.export.py
+    python exec.carca.export.py --company-id aboutpet --version v1
     sleep 3
-    python aboutpet.onnx.validation.py
+    python exec.carca.onnx.validation.py --company-id aboutpet --version v1
     sleep 3
 done

@@ -1,3 +1,4 @@
+import argparse
 import collections
 import json
 
@@ -11,16 +12,8 @@ from item2vec.configs import Settings
 from item2vec.modules import GraphBPRItem2Vec
 from item2vec.volume import Volume
 
+
 RELEASE = "i2i"
-
-COMPANY_ID = "aboutpet"
-
-MODEL_NAME = "item2vec"
-
-VERSION = "v1"
-
-config_path = directories.config(COMPANY_ID, MODEL_NAME, VERSION)
-settings = Settings.load(config_path)
 
 
 def debug(
@@ -71,10 +64,10 @@ def load_embeddings(volume: Volume, embed_dim: int = 256, num_layers: int = 2):
     return embeddings
 
 
-def upload(aggregated_scores: dict):
+def upload(aggregated_scores: dict, company_id: str, model: str, version: str):
     pipeline = clients.redis.aiaas_6.pipeline()
     for pdid, scores in aggregated_scores.items():
-        key = f"{RELEASE}:{COMPANY_ID}:{MODEL_NAME}:{VERSION}:{pdid}"
+        key = f"{RELEASE}:{company_id}:{model}:{version}:{pdid}"
         pipeline.set(key, json.dumps(scores))
         pipeline.expire(key, 30 * 24 * 60 * 60)
     pipeline.execute()
@@ -82,8 +75,11 @@ def upload(aggregated_scores: dict):
 
 
 @retry(tries=3)
-def main(embed_dim=128, k: int = 100, batch_size: int = 1000):
-    volume = Volume(company_id="aboutpet", model="item2vec", version="v1")
+def main(company_id: str, version: str, embed_dim=128, k: int = 100, batch_size: int = 1000):
+    model = "item2vec"
+    config_path = directories.config(company_id, model, version)
+    settings = Settings.load(config_path)
+    volume = Volume(company_id=company_id, model=model, version=version)
 
     embeddings = load_embeddings(volume, embed_dim=embed_dim, num_layers=settings.num_layers)
     items = volume.items(by="pidx")
@@ -138,8 +134,23 @@ def main(embed_dim=128, k: int = 100, batch_size: int = 1000):
 
             aggregated_scores[current_pdid] = aggregated_scores[current_pdid][:k]
 
-    upload(aggregated_scores)
+    upload(aggregated_scores, company_id, model, version)
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="Recommendation 시스템 실행")
+    parser.add_argument(
+        "--company-id",
+        type=str,
+        required=True,
+        help="처리할 회사 ID를 입력하세요."
+    )
+    parser.add_argument(
+        "--version",
+        type=str,
+        required=True,
+        help="모델 버전을 입력하세요."
+    )
+    args = parser.parse_args()
+
+    main(args.company_id, args.version)

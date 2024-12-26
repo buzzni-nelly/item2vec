@@ -1,3 +1,4 @@
+import argparse
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from pytorch_lightning.loggers import WandbLogger
@@ -9,15 +10,16 @@ from item2vec.modules import GraphBPRItem2Vec
 from item2vec.volume import Volume
 
 
-def main():
-    config_path = directories.config("aboutpet", "item2vec", "v1")
+def main(company_id: str, version: str):
+    model = "item2vec"
+    config_path = directories.config(company_id, model, version)
     item2vec_settings = Item2vecSettings.load(config_path)
     item2vec_settings.print()
 
-    logger = WandbLogger(project="aboutpet.item2vec")
+    logger = WandbLogger(project=f"{company_id}.{model}")
     logger.log_hyperparams(item2vec_settings.to_dict())
 
-    volume = Volume(company_id="aboutpet", model="item2vec", version="v1")
+    volume = Volume(company_id=company_id, model=model, version=version)
 
     data_module = SkipGramBPRDataModule(
         volume=volume,
@@ -63,4 +65,19 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="PyTorch Lightning Trainer 실행")
+    parser.add_argument(
+        "--company-id",
+        type=str,
+        required=True,
+        help="처리할 회사 ID를 입력하세요."
+    )
+    parser.add_argument(
+        "--version",
+        type=str,
+        required=True,
+        help="모델 버전을 입력하세요."
+    )
+    args = parser.parse_args()
+
+    main(args.company_id, args.version)

@@ -53,5 +53,3 @@ class Settings(BaseSettings):
     def to_dict(self):
         return self.model_dump()
 
-
-settings = Settings()
