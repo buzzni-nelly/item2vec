@@ -5,7 +5,9 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
 
-    version: str = "v1"
+    company_id: str
+    model: str
+    version: str
 
     embed_dim: int = 128
     num_heads: int = 1

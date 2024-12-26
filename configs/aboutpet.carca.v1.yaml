@@ -1,3 +1,5 @@
+company_id: aboutpet
+model: carca
 version: v1
 
 embed_dim: 128

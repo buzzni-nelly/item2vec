@@ -6,7 +6,9 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
 
-    version: str = "v1"
+    company_id: str
+    model: str
+    version: str
 
     # dataset
     skipgram_window_size: int = 5
