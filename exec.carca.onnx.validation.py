@@ -55,7 +55,7 @@ def main(company_id: str, version: str):
         seq_pidxs, cat1_cidxs, cat2_cidxs, cat3_cidxs, src_key_padding_mask, src_mask, label_pidxs = batch
 
         label_pidxs = label_pidxs.unsqueeze(-1)
-        candidate_pidxs = torch.cat([torch.randint(0, 15000, (seq_pidxs.size(0), 100)), label_pidxs], dim=-1)
+        candidate_pidxs = torch.cat([torch.randint(0, volume_i.vocab_size(), (seq_pidxs.size(0), 1000)), label_pidxs], dim=-1)
 
         input_example = {
             "seq_pidxs": seq_pidxs.numpy(),
