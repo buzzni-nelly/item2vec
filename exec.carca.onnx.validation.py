@@ -3,6 +3,7 @@ import argparse
 import numpy as np
 import onnx
 import onnxruntime as ort
+import requests
 import torch
 import math
 from tqdm import tqdm
@@ -37,6 +38,43 @@ def ndcg_at_k(sorted_pidxs, label_pidx, k=10):
     if rank < k:
         return 1 / math.log2(rank + 2)
     return 0.0
+
+
+def send_performance_metric(
+    company_id: str,
+    model_type: str,
+    model_version: str,
+    metric_function: str,
+    metric_value: float
+):
+    """
+    Sends a POST request to the performance metric endpoint.
+
+    Args:
+        company_id (str): Company ID.
+        model_type (str): Model type.
+        model_version (str): Model version.
+        metric_function (str): Metric function name.
+        metric_value (float): Metric value.
+
+    Returns:
+        Response: The HTTP response from the server.
+    """
+    url = "http://aiaas.isolated.buzzni.com/metric-collector/performance_metric"
+    headers = {
+        "accept": "text/plain",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "company_id": company_id,
+        "model_type": model_type,
+        "model_version": model_version,
+        "metric_function": metric_function,
+        "metric_value": metric_value
+    }
+
+    response = requests.post(url, headers=headers, json=payload)
+    return response
 
 
 def main(company_id: str, version: str):
@@ -79,7 +117,15 @@ def main(company_id: str, version: str):
         tqdm_iterator.set_postfix({"ndcg@10": f"{current_mean_ndcg:.4f}"})
 
     mean_ndcg = np.mean(ndcg_scores)
-    print("Final Mean NDCG@10:", mean_ndcg)
+    print("Final Mean NDCG@10_{1000}:", mean_ndcg)
+
+    send_performance_metric(
+        company_id=company_id,
+        model_type="carca",
+        model_version=version,
+        metric_function="ndcg@10_{1000}",
+        metric_value=float(mean_ndcg),
+    )
 
 
 if __name__ == "__main__":
