@@ -286,6 +286,13 @@ class Trace(Base):
         session.commit()
 
     @staticmethod
+    def delete_traces_before(session: Session, timestamp: float) -> None:
+        session.query(Trace).filter(Trace.timestamp < timestamp).delete(
+            synchronize_session=False,
+        )
+        session.commit()
+
+    @staticmethod
     def aggregate_items(session: Session):
         return (
             session.query(
@@ -504,6 +511,9 @@ class Migrator:
 
     def migrate_traces(self, begin_date: datetime):
         current_date = begin_date
+
+        # 시작 이전의 데이터는 모두 삭제
+        Trace.delete_traces_before(self.session, begin_date.timestamp())
 
         while current_date <= datetime.now(tz=timezone.utc).replace():
             start_criteria, end_criteria = get_start_and_end_timestamps(current_date)
