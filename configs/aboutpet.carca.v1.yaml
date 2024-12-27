@@ -20,7 +20,7 @@ encoder_residual_strategy_2: none
 decoder_residual_strategy_1: none
 decoder_residual_strategy_2: none
 
-trainer_max_epochs: 100
+trainer_max_epochs: 30
 trainer_limit_val_batches: 1.0
 trainer_limit_train_batches: 1.0
 trainer_limit_test_batches: 1.0

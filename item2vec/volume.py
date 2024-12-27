@@ -694,8 +694,8 @@ class Migrator:
 
     def migrate_training_user_histories(
         self,
-        offset_seconds: int = 2 * 60 * 60,
-        chunk_size=100_000,
+        offset_seconds: int = 1 * 24 * 60 * 60,
+        chunk_size: int = 100_000,
         max_size: int = 50,
         condition: Literal["full", "training"] = "training",
     ):
@@ -777,13 +777,13 @@ class Migrator:
             self.session.execute(insert_query, rows)
             self.session.commit()
 
-        print(f"Migration completed: {len(user_histories)} rows inserted.")
+        print(f"Migrating train data completed: {len(user_histories)} rows inserted.")
 
-    def migrate_test_user_histories(self, offset_seconds: int = 6 * 60 * 60, chunk_size=100_000, max_size: int = 50):
+    def migrate_test_user_histories(self, offset_seconds: int = 1 * 24 * 60 * 60, chunk_size=100_000, max_size: int = 50):
         TestUserHistory.reset_table(self.session)
 
         histories = Trace.aggregate_user_histories(
-            self.session, condition="test", min_purchase_count=1, offset_seconds=offset_seconds
+            self.session, condition="test", min_purchase_count=0, offset_seconds=offset_seconds
         )
 
         pidxs_list = [list(map(int, x["pidxs"].split(","))) for x in histories]
@@ -799,22 +799,7 @@ class Migrator:
         zipped = zip(pidxs_list, category1s_list, category2s_list, category3s_list, events_list, timestamps_list)
         iteration = tqdm(zipped, total=len(pidxs_list), desc=f"Partitioning user histories into 50-sequence windows")
         for pidxs, category1s, category2s, category3s, events, timestamps in iteration:
-
-            assert len(pidxs) == len(category1s) == len(category2s) == len(category3s) == len(events) == len(timestamps)
-
-            for i in range(2, len(pidxs)):
-
-                assert timestamps[-2] < timestamps[-1]
-
-                s = max(0, i - max_size)
-                s_pidxs = pidxs[s:i]
-                s_category1s = category1s[s:i]
-                s_category2s = category2s[s:i]
-                s_category3s = category3s[s:i]
-                s_events = events[s:i]
-
-                if s_events[-1] == "purchase":
-                    user_histories.append((s_pidxs, s_category1s, s_category2s, s_category3s))
+            user_histories.append((pidxs[-50:], category1s[-50:], category2s[-50:], category3s[-50:]))
 
         rows = []
         insert_query = text(
@@ -844,7 +829,7 @@ class Migrator:
             self.session.execute(insert_query, rows)
             self.session.commit()
 
-        print(f"Migration completed: {len(user_histories)} rows inserted.")
+        print(f"Migrating test data completed: {len(user_histories)} rows inserted.")
 
     def list_user_histories(
         self,
@@ -1122,6 +1107,6 @@ if __name__ == "__main__":
     # migrator.migrate_categories()
     # migrator.migrate_skip_grams()
     # migrator.migrate_click2purchase_sequences(begin_date=datetime.now() - timedelta(days=7))
-    migrator.migrate_training_user_histories(condition="training")
-    migrator.migrate_test_user_histories()
+    migrator.migrate_training_user_histories(condition="full", offset_seconds=6 * 60 * 60)
+    migrator.migrate_test_user_histories(offset_seconds=1 * 24 * 60 * 60)
     migrator.generate_edge_indices_csv()
