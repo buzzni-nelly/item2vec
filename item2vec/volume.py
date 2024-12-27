@@ -3,7 +3,7 @@ from __future__ import annotations
 import collections
 import enum
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Literal, Type
 
@@ -24,11 +24,11 @@ Base = sqlalchemy.orm.declarative_base()
 
 def get_start_and_end_timestamps(target_date: datetime):
     # 날짜의 시작 시간 (00:00:00)
-    start_of_day = datetime(target_date.year, target_date.month, target_date.day, 0, 0, 0)
+    start_of_day = datetime(target_date.year, target_date.month, target_date.day, 0, 0, 0, tzinfo=timezone.utc)
     start_timestamp = start_of_day.timestamp()
 
     # 날짜의 종료 시간 (23:59:59.999999)
-    end_of_day = datetime(target_date.year, target_date.month, target_date.day, 23, 59, 59, 999999)
+    end_of_day = datetime(target_date.year, target_date.month, target_date.day, 23, 59, 59, 999999, tzinfo=timezone.utc)
     end_timestamp = end_of_day.timestamp()
 
     return start_timestamp, end_timestamp
@@ -505,7 +505,7 @@ class Migrator:
     def migrate_traces(self, begin_date: datetime):
         current_date = begin_date
 
-        while current_date <= datetime.now():
+        while current_date <= datetime.now(tz=timezone.utc).replace():
             start_criteria, end_criteria = get_start_and_end_timestamps(current_date)
 
             print(f"Validating {current_date.strftime('%Y-%m-%d')}")
@@ -1101,12 +1101,12 @@ class Volume:
 
 if __name__ == "__main__":
     migrator = Migrator(company_id="aboutpet", model="item2vec", version="v1")
-    # migrator.migrate_traces(begin_date=datetime(2024, 8, 1))
-    # migrator.migrate_items()
-    # migrator.migrate_users()
-    # migrator.migrate_categories()
-    # migrator.migrate_skip_grams()
-    # migrator.migrate_click2purchase_sequences(begin_date=datetime.now() - timedelta(days=7))
+    migrator.migrate_traces(begin_date=datetime(2024, 8, 1, tzinfo=timezone.utc))
+    migrator.migrate_items()
+    migrator.migrate_users()
+    migrator.migrate_categories()
+    migrator.migrate_skip_grams()
+    migrator.migrate_click2purchase_sequences(begin_date=datetime.now() - timedelta(days=7))
     migrator.migrate_training_user_histories(condition="full", offset_seconds=6 * 60 * 60)
     migrator.migrate_test_user_histories(offset_seconds=1 * 24 * 60 * 60)
     migrator.generate_edge_indices_csv()

@@ -3,6 +3,7 @@ import pathlib
 import re
 from datetime import datetime
 
+import pytz
 import torch
 import z3
 
@@ -107,7 +108,7 @@ def export_sqlite3(company_id: str, version: str):
 
 def compress(company_id: str, version: str):
     volume_c = Volume(company_id=company_id, model="carca", version=version)
-    filename = datetime.now().strftime("%Y%m%d%H%M%S")
+    filename = datetime.now(tz=pytz.timezone("Asia/Seoul")).strftime("%Y%m%d%H%M%S")
     tools.compress(
         file_paths=[volume_c.onnx_path, volume_c.sqlite3_path],
         tar_gz_path=volume_c.workspace_path.joinpath(f"{filename}.tar.gz"),

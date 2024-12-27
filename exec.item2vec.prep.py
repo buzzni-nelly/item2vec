@@ -1,5 +1,5 @@
 import argparse
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from item2vec.volume import Migrator
 
@@ -7,12 +7,12 @@ from item2vec.volume import Migrator
 def main(company_id: str, version: str):
     model = "item2vec"
     migrator = Migrator(company_id=company_id, model=model, version=version)
-    migrator.migrate_traces(begin_date=datetime(2024, 8, 1))
+    migrator.migrate_traces(begin_date=datetime(2024, 8, 1, tzinfo=timezone.utc))
     migrator.migrate_items()
     migrator.migrate_users()
     migrator.migrate_categories()
     migrator.migrate_skip_grams()
-    migrator.migrate_click2purchase_sequences(begin_date=datetime.now() - timedelta(days=7))
+    migrator.migrate_click2purchase_sequences(begin_date=datetime.now(tz=timezone.utc) - timedelta(days=7))
     migrator.migrate_training_user_histories(offset_seconds=1 * 60 * 60, condition="full")
     migrator.migrate_test_user_histories(offset_seconds=48 * 60 * 60)
     migrator.generate_edge_indices_csv()
