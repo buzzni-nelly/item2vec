@@ -146,14 +146,14 @@ def clear_s3_retaining_k(company_id: str, version: str, k: int = 20):
     return retained_keys
 
 
-def redeploy():
+def redeploy(company_id: str):
     tools.redeploy(
-        deployment="aiaas-aboutpet-carca-v1-inference-deployment",
+        deployment=f"aiaas-{company_id}-carca-v1-inference-deployment",
         namespace="aiaas-inference-dev",
         context="service-eks",
     )
     tools.redeploy(
-        deployment="aiaas-aboutpet-carca-v1-inference-deployment",
+        deployment=f"aiaas-{company_id}-carca-v1-inference-deployment",
         namespace="aiaas-inference-prod",
         context="service-eks",
     )
@@ -183,7 +183,7 @@ def main():
     tarfile_path = compress(company_id, version)
     upload_s3(tarfile_path, company_id, version)
     clear_s3_retaining_k(company_id, version, k=20)
-    redeploy()
+    redeploy(company_id)
 
 
 if __name__ == "__main__":
