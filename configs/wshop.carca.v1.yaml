@@ -1,12 +1,12 @@
-company_id: gsshop
+company_id: wshop
 model: carca
 version: v1
 
 embed_dim: 128
-num_heads: 2
-num_layers: 4
+num_heads: 4
+num_layers: 1
 max_len: 50
-dropout: 0.1
+dropout: 0
 
 lr: 0.0001
 weight_decay: 0.01
@@ -20,7 +20,7 @@ encoder_residual_strategy_2: none
 decoder_residual_strategy_1: none
 decoder_residual_strategy_2: none
 
-trainer_max_epochs: 100
+trainer_max_epochs: 30
 trainer_limit_val_batches: 1.0
 trainer_limit_train_batches: 1.0
 trainer_limit_test_batches: 1.0

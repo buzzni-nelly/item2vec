@@ -28,7 +28,6 @@ trainer_strategy: "auto"  # deepspeed_stage_1
 trainer_precision: "16-mixed"
 trainer_profiler: "simple"
 
-#checkpoint_dirpath: "/tmp/aboutpet/carca/v1/checkpoints"
 checkpoint_monitor: "val_ndcg@10"
 checkpoint_filename: "ndcg@10.max"
 checkpoint_mode: "max"
