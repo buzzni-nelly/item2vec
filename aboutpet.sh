@@ -1,5 +1,5 @@
 while true; do
-    python exec.item2vec.prep.py --company-id aboutpet --version v1
+    python exec.item2vec.prep.py --company-id aboutpet --version v1 --trace-begin-date 20240801
     sleep 3
     python aboutpet.popular.export.py
     sleep 3
@@ -7,7 +7,7 @@ while true; do
     sleep 3
     python exec.item2vec.train.py --company-id aboutpet --version v1
     sleep 3
-    python exec.item2vec.export.py --company-id aboutpet --version v1
+    python aboutpet.item2vec.export.py --company-id aboutpet --version v1
     sleep 3
     python exec.carca.delete.py --company-id aboutpet --version v1
     sleep 3
