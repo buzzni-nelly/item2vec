@@ -980,6 +980,9 @@ class Volume:
         else:
             return {x.pidx: x.to_dict() for x in Item.list_items(self.session)}
 
+    def list_all_items(self) -> list[Item]:
+        return Item.list_items(self.session)
+
     def pidx2pdid(self, pidx: int) -> str | None:
         item = Item.get_item_by_pidx(self.session, pidx)
         return item.pdid if item else None

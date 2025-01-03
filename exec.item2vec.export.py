@@ -84,55 +84,43 @@ def main(company_id: str, version: str, embed_dim=128, k: int = 100, batch_size:
     embeddings = load_embeddings(volume, embed_dim=embed_dim, num_layers=settings.num_layers)
     items = volume.items(by="pidx")
 
+    pidx2pdid = {x.pidx: x.pdid for x in volume.list_all_items()}
+
     unknown_pidxs = [x["pidx"] for x in items.values() if x["name"] == "UNKNOWN"]
     embeddings[unknown_pidxs] = torch.zeros(embed_dim, device=embeddings.device)
 
     aggregated_scores = collections.defaultdict(list)
     desc = "추천 점수를 계산 및 Redis 할당 중입니다.."
     num_items = embeddings.shape[0]
+
     for batch_start in tqdm(range(0, num_items, batch_size), desc=desc):
         batch_end = min(batch_start + batch_size, num_items)
         batch_pidxs = list(range(batch_start, batch_end))
+
         batch_pidxs = [pidx for pidx in batch_pidxs if pidx not in unknown_pidxs]
         if not batch_pidxs:
             continue
 
-        batch_items = [items.get(pidx) for pidx in batch_pidxs]
-        batch_categories_1 = [x["category1"] if x else None for x in batch_items]
-
         similarities = torch.mm(embeddings[batch_pidxs], embeddings.T)
 
-        # Process each item in the batch
-        for pidx_in_batch, current_pidx in enumerate(batch_pidxs):
-            current_pdid = volume.pidx2pdid(current_pidx)
-            current_item = batch_items[pidx_in_batch]
-            current_category_1 = batch_categories_1[pidx_in_batch]
+        row_indices = torch.arange(len(batch_pidxs), device=similarities.device)
+        col_indices = torch.tensor(batch_pidxs, device=similarities.device)
+        similarities[row_indices, col_indices] = float("-inf")
 
-            if not current_item:
-                continue
+        top_k_scores, top_k_indices = torch.topk(similarities, k, dim=1)
+        top_k_scores = top_k_scores.cpu()
+        top_k_indices = top_k_indices.cpu()
 
-            sims = similarities[pidx_in_batch]
-            top_k_scores, top_k_pidxs = torch.topk(sims, k * 100)
-            top_k_pidxs, top_k_scores = top_k_pidxs.cpu(), top_k_scores.cpu()
-
-            top_k_pidxs, top_k_scores = top_k_pidxs.tolist(), top_k_scores.tolist()
-            assert len(top_k_pidxs) == len(top_k_scores)
-            for pidx, score in zip(top_k_pidxs, top_k_scores):
-                pdid = volume.pidx2pdid(pidx)
-                item = items.get(pidx)
-                if pidx == current_pidx:
-                    continue
-                if not item:
-                    continue
-                if current_category_1 != item["category1"]:
-                    continue
-
-                value = {"pdid": pdid, "score": f"{score:.4}"}
-                aggregated_scores[current_pdid].append(value)
-                if len(aggregated_scores[current_pdid]) >= k:
-                    break
-
-            aggregated_scores[current_pdid] = aggregated_scores[current_pdid][:k]
+        for i, current_pidx in enumerate(batch_pidxs):
+            current_pdid = pidx2pdid[current_pidx]
+            neighbors = [
+                {
+                    "pdid": pidx2pdid[top_k_indices[i][j].item()],
+                    "score": f"{top_k_scores[i][j].item():.4}"
+                }
+                for j in range(k)
+            ]
+            aggregated_scores[current_pdid] = neighbors
 
     upload(aggregated_scores, company_id, model, version)
 
